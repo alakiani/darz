@@ -15,8 +15,12 @@ The infrastructure node whose public IP a Device's traffic leaves from. Exits ar
 _Avoid_: Egress, VPN server, endpoint
 
 **Node**:
-Any infrastructure server DARZ manages. Bridge and Exit are capabilities a Node has, not kinds of machine: one Node may be both.
-_Avoid_: Server, relay, box
+Any infrastructure server DARZ manages: an Ubuntu machine with SSH access and one public IPv4. A Node holds one or more Roles and any number of Tags.
+_Avoid_: Server, relay, box, VM
+
+**Role**:
+What a Node does: Bridge or Exit. Roles are capabilities, not kinds of machine, so one Node may hold both.
+_Avoid_: Type, kind, mode
 
 **Tag**:
 A label on a Node, such as `country:IR`, that a Rule matches against. A Node carrying the Tags a Rule names may act as the Exit for that Rule's traffic.

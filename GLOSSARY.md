@@ -23,7 +23,7 @@ What a Node does: Bridge or Exit. Roles are capabilities, not kinds of machine, 
 _Avoid_: Type, kind, mode
 
 **Tag**:
-A label on a Node, such as `country:IR`, that a Rule matches against. A Node carrying the Tags a Rule names may act as the Exit for that Rule's traffic.
+A label on a Node, such as `IR`, that a Rule matches against. A Tag names the traffic a Node may carry as an Exit: a Node tagged `IR` may be the Exit for traffic to Iran.
 _Avoid_: Label, attribute, group
 
 **Link**:
@@ -44,8 +44,12 @@ _Avoid_: Daemon, node service, client
 
 ### Policy
 
+**Destination Set**:
+A named set of destination CIDRs, such as the Iranian address space, that a Rule routes as one. It may be fed automatically and adjusted by an Admin.
+_Avoid_: Zone, prefix list, geo list, CIDR list
+
 **Rule**:
-An admin-defined mapping from a set of destination CIDRs to the Tags an Exit must carry. Rules are evaluated on the Bridge, never on the Device.
+An admin-defined mapping from a Destination Set to the Tags an Exit must carry. Rules are evaluated on the Bridge, never on the Device.
 _Avoid_: Policy, route, filter
 
 ### Identity

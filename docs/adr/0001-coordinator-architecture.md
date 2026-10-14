@@ -15,7 +15,7 @@ The Coordinator is a single Go binary with its web assets embedded and SQLite as
 **Data minimisation** (this is the condition for domestic hosting):
 - User: a display handle and credentials only. No email, phone, or real name. An Admin delivers Invites out of band, for example on Telegram.
 - Device: public key, name, and owning User. Private keys are never stored.
-- Metering: bytes per Device per Exit per hour, kept for 90 days and then folded into monthly totals. Never destinations, DNS, or flow logs. A future accounting system is fed by exporting these rollups.
+- Metering: bytes per Device per Exit per hour, kept for 90 days and then folded into monthly totals. Never destinations, DNS, or flow logs. A future accounting system is fed by exporting these rollups. *(Retention superseded by [ADR 0003](0003-identity-devices-metering.md): hourly for 7 days, daily for 90 days, then monthly.)*
 - Device source IPs are never persisted. They exist only in a Bridge's live WireGuard state.
 
 **Backups.** A nightly SQLite `.backup`, encrypted with `age` to a key held only on the operator's laptop and pushed to object storage abroad. A seized host cannot read its own backups. Losing up to a day of metering is accepted.

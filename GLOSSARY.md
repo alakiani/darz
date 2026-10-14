@@ -65,3 +65,7 @@ _Avoid_: Role, superuser, operator
 **Invite**:
 A single-use link through which a person becomes a User.
 _Avoid_: Signup link, registration token, voucher
+
+**Suspended**:
+The state of a User whose Devices are cut off but not revoked, so resuming the User restores them without new configs.
+_Avoid_: Disabled, banned, frozen

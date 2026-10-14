@@ -34,6 +34,10 @@ _Avoid_: Tunnel, connection, peering
 An ordered chain of Links from a Bridge to an Exit that a Device's traffic follows. A Path may pass through more than one Bridge.
 _Avoid_: Route, circuit, chain
 
+**Endpoint Slot**:
+A stable hostname carried in Devices' configs that the Coordinator points at a healthy Bridge. Every Device has one config per Endpoint Slot.
+_Avoid_: Server, entry, gateway, endpoint
+
 **Coordinator**:
 The central service that Users, Devices, and Nodes all coordinate with. It holds identity, topology, policy, and metering, and never touches a packet on the data path.
 _Avoid_: Control plane, control node, orchestrator, server
@@ -59,7 +63,7 @@ A person with a DARZ account. A User owns one or more Devices.
 _Avoid_: Account, client, member
 
 **Device**:
-One WireGuard keypair and its config, issued to exactly one User. A User with three configs has three Devices, even on one phone. Identity and usage are tracked per Device.
+One WireGuard keypair and the configs that carry it, one per Endpoint Slot, issued to exactly one User. A User with three keypairs has three Devices, even on one phone. Identity and usage are tracked per Device.
 _Avoid_: Peer, client, profile, machine
 
 **Admin**:

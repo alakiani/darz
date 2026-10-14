@@ -57,3 +57,11 @@ _Avoid_: Account, client, member
 **Device**:
 One WireGuard keypair and its config, issued to exactly one User. A User with three configs has three Devices, even on one phone. Identity and usage are tracked per Device.
 _Avoid_: Peer, client, profile, machine
+
+**Admin**:
+A User permitted to manage Users, Invites, Nodes, Links, and Rules. Being an Admin is a permission on a User, not a Role.
+_Avoid_: Role, superuser, operator
+
+**Invite**:
+A single-use link through which a person becomes a User.
+_Avoid_: Signup link, registration token, voucher

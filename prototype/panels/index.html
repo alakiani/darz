@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DARZ Panels Prototype</title>
+<!--
+  PROTOTYPE — throwaway. Answers: which screens and flows do the user panel and
+  admin panel need in phase one, and where is the minimal-admin line?
+  Plan: every screen clickable on fake in-memory data; three variants (?variant=A|B|C)
+  for the two open layouts: the User's home and the Admin's mesh overview.
+  Nothing here is wired to a backend. Double-click to open.
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#f6f7f9;--surface:#fff;--surface2:#f0f2f5;--text:#16181d;--muted:#5d6472;--line:#dfe3ea;
+  --accent:#2f5bd3;--accent-ink:#fff;--ok:#1f8a4c;--warn:#b7791f;--bad:#c53030;--mvp:#2f5bd3;--later:#8a8f98;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111318;--surface:#1a1d24;--surface2:#232731;--text:#e8eaef;--muted:#9aa1ad;--line:#2e333e;
+  --accent:#6d8ff0;--accent-ink:#0d1020;--ok:#4cc38a;--warn:#e2b04a;--bad:#f07070;--mvp:#6d8ff0;--later:#7a808b;}}
+:root[data-theme="dark"]{
+  --bg:#111318;--surface:#1a1d24;--surface2:#232731;--text:#e8eaef;--muted:#9aa1ad;--line:#2e333e;
+  --accent:#6d8ff0;--accent-ink:#0d1020;--ok:#4cc38a;--warn:#e2b04a;--bad:#f07070;--mvp:#6d8ff0;--later:#7a808b;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent);text-decoration:none}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button.link{border:none;background:none;color:var(--accent);padding:0}
+input,select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px;width:100%}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+pre{background:var(--surface2);padding:12px;border-radius:8px;overflow:auto;font-size:12.5px;white-space:pre-wrap;word-break:break-all}
+.topbar{display:flex;gap:12px;align-items:center;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.topbar .brand{font-weight:700;letter-spacing:.5px}
+.topbar .who{margin-left:auto;display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.proto-tag{font-size:11px;background:var(--warn);color:#000;border-radius:4px;padding:1px 6px;font-weight:600}
+.user-wrap{max-width:480px;margin:0 auto;padding:16px}
+.admin-wrap{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 50px)}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:12px 8px}
+.side a{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:6px;color:var(--text)}
+.side a.on{background:var(--surface2);font-weight:600}
+.main{padding:20px 24px 90px;min-width:0}
+@media (max-width:760px){.admin-wrap{grid-template-columns:1fr}.side{display:flex;overflow-x:auto;border-right:none;border-bottom:1px solid var(--line)}.side a{white-space:nowrap}.main{padding:16px 16px 90px}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.muted{color:var(--muted)}.small{font-size:13px}
+h1{font-size:22px;margin:4px 0 14px}h2{font-size:17px;margin:0 0 10px}h3{font-size:15px;margin:0 0 6px}
+.pill{display:inline-block;font-size:12px;border-radius:999px;padding:1px 8px;border:1px solid var(--line);background:var(--surface2)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.bg-ok{background:var(--ok)}.bg-warn{background:var(--warn)}.bg-bad{background:var(--bad)}
+.badge{font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;color:#fff}
+.badge.mvp{background:var(--mvp)}.badge.later{background:var(--later)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.note{border-left:3px solid var(--warn);background:var(--surface2);padding:8px 12px;border-radius:0 8px 8px 0;font-size:13px;margin:10px 0}
+.qa{border-left-color:var(--accent)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.big{font-size:34px;font-weight:700;line-height:1.1}
+.bars{display:flex;align-items:flex-end;gap:2px;height:80px}
+.bars div{flex:1;background:var(--accent);opacity:.8;border-radius:2px 2px 0 0;min-height:1px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.modal{background:var(--surface);border-radius:12px;padding:18px;max-width:520px;width:100%;max-height:90vh;overflow:auto}
+#switcher{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#111;color:#fff;border-radius:999px;padding:6px 8px;display:flex;gap:8px;align-items:center;box-shadow:0 6px 24px rgba(0,0,0,.35);z-index:30;font-size:13px}
+#switcher button{background:#333;color:#fff;border:none;border-radius:999px;width:30px;height:30px;padding:0}
+#switcher .lbl{min-width:190px;text-align:center}
+.qrbox{background:#fff;padding:12px;border-radius:8px;display:inline-block}
+.stepper{display:flex;gap:6px;margin-bottom:12px}.stepper span{flex:1;height:4px;border-radius:2px;background:var(--line)}.stepper span.on{background:var(--accent)}
+svg text{fill:var(--text);font-size:12px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="switcher"></div>
+<script>
+// ---------- fake state (in memory only) ----------
+const S = {
+  me: 'sara',
+  users: [
+    {handle:'ala', admin:true, status:'active', cap:5, totp:true, cred:'passkey'},
+    {handle:'sara', admin:false, status:'active', cap:3, totp:false, cred:'passkey'},
+    {handle:'reza', admin:false, status:'suspended', cap:3, totp:false, cred:'password'},
+    {handle:'mina', admin:false, status:'active', cap:3, totp:false, cred:'password'},
+    {handle:'kian', admin:false, status:'active', cap:2, totp:false, cred:'passkey'},
+  ],
+  devices: [
+    {id:1, owner:'sara', name:'Pixel phone', addr:'10.77.0.12', state:'active', created:'2026-09-02', month:18.4, activeHour:true},
+    {id:2, owner:'sara', name:'Laptop', addr:'10.77.0.13', state:'active', created:'2026-09-02', month:41.0, activeHour:false},
+    {id:3, owner:'ala', name:'iPhone', addr:'10.77.0.2', state:'active', created:'2026-08-20', month:22.7, activeHour:true},
+    {id:4, owner:'reza', name:'Galaxy', addr:'10.77.0.20', state:'blocked', reason:'User suspended', created:'2026-09-10', month:3.1, activeHour:false},
+    {id:5, owner:'mina', name:'Phone', addr:'10.77.0.21', state:'active', created:'2026-09-12', month:9.9, activeHour:false},
+  ],
+  invites: [
+    {code:'k3Xa…', kind:'new', for:'—', cap:3, created:'2026-10-12', expires:'2026-10-19', state:'pending'},
+    {code:'p9Lm…', kind:'recovery', for:'mina', cap:'—', created:'2026-10-13', expires:'2026-10-20', state:'pending'},
+    {code:'a1Qz…', kind:'new', for:'kian', cap:2, created:'2026-10-01', expires:'2026-10-08', state:'used'},
+    {code:'z7Rt…', kind:'new', for:'—', cap:3, created:'2026-09-20', expires:'2026-09-27', state:'expired'},
+  ],
+  nodes: [
+    {name:'teh-1', roles:['Bridge','Exit'], tags:['IR','arvan'], ip:'185.x.x.11', seenIp:'185.x.x.11', where:'domestic', agent:'0.4.2', snap:182, contact:4, status:'ok'},
+    {name:'teh-2', roles:['Bridge'], tags:['sotoon'], ip:'2.x.x.40', seenIp:'2.x.x.40', where:'domestic', agent:'0.4.1', snap:182, contact:7, status:'warn'},
+    {name:'fra-1', roles:['Exit'], tags:['DE','gcore'], ip:'92.x.x.7', seenIp:'92.x.x.7', where:'abroad', agent:'0.4.2', snap:182, contact:3, status:'ok'},
+    {name:'ams-1', roles:['Bridge','Exit'], tags:['NL','aws'], ip:'3.x.x.90', seenIp:'10.0.4.17', where:'abroad', agent:'0.4.2', snap:181, contact:610, status:'bad'},
+  ],
+  links: [
+    {a:'teh-1', b:'fra-1', crosses:true, transport:'WG in VLESS+REALITY', standby:['AmneziaWG'], lat:92, loss:0.4, status:'ok'},
+    {a:'teh-1', b:'ams-1', crosses:true, transport:'AmneziaWG', standby:['WG in VLESS+REALITY','WG in WS+TLS (CDN)'], lat:88, loss:0.9, status:'ok'},
+    {a:'teh-2', b:'fra-1', crosses:true, transport:'WG in WS+TLS (CDN)', standby:[], lat:140, loss:6.2, status:'warn'},
+    {a:'teh-2', b:'ams-1', crosses:true, transport:'— (all failing)', standby:[], lat:null, loss:100, status:'bad'},
+    {a:'teh-1', b:'teh-2', crosses:false, transport:'WireGuard', standby:['GRE'], lat:4, loss:0, status:'ok'},
+    {a:'fra-1', b:'ams-1', crosses:false, transport:'WireGuard', standby:[], lat:9, loss:0, status:'ok'},
+  ],
+  rules: [
+    {prio:10, set:'IR', tags:'IR', fallback:'next', locked:false},
+    {prio:1000, set:'0.0.0.0/0 (default)', tags:'!IR', fallback:'drop', locked:true},
+  ],
+  sets: [{name:'IR', source:'MrAriaNet/Get-IP-Iran (IPv4)', cidrs:1972, addrs:'10.84 M', lastFetch:'today 02:10', lastChange:'3 days ago', gates:'pass', adds:[], removes:[], hash:'9f2c…e1'}],
+  tokens: [{name:'laptop-enroll', scope:'nodes:enroll', created:'2026-10-14', expires:'2027-01-12', lastUsed:'today'}],
+  coord: {backup:'today 03:00 (ok)', feed:'pass', version:'0.4.2'},
+};
+const variants = ['A','B','C'];
+const variantNames = {
+  home:{A:'Devices first',B:'Status first',C:'One big action'},
+  overview:{A:'Status board',B:'Topology map',C:'Attention feed'},
+};
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dot = st => `<span class="dot bg-${st}"></span>`;
+const mvp = (m, why) => `<span class="badge ${m?'mvp':'later'}" title="${esc(why||'')}">${m?'MVP':'LATER?'}</span>`;
+const q = () => new URLSearchParams(location.search);
+function variant(){ const v=q().get('variant'); return variants.includes(v)?v:'A'; }
+function setVariant(v){ const p=q(); p.set('variant',v); history.replaceState(null,'',location.pathname+'?'+p.toString()+location.hash); render(); }
+function route(){ return (location.hash||'#/home').slice(1); }
+function go(r){ location.hash = r; }
+function myDevices(){ return S.devices.filter(d=>d.owner===S.me && d.state!=='revoked'); }
+function meUser(){ return S.users.find(u=>u.handle===S.me); }
+function bars(n, seed, max){ let out=''; for(let i=0;i<n;i++){ const v=Math.abs(Math.sin(seed*13+i*1.7))*(i%7>4?0.4:1); out+=`<div style="height:${Math.max(2,v*100)}%" title="${(v*max).toFixed(1)} GB"></div>`;} return `<div class="bars">${out}</div>`; }
+function modal(html){ const m=document.createElement('div'); m.className='modal-bg'; m.innerHTML=`<div class="modal">${html}</div>`; m.addEventListener('click',e=>{if(e.target===m) m.remove();}); document.body.appendChild(m); return m; }
+function closeModal(){ document.querySelectorAll('.modal-bg').forEach(m=>m.remove()); }
+
+// ---------- shell ----------
+function topbar(isAdmin){
+  return `<div class="topbar"><span class="brand">DARZ</span><span class="proto-tag">PROTOTYPE</span>
+  <span class="muted small">${isAdmin?'Admin panel':'User panel'}</span>
+  <div class="who">Viewing as
+   <select onchange="S.me=this.value; go(this.value==='ala'&&route().startsWith('/admin')?route():'/home')" style="width:auto">
+     ${S.users.filter(u=>u.status!=='suspended').map(u=>`<option ${u.handle===S.me?'selected':''}>${u.handle}</option>`).join('')}
+   </select>
+   ${meUser().admin?(isAdmin?`<a href="#/home">User view</a>`:`<a href="#/admin">Admin view</a>`):''}
+   <a href="#/invite">Invite flow</a><a href="#/signin">Sign-in</a>
+  </div></div>`;
+}
+function adminShell(active, body){
+  const items=[['/admin','Overview',1],['/admin/users','Users',1],['/admin/invites','Invites',1],['/admin/nodes','Nodes',1],['/admin/links','Links',1],['/admin/rules','Rules',1],['/admin/sets','Destination Sets',1],['/admin/tokens','API tokens',1]];
+  return topbar(true)+`<div class="admin-wrap"><nav class="side">${items.map(([r,l])=>`<a href="#${r}" class="${active===r?'on':''}">${l}</a>`).join('')}</nav><main class="main">${body}</main></div>`;
+}
+function userShell(body){ return topbar(false)+`<div class="user-wrap">${body}</div>`; }
+
+// ---------- user: invite / sign-in ----------
+function viewInvite(){
+  const recovery = q().get('recovery')==='1';
+  const webauthn = !!window.PublicKeyCredential;
+  return userShell(`
+  <div class="card"><h1>${recovery?'Recover your account':'You\'re invited to DARZ'}</h1>
+   <p class="muted small">${recovery?'An Admin issued this recovery Invite for <b>mina</b>. Your Devices keep working; you only replace how you sign in.':'This link works once and expires on 19 Oct. No email or phone needed.'}</p>
+   ${recovery?'':`<label class="small muted">Choose a handle (not your real name)</label><input value="newfriend" style="margin:4px 0 12px">`}
+   <div class="note qa">This browser ${webauthn?'<b>supports</b>':'does <b>not</b> support'} passkeys. The real page tries a passkey first and only offers a password if creating one fails.</div>
+   <button class="primary" style="width:100%" onclick="go('/home')">Create a passkey</button>
+   <details style="margin-top:12px"><summary class="small muted">Passkey didn't work? Set a password instead</summary>
+     <input type="password" placeholder="At least 12 characters" style="margin:8px 0"><button style="width:100%" onclick="go('/home')">Set password</button></details>
+  </div>
+  <p class="small"><a href="?${new URLSearchParams({...Object.fromEntries(q()),recovery:recovery?'0':'1'})}#/invite">Show the ${recovery?'new-User':'recovery'} version</a></p>`);
+}
+function viewSignin(){
+  return userShell(`<div class="card"><h1>Sign in</h1>
+   <button class="primary" style="width:100%" onclick="go('/home')">Sign in with a passkey</button>
+   <p class="muted small" style="text-align:center">or</p>
+   <input placeholder="Handle" style="margin-bottom:8px"><input type="password" placeholder="Password" style="margin-bottom:8px">
+   <button style="width:100%" onclick="go('/home')">Sign in</button>
+   <p class="small muted">Lost your passkey or password? Ask an Admin for a recovery Invite. There is no email reset.</p></div>`);
+}
+
+// ---------- user: home variants ----------
+function deviceRow(d){
+  const st = d.state==='active'?'ok':'bad';
+  return `<a href="#/device/${d.id}" class="card spread" style="color:inherit;display:flex">
+   <div><b>${esc(d.name)}</b><div class="small muted mono">${d.addr}</div></div>
+   <div style="text-align:right"><div>${d.month.toFixed(1)} GB</div><div class="small">${dot(st)}${d.state==='active'?(d.activeHour?'used in the last hour':'idle'):esc(d.reason||'blocked')}</div></div></a>`;
+}
+function serviceStatus(){
+  return `<div class="spread"><div><div class="small muted">Service</div><div><span class="dot bg-ok"></span><b>Working</b></div></div>
+   <div><div class="small muted">Iran traffic</div><div class="small">exits in Iran</div></div>
+   <div><div class="small muted">Everything else</div><div class="small">exits abroad</div></div></div>`;
+}
+function homeA(){
+  const ds=myDevices(), u=meUser();
+  return `<div class="spread"><h1>Your Devices</h1><span class="muted small">${ds.length} of ${u.cap}</span></div>
+   ${ds.map(deviceRow).join('')||'<p class="muted">No Devices yet.</p>'}
+   <button class="primary" style="width:100%" ${ds.length>=u.cap?'disabled':''} onclick="go('/device/new')">+ New Device</button>
+   ${ds.length>=u.cap?'<p class="small muted">You\'ve reached your Device cap. Revoke one, or ask an Admin to raise it.</p>':''}
+   <div class="card" style="margin-top:16px">${serviceStatus()}</div>
+   <p class="small"><a href="#/account">Account and sign-in</a></p>`;
+}
+function homeB(){
+  const ds=myDevices(), u=meUser(), total=ds.reduce((a,d)=>a+d.month,0);
+  return `<div class="card" style="text-align:center"><div class="small muted">DARZ is</div><div class="big ok">Working</div>
+   <div class="small muted">Last checked a few seconds ago</div></div>
+   <div class="card"><div class="spread"><div><div class="small muted">Used this month</div><div class="big">${total.toFixed(1)} GB</div></div><div class="small muted">No limit yet</div></div>
+   ${bars(30,3,3)}<div class="spread small muted"><span>15 Sep</span><span>today</span></div></div>
+   <details class="card"><summary><b>Devices</b> <span class="muted small">(${ds.length} of ${u.cap})</span></summary><div style="margin-top:10px">${ds.map(deviceRow).join('')}
+   <button class="primary" style="width:100%" ${ds.length>=u.cap?'disabled':''} onclick="go('/device/new')">+ New Device</button></div></details>
+   <p class="small"><a href="#/account">Account and sign-in</a></p>`;
+}
+function homeC(){
+  const ds=myDevices(), u=meUser();
+  return `<div class="card" style="text-align:center;padding:28px 16px">
+   <div class="small muted">Hi ${esc(S.me)}</div>
+   <h1 style="margin:8px 0 4px">Connect another phone or computer</h1>
+   <p class="muted small">Takes a minute. You'll scan a QR code with the WireGuard app.</p>
+   <button class="primary" style="font-size:17px;padding:12px 22px" ${ds.length>=u.cap?'disabled':''} onclick="go('/device/new')">Set up a Device</button>
+   <p class="small muted">${ds.length} of ${u.cap} Devices used</p></div>
+   <div class="small muted" style="margin:14px 4px 6px">Already set up</div>
+   ${ds.map(d=>`<div class="spread" style="padding:8px 4px;border-bottom:1px solid var(--line)"><a href="#/device/${d.id}">${esc(d.name)}</a><span class="small muted">${d.month.toFixed(1)} GB this month</span></div>`).join('')}
+   <p class="small"><a href="#/account">Account and sign-in</a></p>`;
+}
+
+// ---------- user: device issuance (browser keygen) ----------
+const issue = {step:1, name:'', priv:'', pub:'', real:false};
+async function genKeys(){
+  try{
+    const kp = await crypto.subtle.generateKey({name:'X25519'}, true, ['deriveBits']);
+    const pub = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
+    const pk8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey));
+    issue.pub = btoa(String.fromCharCode(...pub)); issue.priv = btoa(String.fromCharCode(...pk8.slice(-32))); issue.real=true;
+  }catch(e){
+    const r=crypto.getRandomValues(new Uint8Array(64));
+    issue.priv=btoa(String.fromCharCode(...r.slice(0,32))); issue.pub=btoa(String.fromCharCode(...r.slice(32))); issue.real=false;
+  }
+}
+function confText(addr){
+  return `[Interface]
+PrivateKey = ${issue.priv}
+Address = ${addr}/32, fd77::${addr.split('.').pop()}/128
+DNS = 10.77.0.1
+
+[Peer]
+PublicKey = <Bridge public key>
+Endpoint = <decided by Client-hop failover ticket>:51820
+AllowedIPs = 0.0.0.0/0, ::/0
+PersistentKeepalive = 25`;
+}
+function viewNewDevice(){
+  const steps=`<div class="stepper">${[1,2,3].map(i=>`<span class="${i<=issue.step?'on':''}"></span>`).join('')}</div>`;
+  if(issue.step===1) return userShell(`<div class="card">${steps}<h1>New Device</h1>
+    <label class="small muted">Name it so you'll recognise it</label><input id="dn" value="${esc(issue.name||'New phone')}" style="margin:4px 0 12px">
+    <div class="note qa">Your browser creates the key. DARZ only ever receives the public half, so it can't show you this config again.</div>
+    <button class="primary" style="width:100%" onclick="issue.name=$('#dn').value; genKeys().then(()=>{issue.step=2; render();})">Create key and config</button>
+    <p><a href="#/home">Cancel</a></p></div>`);
+  const addr='10.77.0.'+(30+S.devices.length);
+  if(issue.step===2){
+    setTimeout(()=>{ const el=$('#qr'); if(el&&window.QRCode){ el.innerHTML=''; new QRCode(el,{text:confText(addr),width:240,height:240,correctLevel:QRCode.CorrectLevel.L}); } else if(el){ el.textContent='(QR library not loaded — offline?)'; } },0);
+    return userShell(`<div class="card">${steps}<h1>Scan or save it now</h1>
+     <p class="small"><b>This is the only time you'll see this.</b> Close the page and it's gone; you'd have to Replace the Device.</p>
+     <div style="text-align:center"><div class="qrbox" id="qr"></div></div>
+     <div class="row" style="margin:12px 0"><button onclick="dl('${addr}')">Download .conf</button><span class="small muted">key generated ${issue.real?'with WebCrypto X25519':'with a random stand-in (this browser lacks X25519)'}</span></div>
+     <details><summary class="small muted">Show config text</summary><pre>${esc(confText(addr))}</pre></details>
+     <div class="note">Sent to DARZ: name "${esc(issue.name)}" and public key <span class="mono">${issue.pub.slice(0,12)}…</span>. Nothing else.</div>
+     <button class="primary" style="width:100%" onclick="S.devices.push({id:S.devices.length+1,owner:S.me,name:issue.name,addr:'${addr}',state:'active',created:'today',month:0,activeHour:false}); issue.priv=''; issue.step=3; render();">I've saved it</button></div>`);
+  }
+  return userShell(`<div class="card">${steps}<h1>Done</h1><p>Open the WireGuard app, turn on the tunnel, and you're connected. The private key has been wiped from this page.</p>
+   <button class="primary" onclick="issue.step=1; go('/home')">Back to my Devices</button></div>`);
+}
+function dl(addr){ const b=new Blob([confText(addr)],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=(issue.name||'darz').replace(/\W+/g,'-')+'.conf'; a.click(); }
+
+function viewDevice(id){
+  const d=S.devices.find(x=>x.id==id); if(!d) return userShell('<p>Not found.</p>');
+  const res=q().get('res')||'day';
+  return userShell(`<p><a href="#/home">← Devices</a></p><div class="card"><div class="spread"><h1 style="margin:0">${esc(d.name)}</h1><span class="pill">${d.state}</span></div>
+   <div class="small muted mono">${d.addr} · created ${d.created}</div></div>
+   <div class="card"><div class="spread"><h2>Usage</h2><div class="row small">
+     ${['hour','day','month'].map(r=>`<a href="?${new URLSearchParams({...Object.fromEntries(q()),res:r})}#/device/${d.id}" style="${r===res?'font-weight:700':''}">${{hour:'Hourly · 7 days',day:'Daily · 90 days',month:'Monthly'}[r]}</a>`).join(' · ')}</div></div>
+     ${bars(res==='hour'?168:res==='day'?90:6, d.id, res==='hour'?0.3:res==='day'?3:60)}
+     <div class="small muted">${d.month.toFixed(1)} GB this month · split by Exit: Iran ${(d.month*0.2).toFixed(1)} GB, abroad ${(d.month*0.8).toFixed(1)} GB</div>
+     <div class="note small">Retention from the identity ADR: hourly for 7 days, daily for 90, then monthly. There is no "connected since" — sessions aren't stored.</div></div>
+   <div class="card"><h2>Lost this phone, or the config leaked?</h2>
+     <div class="row"><button onclick="replaceDev(${d.id})">Replace</button><span class="small muted">new key and config; this one stops working</span></div>
+     <div class="row" style="margin-top:8px"><button class="danger" onclick="revokeDev(${d.id})">Revoke</button><span class="small muted">stops working within seconds</span></div></div>`);
+}
+function revokeDev(id){ const m=modal(`<h2>Revoke this Device?</h2><p class="small">Its key is erased and every Bridge drops it within seconds. Usage history stays until it ages out.</p><div class="row"><button class="danger" onclick="S.devices.find(d=>d.id==${id}).state='revoked'; closeModal(); go('/home')">Revoke</button><button onclick="closeModal()">Cancel</button></div>`); }
+function replaceDev(id){ const d=S.devices.find(x=>x.id==id); d.state='revoked'; issue.step=1; issue.name=d.name; go('/device/new'); }
+function viewAccount(){
+  const u=meUser();
+  return userShell(`<p><a href="#/home">← Home</a></p><div class="card"><h1>Account</h1>
+   <div class="spread"><span>Handle</span><b>${esc(u.handle)}</b></div>
+   <div class="spread" style="margin-top:8px"><span>Signs in with</span><span>${u.cred}</span></div>
+   <div class="spread" style="margin-top:8px"><span>Authenticator app (TOTP)</span>${u.totp?'<span class="ok">on</span>':'<button>Turn on (optional)</button>'}</div>
+   <div class="spread" style="margin-top:8px"><span>Device cap</span><span>${u.cap}</span></div>
+   <p class="small muted">Sessions last 30 days. <button class="link">Sign out everywhere</button></p></div>`);
+}
+
+// ---------- admin: overview variants ----------
+function coordCard(){
+  return `<div class="card"><h3>Coordinator</h3><div class="small">${dot('ok')}up · v${S.coord.version}</div>
+   <div class="small">${dot('ok')}IR feed gates: ${S.coord.feed} · <a href="#/admin/sets">Destination Sets</a></div>
+   <div class="small">${dot('ok')}Nightly backup: ${S.coord.backup}</div></div>`;
+}
+function ovA(){
+  const nodes=S.nodes.map(n=>`<a href="#/admin/node/${n.name}" class="card" style="color:inherit;display:block">
+    <div class="spread"><b>${dot(n.status)}${n.name}</b><span class="small muted">${n.where}</span></div>
+    <div class="small">${n.roles.join(' + ')} · ${n.tags.map(t=>`<span class="pill">${t}</span>`).join(' ')}</div>
+    <div class="small muted">last contact ${n.contact<60?n.contact+' s':Math.round(n.contact/60)+' min'} ago · snapshot ${n.snap}</div></a>`).join('');
+  const names=S.nodes.map(n=>n.name);
+  const cell=(a,b)=>{ if(a===b) return '<td class="muted">—</td>'; const l=S.links.find(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a)); return l?`<td title="${esc(l.transport)}">${dot(l.status)}${l.lat??'×'}${l.lat?' ms':''}</td>`:'<td class="muted small">no Link</td>'; };
+  return `<h1>Mesh overview</h1><div class="grid2">${nodes}</div>${coordCard()}
+   <h2>Links (latency)</h2><div class="tablewrap"><table><tr><th></th>${names.map(n=>`<th>${n}</th>`).join('')}</tr>
+   ${names.map(a=>`<tr><th>${a}</th>${names.map(b=>cell(a,b)).join('')}</tr>`).join('')}</table></div>`;
+}
+function ovB(){
+  const pos={'teh-1':[120,80],'teh-2':[120,240],'fra-1':[480,80],'ams-1':[480,240]};
+  const col={ok:'var(--ok)',warn:'var(--warn)',bad:'var(--bad)'};
+  const lines=S.links.map(l=>{const [x1,y1]=pos[l.a],[x2,y2]=pos[l.b]; return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col[l.status]}" stroke-width="${l.status==='bad'?2:4}" ${l.status==='bad'?'stroke-dasharray="6 5"':''}/><text x="${x1+(x2-x1)*(y1===y2||x1===x2?0.5:0.28)+6}" y="${y1+(y2-y1)*(y1===y2||x1===x2?0.5:0.28)-6}">${l.lat?l.lat+' ms':'down'}</text>`;}).join('');
+  const nodes=S.nodes.map(n=>{const [x,y]=pos[n.name]; return `<a href="#/admin/node/${n.name}"><circle cx="${x}" cy="${y}" r="26" fill="var(--surface)" stroke="${col[n.status]}" stroke-width="3"/><text x="${x}" y="${y+4}" text-anchor="middle" style="font-weight:700">${n.name}</text><text x="${x}" y="${y+44}" text-anchor="middle" class="small">${n.roles.map(r=>r[0]).join('+')} · ${n.tags[0]}</text></a>`;}).join('');
+  return `<h1>Mesh overview</h1><div class="card" style="overflow-x:auto">
+   <svg viewBox="0 0 600 310" style="width:100%;min-width:480px;max-width:760px">
+    <rect x="20" y="20" width="200" height="270" rx="12" fill="none" stroke="var(--line)" stroke-dasharray="4 4"/><text x="30" y="40" class="small">Inside Iran</text>
+    <rect x="380" y="20" width="200" height="270" rx="12" fill="none" stroke="var(--line)" stroke-dasharray="4 4"/><text x="390" y="40" class="small">Abroad</text>
+    <line x1="300" y1="20" x2="300" y2="290" stroke="var(--bad)" stroke-opacity=".35" stroke-width="2"/><text x="306" y="300" class="small">the filter</text>
+    ${lines}${nodes}</svg>
+   <div class="small muted">B = Bridge, E = Exit. Click a Node for its Paths. Dashed = Link down.</div></div>${coordCard()}`;
+}
+function ovC(){
+  const items=[];
+  S.nodes.filter(n=>n.status!=='ok').forEach(n=>items.push({sev:n.status,t:`${n.name}: ${n.contact>300?'no contact for '+Math.round(n.contact/60)+' min':'degraded'}`,d:n.seenIp!==n.ip?`Public IP mismatch: holds ${n.ip}, Coordinator sees ${n.seenIp} (NAT?)`:`Agent ${n.agent} — behind latest 0.4.2`,href:'#/admin/node/'+n.name}));
+  S.links.filter(l=>l.status!=='ok').forEach(l=>items.push({sev:l.status,t:`Link ${l.a} ↔ ${l.b}: ${l.status==='bad'?'every transport failing':'loss '+l.loss+'%'}`,d:l.status==='bad'?'No working transport. Bridges route around it via other Bridges.':`Running on ${l.transport}; no standby transport left.`,href:'#/admin/links'}));
+  items.sort((a,b)=>(a.sev==='bad'?0:1)-(b.sev==='bad'?0:1));
+  return `<h1>What needs attention</h1>
+   ${items.map(i=>`<a href="${i.href}" class="card" style="display:block;color:inherit;border-left:4px solid var(--${i.sev})"><b>${i.t}</b><div class="small muted">${i.d}</div></a>`).join('')}
+   <div class="card"><b class="ok">Everything else is healthy</b><div class="small muted">${S.nodes.filter(n=>n.status==='ok').length} Nodes · ${S.links.filter(l=>l.status==='ok').length} Links · ${S.users.length} Users · ${S.devices.filter(d=>d.state==='active').length} active Devices · IR feed ${S.coord.feed} · backup ${S.coord.backup}</div></div>`;
+}
+
+// ---------- admin: other screens ----------
+function aUsers(){
+  return `<div class="spread"><h1>Users ${mvp(1)}</h1><button class="primary" onclick="go('/admin/invites')">Invite someone</button></div>
+  <div class="tablewrap"><table><tr><th>Handle</th><th>Status</th><th>Devices</th><th>Cap</th><th>Sign-in</th><th>This month</th><th></th></tr>
+  ${S.users.map(u=>{const ds=S.devices.filter(d=>d.owner===u.handle&&d.state!=='revoked'); return `<tr>
+   <td><b>${u.handle}</b> ${u.admin?'<span class="pill">Admin</span>':''}</td>
+   <td>${u.status==='suspended'?'<span class="warn">Suspended</span>':'active'}</td>
+   <td>${ds.length}</td>
+   <td><select style="width:64px" onchange="S.users.find(x=>x.handle==='${u.handle}').cap=+this.value">${[1,2,3,4,5,8].map(c=>`<option ${c===u.cap?'selected':''}>${c}</option>`).join('')}</select></td>
+   <td class="small">${u.cred}${u.totp?' + TOTP':''}</td>
+   <td>${ds.reduce((a,d)=>a+d.month,0).toFixed(1)} GB</td>
+   <td class="row"><button onclick="toggleSuspend('${u.handle}')">${u.status==='suspended'?'Resume':'Suspend'}</button><button onclick="recov('${u.handle}')">Recovery Invite</button><button class="danger" onclick="delUser('${u.handle}')">Delete</button></td></tr>`;}).join('')}
+  </table></div>
+  <div class="note small">Suspend keeps keys and cuts the Devices off; Resume restores them without new configs. Delete removes the User, Devices, and usage with no leftovers.</div>
+  <div class="note qa small"><b>Open:</b> should an Admin see each User's Devices and per-Device usage, or only totals? Showing less is safer if this panel is ever seized.</div>`;
+}
+function toggleSuspend(h){ const u=S.users.find(x=>x.handle===h); u.status=u.status==='suspended'?'active':'suspended'; S.devices.filter(d=>d.owner===h&&d.state!=='revoked').forEach(d=>{d.state=u.status==='suspended'?'blocked':'active'; d.reason='User suspended';}); render(); }
+function recov(h){ S.invites.unshift({code:'r'+Math.random().toString(36).slice(2,5)+'…',kind:'recovery',for:h,cap:'—',created:'today',expires:'+7 days',state:'pending'}); go('/admin/invites'); }
+function delUser(h){ modal(`<h2>Delete ${h}?</h2><p class="small">Removes the User, all their Devices, and all their usage. This can't be undone.</p><p class="small">Type the handle to confirm:</p><input id="cf"><div class="row" style="margin-top:10px"><button class="danger" onclick="if($('#cf').value==='${h}'){S.users=S.users.filter(u=>u.handle!=='${h}');S.devices=S.devices.filter(d=>d.owner!=='${h}');closeModal();render();}">Delete</button><button onclick="closeModal()">Cancel</button></div>`); }
+function aInvites(){
+  return `<h1>Invites ${mvp(1)}</h1><div class="card"><h2>New Invite</h2><div class="row"><label class="small">Device cap <select id="ic" style="width:70px">${[1,2,3,5].map(c=>`<option ${c===3?'selected':''}>${c}</option>`).join('')}</select></label>
+   <button class="primary" onclick="newInvite()">Create link</button></div><div id="inv-out"></div></div>
+  <div class="tablewrap"><table><tr><th>Code</th><th>Kind</th><th>For</th><th>Cap</th><th>Created</th><th>Expires</th><th>State</th><th></th></tr>
+  ${S.invites.map((i,ix)=>`<tr><td class="mono">${i.code}</td><td>${i.kind}</td><td>${i.for}</td><td>${i.cap}</td><td>${i.created}</td><td>${i.expires}</td><td>${i.state}</td><td>${i.state==='pending'?`<button onclick="S.invites[${ix}].state='withdrawn';render()">Withdraw</button>`:''}</td></tr>`).join('')}</table></div>`;
+}
+function newInvite(){ const code=Math.random().toString(36).slice(2,10); S.invites.unshift({code:code.slice(0,4)+'…',kind:'new',for:'—',cap:$('#ic').value,created:'today',expires:'+7 days',state:'pending'}); render(); setTimeout(()=>{$('#inv-out').innerHTML=`<pre>https://4miz.ir/i/${code}</pre><p class="small muted">Send it on Telegram or in person. It works once and expires in 7 days.</p>`;},0); }
+function aNodes(){
+  return `<div class="spread"><h1>Nodes ${mvp(1)}</h1><button class="primary" onclick="addNode()">Add Node</button></div>
+  <div class="tablewrap"><table><tr><th>Node</th><th>Roles</th><th>Tags</th><th>Public IP</th><th>Agent</th><th>Snapshot</th><th>Last contact</th></tr>
+  ${S.nodes.map(n=>`<tr><td>${dot(n.status)}<a href="#/admin/node/${n.name}">${n.name}</a></td><td>${n.roles.join(' + ')}</td><td>${n.tags.map(t=>`<span class="pill">${t}</span>`).join(' ')}</td>
+   <td class="mono small">${n.ip}${n.seenIp!==n.ip?`<div class="warn">seen as ${n.seenIp}</div>`:''}</td><td>${n.agent}${n.agent!=='0.4.2'?' <span class="warn small">old</span>':''}</td><td>${n.snap}</td><td>${n.contact<60?n.contact+' s':Math.round(n.contact/60)+' min'}</td></tr>`).join('')}</table></div>
+  <div class="note qa small"><b>Proposed MVP line:</b> edit Roles and Tags, add and delete. Bulk operations ${mvp(0)} stay in the fog.</div>`;
+}
+function addNode(){
+  modal(`<h2>Add Node</h2><label class="small">Name</label><input id="nn" value="teh-3"><label class="small">Roles</label>
+   <div class="row"><label><input type="checkbox" checked style="width:auto"> Bridge</label><label><input type="checkbox" style="width:auto"> Exit</label></div>
+   <label class="small">Tags</label><input id="nt" value="IR, arvan"><div style="margin-top:10px"><button class="primary" onclick="nodeCmd()">Create and get command</button></div><div id="cmd"></div>`);
+}
+function nodeCmd(){ const t=Math.random().toString(36).slice(2,14); $('#cmd').innerHTML=`<p class="small">Run from your laptop within 1 hour:</p><pre>ansible-playbook enroll.yml -i &lt;ip&gt;, -e name=${esc($('#nn').value)} -e roles=bridge -e tags="${esc($('#nt').value)}" -e token=${t}</pre><p class="small muted">Or skip this dialog: the same playbook mints its own enrollment token through your <code>nodes:enroll</code> API token.</p><p class="small">${dot('warn')}Waiting for first health report…</p>`; }
+function aNode(name){
+  const n=S.nodes.find(x=>x.name===name);
+  const bridge=n.roles.includes('Bridge');
+  return `<p><a href="#/admin/nodes">← Nodes</a></p><div class="spread"><h1>${dot(n.status)}${n.name}</h1><div class="row"><button>Edit Roles & Tags</button><button class="danger">Delete</button></div></div>
+  <div class="card small">${n.roles.join(' + ')} · ${n.tags.map(t=>`<span class="pill">${t}</span>`).join(' ')} · ${n.where} · Agent ${n.agent} · snapshot ${n.snap}${n.snap<182?' <span class="warn">(behind)</span>':''}</div>
+  ${bridge?`<h2>Active Exit per Rule ${mvp(1,'read-only')}</h2><div class="tablewrap"><table><tr><th>Rule</th><th>Active Path</th><th>Candidates</th></tr>
+   <tr><td>IR</td><td>${n.tags.includes('IR')?'local exit (zero-Link Path)':'→ teh-1 (WireGuard, 4 ms)'}</td><td class="small">${n.tags.includes('IR')?'teh-2 → … none needed':'teh-1'}</td></tr>
+   <tr><td>default</td><td>${n.name==='teh-2'?'→ teh-1 → fra-1 (transit via another Bridge)':'→ fra-1 (WG in VLESS+REALITY, 92 ms)'}</td><td class="small">fra-1 direct · ams-1 direct · via ${n.name==='teh-1'?'teh-2':'teh-1'} → fra-1</td></tr></table></div>
+   <div class="note small">From the exit policy ADR: every Bridge keeps at least one candidate through another Bridge.</div>`:''}
+  <h2>Links</h2>${linksTable(S.links.filter(l=>l.a===name||l.b===name))}`;
+}
+function linksTable(ls){
+  return `<div class="tablewrap"><table><tr><th>Link</th><th>Crosses filter</th><th>Transport in use</th><th>Standbys</th><th>Latency</th><th>Loss</th></tr>
+  ${ls.map(l=>`<tr><td>${dot(l.status)}${l.a} ↔ ${l.b}</td><td>${l.crosses?'yes':'no'}</td><td>${l.transport}</td><td class="small">${l.standby.join(', ')||'<span class="muted">none</span>'}</td><td>${l.lat?l.lat+' ms':'—'}</td><td class="${l.loss>5?'bad':''}">${l.loss}%</td></tr>`).join('')}</table></div>`;
+}
+function aLinks(){
+  return `<h1>Links ${mvp(1,'read-only')}</h1>${linksTable(S.links)}
+  <div class="note qa small"><b>Proposed MVP line:</b> read-only. Transports are discovered, not configured; the one Admin input is the candidate transport list, below. Editing individual Links ${mvp(0)} stays in the fog.</div>
+  <div class="card"><h2>Candidate transports ${mvp(1)}</h2><div class="small">Tried on every Link, in this order:</div>
+  ${['WG in VLESS+REALITY (TCP/443)','WG in XHTTP or WS+TLS via CDN','AmneziaWG','WireGuard (non-crossing Links only)','GRE (non-crossing Links only)'].map((t,i)=>`<div class="row small" style="margin-top:4px"><input type="checkbox" checked style="width:auto"> ${i+1}. ${t}</div>`).join('')}
+  <div class="note small">Exact list and ordering belong to the Link transport discovery ticket.</div></div>`;
+}
+function aRules(){
+  return `<h1>Rules ${mvp(1,'edit fallback/tags/priority')}</h1><p class="small muted">Checked top to bottom; the first match decides which Exits may carry the traffic.</p>
+  <div class="tablewrap"><table><tr><th>Priority</th><th>Destination Set</th><th>Exit must carry</th><th>If no Exit reachable</th><th></th></tr>
+  ${S.rules.map(r=>`<tr><td>${r.prio}</td><td>${r.set}</td><td><span class="pill">${r.tags}</span>${r.tags==='!IR'?' <span class="small muted">any Exit except IR</span>':''}</td><td>${r.fallback==='next'?'fall through to next Rule':'drop (fail closed)'}</td><td>${r.locked?'<span class="small muted">locked</span>':'<button>Edit</button>'}</td></tr>`).join('')}</table></div>
+  <div class="row" style="margin-top:10px"><button>+ Add Rule</button>${mvp(0,'new Rules need new Destination Sets')}</div>
+  <div class="note small">Before any fallback, a Bridge reaches a matching Exit through another Bridge. The default Rule always drops, so international traffic never leaves through a domestic NIC.</div>
+  <div class="note qa small"><b>Proposed MVP line:</b> view both Rules, edit the IR Rule's Tags and fallback. Authoring new Rules and Destination Sets ${mvp(0)} stays in the fog.</div>`;
+}
+function aSets(){
+  const s=S.sets[0];
+  return `<h1>Destination Sets ${mvp(1)}</h1><div class="card"><div class="spread"><h2 style="margin:0">IR</h2><span class="pill mono">${s.hash}</span></div>
+   <div class="small">Source: ${s.source}, nightly</div>
+   <div class="small">${dot('ok')}Last fetch ${s.lastFetch}: gates ${s.gates} · ${s.cidrs} CIDRs · ${s.addrs} addresses · last changed ${s.lastChange}</div>
+   <details class="small" style="margin-top:6px"><summary>Gates</summary><ul><li>private and reserved ranges stripped (10.0.0.0/8 removed)</li><li>address space within ±2% of last good set</li><li>parses cleanly, not empty</li><li>divergence from direct RIPEstat beyond known extras → alert</li></ul></details>
+   <div class="row" style="margin-top:10px"><button>Fetch now</button><button>Roll back to previous</button></div></div>
+  <div class="card"><h2>Admin overrides</h2><div class="grid2"><div><h3>Always include</h3><input placeholder="e.g. 5.160.0.0/16"><p class="small muted">none</p></div><div><h3>Always exclude</h3><input placeholder="CIDR"><p class="small muted">none</p></div></div></div>`;
+}
+function aTokens(){
+  return `<div class="spread"><h1>API tokens ${mvp(1)}</h1><button class="primary" onclick="modal('<h2>New API token</h2><p class=small>Requires your passkey or TOTP.</p><label class=small>Name</label><input value=laptop-enroll><label class=small>Scope</label><select><option>nodes:enroll</option></select><p class=\\'small muted\\'>Expires in 90 days. Shown once.</p><button class=primary onclick=closeModal()>Create</button>')">New token</button></div>
+  <div class="tablewrap"><table><tr><th>Name</th><th>Scope</th><th>Created</th><th>Expires</th><th>Last used</th><th></th></tr>
+  ${S.tokens.map(t=>`<tr><td>${t.name}</td><td class="mono">${t.scope}</td><td>${t.created}</td><td>${t.expires}</td><td>${t.lastUsed}</td><td><button class="danger">Revoke</button></td></tr>`).join('')}</table></div>
+  <div class="note small">Only <code>nodes:enroll</code> exists in phase one. Future MCP grants follow the same scoped pattern.</div>`;
+}
+
+// ---------- router ----------
+function render(){
+  const r=route(); let html='', ctx=null;
+  const isAdminRoute=r.startsWith('/admin');
+  if(isAdminRoute && !meUser().admin){ S.me='ala'; }
+  if(r==='/invite') html=viewInvite();
+  else if(r==='/signin') html=viewSignin();
+  else if(r==='/home'){ ctx='home'; html=userShell({A:homeA,B:homeB,C:homeC}[variant()]()); }
+  else if(r==='/device/new') html=viewNewDevice();
+  else if(r.startsWith('/device/')) html=viewDevice(r.split('/')[2]);
+  else if(r==='/account') html=viewAccount();
+  else if(r==='/admin'){ ctx='overview'; html=adminShell('/admin',{A:ovA,B:ovB,C:ovC}[variant()]()); }
+  else if(r==='/admin/users') html=adminShell(r,aUsers());
+  else if(r==='/admin/invites') html=adminShell(r,aInvites());
+  else if(r==='/admin/nodes') html=adminShell(r,aNodes());
+  else if(r.startsWith('/admin/node/')) html=adminShell('/admin/nodes',aNode(r.split('/')[3]));
+  else if(r==='/admin/links') html=adminShell(r,aLinks());
+  else if(r==='/admin/rules') html=adminShell(r,aRules());
+  else if(r==='/admin/sets') html=adminShell(r,aSets());
+  else if(r==='/admin/tokens') html=adminShell(r,aTokens());
+  else html=userShell('<p>Unknown screen. <a href="#/home">Home</a></p>');
+  $('#app').innerHTML=html;
+  const v=variant();
+  $('#switcher').innerHTML = ctx
+    ? `<button onclick="setVariant(variants[(variants.indexOf(variant())+2)%3])">←</button><span class="lbl">${v} (${variantNames[ctx][v]})</span><button onclick="setVariant(variants[(variants.indexOf(variant())+1)%3])">→</button>`
+    : `<span class="lbl" style="opacity:.7">Single version · variants on <a href="#/home" style="color:#9cf">Home</a> and <a href="#/admin" style="color:#9cf">Overview</a></span>`;
+}
+window.addEventListener('hashchange',render);
+document.addEventListener('keydown',e=>{
+  if(e.target.closest('input,textarea,select,[contenteditable]')) return;
+  if(!['/home','/admin'].includes(route())) return;
+  if(e.key==='ArrowRight') setVariant(variants[(variants.indexOf(variant())+1)%3]);
+  if(e.key==='ArrowLeft') setVariant(variants[(variants.indexOf(variant())+2)%3]);
+});
+render();
+</script>
+</body>
+</html>

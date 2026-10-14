@@ -12,6 +12,7 @@
   Nothing here is wired to a backend. Double-click to open.
 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
   --bg:#f6f7f9;--surface:#fff;--surface2:#f0f2f5;--text:#16181d;--muted:#5d6472;--line:#dfe3ea;
@@ -246,15 +247,18 @@ async function genKeys(){
     issue.priv=btoa(String.fromCharCode(...r.slice(0,32))); issue.pub=btoa(String.fromCharCode(...r.slice(32))); issue.real=false;
   }
 }
-function confText(addr){
+const SLOTS=[{key:'main',label:'Main',host:'a.4miz.ir'},{key:'b1',label:'Backup 1',host:'b.4miz.ir'},{key:'b2',label:'Backup 2',host:'c.4miz.ir'}];
+let slotIx=0;
+function confText(addr, slot){
+  slot=slot||SLOTS[0];
   return `[Interface]
 PrivateKey = ${issue.priv}
 Address = ${addr}/32, fd77::${addr.split('.').pop()}/128
 DNS = 10.77.0.1
 
 [Peer]
-PublicKey = <Bridge public key>
-Endpoint = <decided by Client-hop failover ticket>:51820
+PublicKey = <shared Bridge public key>
+Endpoint = ${slot.host}:51820
 AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 25`;
 }
@@ -262,24 +266,34 @@ function viewNewDevice(){
   const steps=`<div class="stepper">${[1,2,3].map(i=>`<span class="${i<=issue.step?'on':''}"></span>`).join('')}</div>`;
   if(issue.step===1) return userShell(`<div class="card">${steps}<h1>New Device</h1>
     <label class="small muted">Name it so you'll recognise it</label><input id="dn" value="${esc(issue.name||'New phone')}" style="margin:4px 0 12px">
-    <div class="note qa">Your browser creates the key. DARZ only ever receives the public half, so it can't show you this config again.</div>
-    <button class="primary" style="width:100%" onclick="issue.name=$('#dn').value; genKeys().then(()=>{issue.step=2; render();})">Create key and config</button>
+    <div class="note qa">Your browser creates the key. DARZ only ever receives the public half, so it can't show you these configs again.</div>
+    <button class="primary" style="width:100%" onclick="issue.name=$('#dn').value; genKeys().then(()=>{issue.step=2; slotIx=0; render();})">Create key and configs</button>
     <p><a href="#/home">Cancel</a></p></div>`);
   const addr='10.77.0.'+(30+S.devices.length);
   if(issue.step===2){
-    setTimeout(()=>{ const el=$('#qr'); if(el&&window.QRCode){ el.innerHTML=''; new QRCode(el,{text:confText(addr),width:240,height:240,correctLevel:QRCode.CorrectLevel.L}); } else if(el){ el.textContent='(QR library not loaded — offline?)'; } },0);
-    return userShell(`<div class="card">${steps}<h1>Scan or save it now</h1>
-     <p class="small"><b>This is the only time you'll see this.</b> Close the page and it's gone; you'd have to Replace the Device.</p>
-     <div style="text-align:center"><div class="qrbox" id="qr"></div></div>
-     <div class="row" style="margin:12px 0"><button onclick="dl('${addr}')">Download .conf</button><span class="small muted">key generated ${issue.real?'with WebCrypto X25519':'with a random stand-in (this browser lacks X25519)'}</span></div>
-     <details><summary class="small muted">Show config text</summary><pre>${esc(confText(addr))}</pre></details>
+    const slot=SLOTS[slotIx];
+    setTimeout(()=>{ const el=$('#qr'); if(el&&window.QRCode){ el.innerHTML=''; new QRCode(el,{text:confText(addr,slot),width:240,height:240,correctLevel:QRCode.CorrectLevel.L}); } else if(el){ el.textContent='(QR library not loaded — offline?)'; } },0);
+    return userShell(`<div class="card">${steps}<h1>Scan or save them now</h1>
+     <p class="small"><b>This is the only time you'll see these.</b> Close the page and they're gone; you'd have to Replace the Device.</p>
+     <div class="note qa small">PROTOTYPE assumption: ${SLOTS.length} configs per Device, one per endpoint slot. The count and the slot design are decided by the Client-hop failover ticket.</div>
+     <div class="row" style="margin:8px 0">${SLOTS.map((x,i)=>`<button class="${i===slotIx?'primary':''}" onclick="slotIx=${i};render()">${x.label}</button>`).join('')}</div>
+     <div style="text-align:center"><div class="qrbox" id="qr"></div><div class="small muted">${slot.label} · <span class="mono">${slot.host}</span></div></div>
+     <div class="row" style="margin:12px 0"><button class="primary" onclick="dlAll('${addr}')">Download all (.zip)</button><button onclick="dl('${addr}',${slotIx})">Download ${slot.label} only</button></div>
+     <div class="small muted">Key generated ${issue.real?'with WebCrypto X25519':'with a random stand-in (this browser lacks X25519)'}. Import the .zip in the WireGuard app (Android and iOS accept a zip of configs).</div>
+     <details><summary class="small muted">Show ${slot.label} config text</summary><pre>${esc(confText(addr,slot))}</pre></details>
      <div class="note">Sent to DARZ: name "${esc(issue.name)}" and public key <span class="mono">${issue.pub.slice(0,12)}…</span>. Nothing else.</div>
-     <button class="primary" style="width:100%" onclick="S.devices.push({id:S.devices.length+1,owner:S.me,name:issue.name,addr:'${addr}',state:'active',created:'today',month:0,activeHour:false}); issue.priv=''; issue.step=3; render();">I've saved it</button></div>`);
+     <button class="primary" style="width:100%" onclick="S.devices.push({id:S.devices.length+1,owner:S.me,name:issue.name,addr:'${addr}',state:'active',created:'today',month:0,activeHour:false}); issue.priv=''; issue.step=3; render();">I've saved them</button></div>`);
   }
-  return userShell(`<div class="card">${steps}<h1>Done</h1><p>Open the WireGuard app, turn on the tunnel, and you're connected. The private key has been wiped from this page.</p>
+  return userShell(`<div class="card">${steps}<h1>Done</h1><p>Open the WireGuard app and turn on <b>Main</b>. If it ever stops working, turn on <b>Backup 1</b>, then <b>Backup 2</b>. Only one can be on at a time. The private key has been wiped from this page.</p>
    <button class="primary" onclick="issue.step=1; go('/home')">Back to my Devices</button></div>`);
 }
-function dl(addr){ const b=new Blob([confText(addr)],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=(issue.name||'darz').replace(/\W+/g,'-')+'.conf'; a.click(); }
+function fname(slot){ return ((issue.name||'darz').replace(/\W+/g,'-')+'-'+slot.key).slice(0,15)+'.conf'; }
+function dl(addr, i){ const slot=SLOTS[i||0]; const b=new Blob([confText(addr,slot)],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=fname(slot); a.click(); }
+async function dlAll(addr){
+  if(!window.JSZip){ SLOTS.forEach((_,i)=>dl(addr,i)); return; }
+  const z=new JSZip(); SLOTS.forEach(sl=>z.file(fname(sl),confText(addr,sl)));
+  const b=await z.generateAsync({type:'blob'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=(issue.name||'darz').replace(/\W+/g,'-')+'.zip'; a.click();
+}
 
 function viewDevice(id){
   const d=S.devices.find(x=>x.id==id); if(!d) return userShell('<p>Not found.</p>');
@@ -291,6 +305,7 @@ function viewDevice(id){
      ${bars(res==='hour'?168:res==='day'?90:6, d.id, res==='hour'?0.3:res==='day'?3:60)}
      <div class="small muted">${d.month.toFixed(1)} GB this month · split by Exit: Iran ${(d.month*0.2).toFixed(1)} GB, abroad ${(d.month*0.8).toFixed(1)} GB</div>
      <div class="note small">Retention from the identity ADR: hourly for 7 days, daily for 90, then monthly. There is no "connected since" — sessions aren't stored.</div></div>
+   <div class="note qa small">Stopped working? In the WireGuard app, switch from Main to Backup 1, then Backup 2.</div>
    <div class="card"><h2>Lost this phone, or the config leaked?</h2>
      <div class="row"><button onclick="replaceDev(${d.id})">Replace</button><span class="small muted">new key and config; this one stops working</span></div>
      <div class="row" style="margin-top:8px"><button class="danger" onclick="revokeDev(${d.id})">Revoke</button><span class="small muted">stops working within seconds</span></div></div>`);

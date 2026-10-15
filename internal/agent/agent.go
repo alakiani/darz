@@ -87,6 +87,11 @@ type agent struct {
 	log  *slog.Logger
 	pool *x509.CertPool
 
+	// healthMu keeps one health report in flight at a time, so reports
+	// reach the Coordinator in the order they were made. Otherwise a report
+	// stuck behind a cut link could land after a newer one and overwrite it.
+	healthMu sync.Mutex
+
 	mu        sync.Mutex
 	st        persisted
 	current   uint64 // version in effect now, confirmed or not
@@ -316,6 +321,8 @@ func (a *agent) rotate() {
 // sendHealth reports health once, including any unreported reverts, and
 // clears those it delivered.
 func (a *agent) sendHealth(ctx context.Context) error {
+	a.healthMu.Lock()
+	defer a.healthMu.Unlock()
 	a.mu.Lock()
 	h := protocol.Health{
 		AppliedVersion: a.current,

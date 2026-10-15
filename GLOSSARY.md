@@ -23,12 +23,16 @@ What a Node does: Bridge or Exit. Roles are capabilities, not kinds of machine, 
 _Avoid_: Type, kind, mode
 
 **Tag**:
-A label on a Node, such as `IR`, that a Rule matches against. A Tag names the traffic a Node may carry as an Exit: a Node tagged `IR` may be the Exit for traffic to Iran.
+A label on a Node, such as `IR`, that a Rule matches against. A Tag names the traffic a Node may carry as an Exit: a Node tagged `IR` may be the Exit for traffic to Iran. The `IR` Tag also marks a Node as inside the filter.
 _Avoid_: Label, attribute, group
 
 **Link**:
-One tunnel between two Nodes, carried by one transport (such as WireGuard, GRE, QUIC, or WebSocket) and continuously measured for health. A Link is flagged by whether it crosses the filter.
+One tunnel between two Nodes, carried at any moment by one Transport chosen from its candidates by health, and continuously measured. A Link crosses the filter when exactly one of its Nodes is tagged `IR`.
 _Avoid_: Tunnel, connection, peering
+
+**Transport**:
+A way of carrying a Link's traffic between two Nodes, such as plain WireGuard or AmneziaWG. Which Transports work on a Link is discovered by trying them, never configured.
+_Avoid_: Protocol, carrier, tunnel type
 
 **Path**:
 An ordered chain of Links from a Bridge to an Exit that a Device's traffic follows. A Path may pass through more than one Bridge.

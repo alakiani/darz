@@ -23,7 +23,7 @@ Failures of a Bridge's Links or Exits that the mesh can route around (ADR 0004) 
 - **Eligibility.** A Bridge may hold a slot only while all three of these hold:
   1. The probe Device's check against it is passing.
   2. Its Agent is reporting.
-  3. It has a working default-Rule Path, directly or through the mesh.
+  3. It has a working default-Rule Path, directly or through the mesh (at least one eligible candidate for the default Rule, [ADR 0008](0008-path-selection-and-exit-balancing.md)).
 - **Re-pointing:**
   - A slot moves after its Bridge has been ineligible for 60 s.
   - It does not move back automatically when that Bridge recovers.

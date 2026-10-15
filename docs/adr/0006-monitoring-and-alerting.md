@@ -37,7 +37,7 @@ A consequence: per-Device anomalies, such as one Device using unusually much, ar
 
 - **Every Node:** Agent and build info, the applied snapshot version, `coordinator_last_contact_seconds`, apply failures, clock skew, expiry of its client certificate, and node_exporter host metrics.
 - **Link** (labelled by its two Nodes): up, round-trip time, loss, the transport in use, transport changes, bytes.
-- **Path:** the active Path per Bridge per Rule, switch count, and number of healthy candidate Paths.
+- **Path:** share of buckets per candidate per Bridge per Rule, bucket moves by kind (failure or rebalancing), and number of eligible candidates ([ADR 0008](0008-path-selection-and-exit-balancing.md)).
 - **Bridge:** count of active Devices (handshake in the last 3 minutes), total WireGuard bytes, version and age of its IR Destination Set, and metering backlog (hourly buckets not yet acknowledged).
 - **Endpoint Slot:** the Bridge each slot points to, re-point count, number of eligible Bridges, ArvanCloud API errors.
 - **Probe Device**, per Bridge: handshake success, DNS query success, latency.
@@ -51,7 +51,7 @@ A consequence: per-Device anomalies, such as one Device using unusually much, ar
 | Coordinator unreachable from a Node | scrape works but `coordinator_last_contact_seconds` > 180 | warning |
 | Link down | no working transport for 2 min | warning |
 | Bridge has no Path for the default Rule | 1 min | critical |
-| Path flapping | more than 6 switches per hour (a single switch is not an alert) | warning |
+| Path flapping | more than 6 failure moves per hour; rebalancing moves do not count (ADR 0008) | warning |
 | Endpoint Slot re-pointed | each event | info |
 | Bridge lost slot eligibility | each event | warning |
 | All slots on one Bridge | 2 min | critical |

@@ -31,9 +31,9 @@ Bridges route each packet by the first matching Rule. A Rule names a Destination
 
 ## Exit choice and the mesh
 
-- **Exit choice is per Bridge per Rule.** In phase one, all Devices on one Bridge share an Exit for a given Rule, picked automatically by Path health.
+- **Exit choice is per Bridge per Rule.** In phase one, all Devices on one Bridge share an Exit for a given Rule, picked automatically by Path health. *(Amended by [ADR 0008](0008-path-selection-and-exit-balancing.md): Exit choice is per bucket of Devices per Bridge per Rule, spread over Exits by measured capacity.)*
 - **The mesh comes before fallback.** For each (Bridge, Rule), the Coordinator's candidate Paths must include at least one that transits another Bridge whenever the mesh has one, and it must not share a first Link with the direct candidates. The Bridge fails over through these locally, without the Coordinator. `fallback` applies only when every candidate is down: the IR Rule falls through to the default (degraded, still working), and the default Rule drops.
-- **Open, handed to [Path selection and failover](https://github.com/alakiani/darz/issues/12):** when the Coordinator is unreachable and every candidate has died, should Bridges discover transit by asking neighbouring Bridges?
+- **Open, handed to [Path selection and failover](https://github.com/alakiani/darz/issues/12):** when the Coordinator is unreachable and every candidate has died, should Bridges discover transit by asking neighbouring Bridges? *(Answered in [ADR 0008](0008-path-selection-and-exit-balancing.md): yes. Bridges work out candidates themselves, every neighbouring Bridge is always a transit candidate, and a "transit OK" flag in the Link probe reply says whether it can carry the Rule.)*
 - **A dual-role Node exits locally through a zero-Link Path.** A Node holding both Roles and tagged `IR` reaches itself with latency 0, so it wins on its own merits. It forwards out of its own NIC with NAT, and needs no special capability.
 
 ## Bridge data plane

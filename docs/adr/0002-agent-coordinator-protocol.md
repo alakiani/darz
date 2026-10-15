@@ -28,7 +28,7 @@ JSON over mTLS on TCP 443, under `/v1`. `GET /v1/state?after=<version>` blocks u
 
 - **Snapshots, not deltas.** Each version is that Node's complete desired state, so a missed version cannot corrupt anything.
 - **Large, slow-changing data is referenced by content hash.** CIDR sets are an example: the Agent fetches and caches them separately.
-- **A Node sees only what its Roles need.** A Bridge gets Device public keys, Rules, and candidate Paths. An Exit gets its Link peers and forwarding instructions, never the Device list, so a seized abroad Exit reveals no Users.
+- **A Node sees only what its Roles need.** A Bridge gets Device public keys, Rules, and candidate Paths *(replaced by scoring parameters in [ADR 0008](0008-path-selection-and-exit-balancing.md); Bridges work out candidates themselves)*. An Exit gets its Link peers and forwarding instructions, never the Device list, so a seized abroad Exit reveals no Users.
 - **Snapshots set candidates, not live choices.** The active Path and the winning transport per Link are the Agent's runtime state. An apply never resets a live choice that is still among the candidates.
 
 ## Applying a snapshot safely (commit-confirm)
@@ -37,7 +37,7 @@ The Agent keeps the previous snapshot, applies the new one, and must complete a 
 
 ## Reporting
 
-- **Health, every 30 s, from every Node:** the applied snapshot version, the Agent version, latency and loss per Link plus the transport in use, and the active Path per Exit. The Coordinator keeps the latest report and what Path computation needs. Time series belong to Prometheus.
+- **Health, every 30 s, from every Node:** the applied snapshot version, the Agent version, latency and loss per Link plus the transport in use, and the active Path per Exit *(bucket shares per candidate per Rule since [ADR 0008](0008-path-selection-and-exit-balancing.md))*. The Coordinator keeps the latest report and what Path computation needs. Time series belong to Prometheus.
 - **Metering, from Bridges only:** bytes up and down per Device per Exit, in hourly buckets closed on disk. Uploads are keyed by `(node, device, exit, hour)` and idempotent. Up to 30 days of unacknowledged buckets are kept, so an outage keeps its hourly attribution.
 - **Clocks:** every Node runs chrony, and Agents stamp hours by their own clock. Reports carry the Agent's time. Skew over 60 s raises an alert, and the data is kept but flagged.
 

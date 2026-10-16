@@ -90,7 +90,24 @@ func (p *Prober) Check(ctx context.Context, endpoint netip.AddrPort, bridgeKey w
 			return nil
 		}
 	}
-	return errors.New("probe: no answer through the Bridge")
+	if !handshook(dev) {
+		return errors.New("probe: no handshake with the Bridge")
+	}
+	return errors.New("probe: handshake done, but no DNS answer through the Bridge")
+}
+
+// handshook reports whether dev completed a handshake with its peer.
+func handshook(dev *device.Device) bool {
+	cfg, err := dev.IpcGet()
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(cfg, "\n") {
+		if v, ok := strings.CutPrefix(line, "last_handshake_time_sec="); ok && v != "0" {
+			return true
+		}
+	}
+	return false
 }
 
 // dnsQuery is an A query for host with a random id.

@@ -140,6 +140,9 @@ func (c *Coordinator) slotRound(ctx context.Context) error {
 		ids[i] = b.ID
 		s.probes[b.ID] = results[i]
 		reasons := ineligibility(results[i], health[b.ID], defaultRule, now, c.Slots.ReportingWithin)
+		if !results[i].OK {
+			c.log.Debug("probe failed", "node", b.Name, "err", results[i].Error)
+		}
 		_, was := s.inelSince[b.ID]
 		switch {
 		case len(reasons) == 0:
@@ -153,7 +156,7 @@ func (c *Coordinator) slotRound(ctx context.Context) error {
 			s.reasons[b.ID] = reasons
 			if !was {
 				s.inelSince[b.ID] = now
-				c.log.Warn("Bridge lost slot eligibility", "node", b.Name, "reasons", reasons)
+				c.log.Warn("Bridge lost slot eligibility", "node", b.Name, "reasons", reasons, "probe", results[i].Error)
 			}
 		}
 	}

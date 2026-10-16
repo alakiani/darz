@@ -92,14 +92,8 @@ func (p *Plane) Apply(ctx context.Context, st protocol.State) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	for k, v := range map[string]string{
-		"net/ipv4/ip_forward":             "1",
-		"net/ipv4/conf/all/rp_filter":     "2", // replies arrive over Links, not the uplink
-		"net/ipv4/conf/default/rp_filter": "2",
-	} {
-		if err := os.WriteFile("/proc/sys/"+k, []byte(v), 0o644); err != nil {
-			return fmt.Errorf("sysctl %s: %w", k, err)
-		}
+	if err := setSysctls(); err != nil {
+		return err
 	}
 	up, err := findUplink(ctx)
 	if err != nil {
@@ -395,6 +389,49 @@ func ourRules(ctx context.Context) (map[string]bool, error) {
 		}
 	}
 	return have, nil
+}
+
+// setSysctls turns on forwarding, and turns reverse-path filtering off on
+// the tunnel interfaces. Their far ends are Devices, held to their own /32
+// by WireGuard, or this mesh's own Nodes, which legitimately send replies
+// and transit traffic from any source; the filter there only drops
+// replies. Interfaces made later inherit the default. The uplink keeps
+// its own setting, and "all" is 0 so the per-interface value decides.
+func setSysctls() error {
+	write := func(k, v string) error {
+		if err := os.WriteFile("/proc/sys/net/ipv4/"+k, []byte(v), 0o644); err != nil {
+			return fmt.Errorf("sysctl %s: %w", k, err)
+		}
+		return nil
+	}
+	if err := write("ip_forward", "1"); err != nil {
+		return err
+	}
+	ifaces, err := os.ReadDir("/proc/sys/net/ipv4/conf")
+	if err != nil {
+		return err
+	}
+	uplinkValue := "2"
+	for _, e := range ifaces {
+		name := e.Name()
+		if name == "all" || name == "default" || name == "lo" {
+			continue
+		}
+		if name == DeviceIface || strings.HasPrefix(name, "dz") {
+			if err := write("conf/"+name+"/rp_filter", "0"); err != nil {
+				return err
+			}
+		} else if b, err := os.ReadFile("/proc/sys/net/ipv4/conf/" + name + "/rp_filter"); err == nil && strings.TrimSpace(string(b)) == "0" {
+			// An uplink inheriting 0 from "all" would lose its filter.
+			if err := write("conf/"+name+"/rp_filter", uplinkValue); err != nil {
+				return err
+			}
+		}
+	}
+	if err := write("conf/default/rp_filter", "0"); err != nil {
+		return err
+	}
+	return write("conf/all/rp_filter", "0")
 }
 
 // findUplink is the interface and gateway of the main table's default

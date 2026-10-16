@@ -362,7 +362,8 @@ func dumpNetOnFailure(t *testing.T, l *lab.Lab, names ...string) {
 				{"nft", "list", "ruleset"},
 				{"ip", "rule"},
 				{"ip", "route", "show", "table", "all"},
-				{"ip", "-s", "-br", "link"},
+				{"ip", "-s", "link"},
+				{"nstat", "-az", "IpInNoRoutes", "IpExtInNoRoutes", "TcpExtIPReversePathFilter", "IpForwDatagrams", "IpInAddrErrors", "IpOutNoRoutes", "IpInDelivers", "UdpNoPorts"},
 				{"cat", "/proc/sys/net/ipv4/ip_forward", "/proc/sys/net/ipv4/conf/all/rp_filter"},
 			} {
 				out, _ := n.Command(cmd[0], cmd[1:]...).CombinedOutput()

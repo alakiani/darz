@@ -50,6 +50,15 @@ type Coordinator struct {
 	Upstreams []string
 	// Scoring is pushed to every Bridge (ADR 0008).
 	Scoring protocol.Scoring
+	// PanelURL is where the panel is served; Invite links point into it.
+	PanelURL string
+	// EndpointSlots are the hostnames in Device configs (ADR 0005).
+	EndpointSlots []string
+	// SecureCookies marks session cookies Secure; off only for plain-HTTP
+	// development.
+	SecureCookies bool
+
+	limit limiter // failed sign-ins
 	// FeedURL and RIPEstatURL are where the IR feed and its cross-check
 	// come from; HTTPClient fetches them.
 	FeedURL, RIPEstatURL string
@@ -65,6 +74,7 @@ type Coordinator struct {
 func New(s *store.Store, c *ca.CA, log *slog.Logger) *Coordinator {
 	return &Coordinator{store: s, ca: c, log: log, LongPoll: 60 * time.Second,
 		LinkTiming: protocol.DefaultLinkTiming, Egress: DefaultEgressTargets, Upstreams: DefaultUpstreams, Scoring: protocol.DefaultScoring,
+		PanelURL: "https://4miz.ir", EndpointSlots: DefaultEndpointSlots, SecureCookies: true,
 		FeedURL: irfeed.DefaultURL, RIPEstatURL: irfeed.DefaultRIPEstatURL, HTTPClient: http.DefaultClient,
 		changed: make(chan struct{})}
 }
@@ -146,14 +156,6 @@ func (c *Coordinator) waitChan() <-chan struct{} {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.changed
-}
-
-// AdminHandler serves the Admin API.
-func (c *Coordinator) AdminHandler() http.Handler {
-	mux := http.NewServeMux()
-	mux.Handle("POST /v1/nodes", c.requireScope(store.ScopeNodesEnroll, c.createNode))
-	mux.Handle("GET /v1/nodes/{id}", c.requireScope(store.ScopeNodesEnroll, c.getNode))
-	return mux
 }
 
 // AgentHandler serves the Agent API. It must sit behind the TLS config from

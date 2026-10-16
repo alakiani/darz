@@ -5,6 +5,7 @@
 //
 //	coordinator [serve flags]               run the Coordinator
 //	coordinator token create [flags]        mint a scoped API token and print its secret once
+//	coordinator invite create [flags]       make an Invite, such as the first Admin's, and print its link
 package main
 
 import (
@@ -33,9 +34,12 @@ var version = "dev"
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	var err error
-	if len(os.Args) > 2 && os.Args[1] == "token" && os.Args[2] == "create" {
+	switch {
+	case len(os.Args) > 2 && os.Args[1] == "token" && os.Args[2] == "create":
 		err = tokenCreate(os.Args[3:])
-	} else {
+	case len(os.Args) > 2 && os.Args[1] == "invite" && os.Args[2] == "create":
+		err = inviteCreate(os.Args[3:], log)
+	default:
 		err = serve(os.Args[1:], log)
 	}
 	if err != nil {
@@ -54,6 +58,7 @@ func serve(args []string, log *slog.Logger) error {
 	adminKey := fs.String("admin-tls-key", "", "key for -admin-tls-cert")
 	agentListen := fs.String("agent-listen", ":8443", "Agent API listen address")
 	agentHosts := fs.String("agent-hosts", "4miz.ir", "comma-separated hostnames and IPs Agents dial")
+	panelURL := fs.String("panel-url", "https://4miz.ir", "where the panel is served; Invite links point here")
 	fs.Parse(args)
 	if *showVersion {
 		fmt.Println(version)
@@ -70,6 +75,8 @@ func serve(args []string, log *slog.Logger) error {
 		return err
 	}
 	c := coordinator.New(s, authority, log)
+	c.PanelURL = *panelURL
+	c.SecureCookies = *adminCert != "" // plain HTTP is for development only
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := c.Reconcile(ctx); err != nil {
@@ -138,5 +145,28 @@ func tokenCreate(args []string) error {
 	}
 	fmt.Fprintf(os.Stderr, "created %s (%s), expires %s\n", tok.ID, tok.Scope, tok.ExpiresAt.Format(time.RFC3339))
 	fmt.Println(secret)
+	return nil
+}
+
+func inviteCreate(args []string, log *slog.Logger) error {
+	fs := flag.NewFlagSet("coordinator invite create", flag.ExitOnError)
+	dbPath := fs.String("db", "/var/lib/darz/darz.db", "SQLite database")
+	admin := fs.Bool("admin", false, "the Invite makes an Admin, who must turn on TOTP before acting as one")
+	deviceCap := fs.Int("device-cap", 0, "Device cap for the new User; 0 for the default of 3")
+	panelURL := fs.String("panel-url", "https://4miz.ir", "where the panel is served")
+	fs.Parse(args)
+	s, err := store.Open(*dbPath)
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+	token, expires, err := s.CreateInvite(context.Background(), store.Invite{Kind: "new", Admin: *admin, DeviceCap: *deviceCap}, coordinator.InviteTTL)
+	if err != nil {
+		return err
+	}
+	c := coordinator.New(s, nil, log)
+	c.PanelURL = *panelURL
+	fmt.Fprintf(os.Stderr, "single-use Invite, expires %s; hand it over out of band\n", expires.Format(time.RFC3339))
+	fmt.Println(c.InviteURL(token))
 	return nil
 }

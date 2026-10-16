@@ -36,12 +36,13 @@ const (
 )
 
 // effectiveState is phase one's single policy: a suspended User or a
-// revoked Device is blocked, and everything else is active.
-func effectiveState(d store.Device) (EffectiveState, string) {
+// revoked Device is blocked, and everything else is active. Later quotas
+// read usage totals here too.
+func effectiveState(revoked, userSuspended bool) (EffectiveState, string) {
 	switch {
-	case d.Revoked || d.PublicKey == "":
+	case revoked:
 		return StateBlocked, "device revoked"
-	case d.UserSuspended:
+	case userSuspended:
 		return StateBlocked, "user suspended"
 	}
 	return StateActive, ""
@@ -76,7 +77,7 @@ func (c *Coordinator) bridgeState(ctx context.Context) (*protocol.BridgeState, e
 		return nil, err
 	}
 	for _, d := range devices {
-		if st, _ := effectiveState(d); st == StateBlocked {
+		if st, _ := effectiveState(d.Revoked || d.PublicKey == "", d.UserSuspended); st == StateBlocked {
 			continue
 		}
 		b.Devices = append(b.Devices, protocol.Device{PublicKey: d.PublicKey, Address: netip.PrefixFrom(d.Address, 32).String()})

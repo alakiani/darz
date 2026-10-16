@@ -1,0 +1,1694 @@
+{
+  "components": {
+    "schemas": {
+      "AWGParams": {
+        "properties": {
+          "h1": {
+            "type": "string"
+          },
+          "h2": {
+            "type": "string"
+          },
+          "h3": {
+            "type": "string"
+          },
+          "h4": {
+            "type": "string"
+          },
+          "i1": {
+            "type": "string"
+          },
+          "i2": {
+            "type": "string"
+          },
+          "i3": {
+            "type": "string"
+          },
+          "i4": {
+            "type": "string"
+          },
+          "i5": {
+            "type": "string"
+          },
+          "jc": {
+            "type": "integer"
+          },
+          "jmax": {
+            "type": "integer"
+          },
+          "jmin": {
+            "type": "integer"
+          },
+          "s1": {
+            "type": "integer"
+          },
+          "s2": {
+            "type": "integer"
+          },
+          "s3": {
+            "type": "integer"
+          },
+          "s4": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "h1",
+          "h2",
+          "h3",
+          "h4",
+          "jc",
+          "jmax",
+          "jmin",
+          "s1",
+          "s2",
+          "s3",
+          "s4"
+        ],
+        "type": "object"
+      },
+      "AcceptInvite": {
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "password",
+          "token"
+        ],
+        "type": "object"
+      },
+      "ChangePassword": {
+        "properties": {
+          "current": {
+            "type": "string"
+          },
+          "new": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "current",
+          "new"
+        ],
+        "type": "object"
+      },
+      "CreateInvite": {
+        "properties": {
+          "admin": {
+            "type": "boolean"
+          },
+          "device_cap": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CreateNodeRequest": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "reenroll": {
+            "type": "boolean"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "roles",
+          "tags"
+        ],
+        "type": "object"
+      },
+      "CreateNodeResponse": {
+        "properties": {
+          "enrollment_token": {
+            "type": "string"
+          },
+          "node": {
+            "$ref": "#/components/schemas/NodeStatus"
+          },
+          "token_expires_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "type": "object"
+      },
+      "DeviceConfig": {
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "allowed_ips": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "bridge_public_key": {
+            "type": "string"
+          },
+          "dns": {
+            "type": "string"
+          },
+          "endpoints": {
+            "items": {
+              "$ref": "#/components/schemas/Endpoint"
+            },
+            "type": "array"
+          },
+          "ipv6_placeholder": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "allowed_ips",
+          "bridge_public_key",
+          "dns",
+          "endpoints",
+          "ipv6_placeholder"
+        ],
+        "type": "object"
+      },
+      "DeviceInfo": {
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "created_at",
+          "id",
+          "name",
+          "revoked",
+          "state"
+        ],
+        "type": "object"
+      },
+      "Endpoint": {
+        "properties": {
+          "host": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "host",
+          "label",
+          "port"
+        ],
+        "type": "object"
+      },
+      "Error": {
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "HealthStatus": {
+        "properties": {
+          "addr": {
+            "type": "string"
+          },
+          "agent_version": {
+            "type": "string"
+          },
+          "applied_version": {
+            "type": "integer"
+          },
+          "apply_failed": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "link_public_key": {
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkHealth"
+            },
+            "type": "array"
+          },
+          "listening": {
+            "items": {
+              "$ref": "#/components/schemas/ListenChoice"
+            },
+            "type": "array"
+          },
+          "paths": {
+            "items": {
+              "$ref": "#/components/schemas/RuleHealth"
+            },
+            "type": "array"
+          },
+          "received_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "seen_addr": {
+            "type": "string"
+          },
+          "time": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "addr",
+          "agent_version",
+          "applied_version",
+          "received_at",
+          "seen_addr",
+          "time"
+        ],
+        "type": "object"
+      },
+      "InstanceHealth": {
+        "properties": {
+          "down_since": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "loss": {
+            "type": "number"
+          },
+          "rtt_ms": {
+            "type": "number"
+          },
+          "up": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "loss",
+          "rtt_ms",
+          "up"
+        ],
+        "type": "object"
+      },
+      "InviteInfo": {
+        "properties": {
+          "admin": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "admin",
+          "expires_at",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "InviteToken": {
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
+      "IssuedDevice": {
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/DeviceConfig"
+          },
+          "device": {
+            "$ref": "#/components/schemas/DeviceInfo"
+          }
+        },
+        "required": [
+          "config",
+          "device"
+        ],
+        "type": "object"
+      },
+      "IssuedInvite": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expires_at",
+          "token",
+          "url"
+        ],
+        "type": "object"
+      },
+      "LinkHealth": {
+        "properties": {
+          "active_instance": {
+            "type": "integer"
+          },
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/InstanceHealth"
+            },
+            "type": "array"
+          },
+          "last_success_s": {
+            "type": "number"
+          },
+          "link_id": {
+            "type": "integer"
+          },
+          "loss": {
+            "type": "number"
+          },
+          "peer_egress_ok": {
+            "type": "boolean"
+          },
+          "peer_transit_rules": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "rtt_ms": {
+            "type": "number"
+          },
+          "transport": {
+            "type": "string"
+          },
+          "up": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "instances",
+          "last_success_s",
+          "link_id",
+          "loss",
+          "peer_egress_ok",
+          "rtt_ms",
+          "up"
+        ],
+        "type": "object"
+      },
+      "ListenChoice": {
+        "properties": {
+          "awg": {
+            "$ref": "#/components/schemas/AWGParams"
+          },
+          "instance_id": {
+            "type": "integer"
+          },
+          "port": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "instance_id",
+          "port"
+        ],
+        "type": "object"
+      },
+      "Login": {
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "totp_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle",
+          "password"
+        ],
+        "type": "object"
+      },
+      "Me": {
+        "properties": {
+          "admin": {
+            "type": "boolean"
+          },
+          "device_cap": {
+            "type": "integer"
+          },
+          "device_count": {
+            "type": "integer"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "mfa": {
+            "type": "boolean"
+          },
+          "totp_enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "admin",
+          "device_cap",
+          "device_count",
+          "handle",
+          "id",
+          "mfa",
+          "totp_enabled"
+        ],
+        "type": "object"
+      },
+      "NewDevice": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "public_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "public_key"
+        ],
+        "type": "object"
+      },
+      "NodeStatus": {
+        "properties": {
+          "enrolled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "last_health": {
+            "$ref": "#/components/schemas/HealthStatus"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "enrolled",
+          "id",
+          "name",
+          "roles",
+          "tags"
+        ],
+        "type": "object"
+      },
+      "RuleHealth": {
+        "properties": {
+          "eligible": {
+            "type": "integer"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "rule_id": {
+            "type": "integer"
+          },
+          "shares": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "eligible",
+          "mode",
+          "rule_id",
+          "shares"
+        ],
+        "type": "object"
+      },
+      "SetDeviceCap": {
+        "properties": {
+          "device_cap": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "device_cap"
+        ],
+        "type": "object"
+      },
+      "TOTPCode": {
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "TOTPOffer": {
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "uri": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "uri"
+        ],
+        "type": "object"
+      },
+      "UserInfo": {
+        "properties": {
+          "admin": {
+            "type": "boolean"
+          },
+          "device_cap": {
+            "type": "integer"
+          },
+          "device_count": {
+            "type": "integer"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "suspended": {
+            "type": "boolean"
+          },
+          "totp_enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "admin",
+          "device_cap",
+          "device_count",
+          "handle",
+          "id",
+          "suspended",
+          "totp_enabled"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "apiToken": {
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "session": {
+        "in": "cookie",
+        "name": "darz_session",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "description": "The panel's and the enroll playbook's API. Changes must be application/json.",
+    "title": "DARZ Coordinator API",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/admin/devices/{id}/revoke": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminDevicesIdRevoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Revoke any Device"
+      }
+    },
+    "/v1/admin/invites": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminInvites",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedInvite"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Create a new-User Invite"
+      }
+    },
+    "/v1/admin/users": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminUsers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Every User"
+      }
+    },
+    "/v1/admin/users/{id}": {
+      "delete": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "deleteAdminUsersId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Delete a User with their Devices and usage"
+      }
+    },
+    "/v1/admin/users/{id}/device-cap": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminUsersIdDeviceCap",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDeviceCap"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Set a User's Device cap"
+      }
+    },
+    "/v1/admin/users/{id}/devices": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminUsersIdDevices",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "A User's Devices"
+      }
+    },
+    "/v1/admin/users/{id}/recovery-invite": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminUsersIdRecoveryInvite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedInvite"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Create a recovery Invite: new credentials, same Devices"
+      }
+    },
+    "/v1/admin/users/{id}/resume": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminUsersIdResume",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Resume a suspended User"
+      }
+    },
+    "/v1/admin/users/{id}/suspend": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminUsersIdSuspend",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Suspend a User: their Devices leave the Bridges"
+      }
+    },
+    "/v1/invites/accept": {
+      "post": {
+        "operationId": "postInvitesAccept",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [],
+        "summary": "Redeem an Invite and sign in"
+      }
+    },
+    "/v1/invites/lookup": {
+      "post": {
+        "operationId": "postInvitesLookup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [],
+        "summary": "See what an Invite offers"
+      }
+    },
+    "/v1/login": {
+      "post": {
+        "operationId": "postLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [],
+        "summary": "Sign in"
+      }
+    },
+    "/v1/logout": {
+      "post": {
+        "operationId": "postLogout",
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "End this session"
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "operationId": "getMe",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "The signed-in User"
+      }
+    },
+    "/v1/me/devices": {
+      "get": {
+        "operationId": "getMeDevices",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "My Devices"
+      },
+      "post": {
+        "operationId": "postMeDevices",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewDevice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedDevice"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Create a Device from a public key made in the browser"
+      }
+    },
+    "/v1/me/devices/{id}/replace": {
+      "post": {
+        "operationId": "postMeDevicesIdReplace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewDevice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedDevice"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Issue a new Device and revoke this one in one step"
+      }
+    },
+    "/v1/me/devices/{id}/revoke": {
+      "post": {
+        "operationId": "postMeDevicesIdRevoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Revoke one of my Devices"
+      }
+    },
+    "/v1/me/password": {
+      "post": {
+        "operationId": "postMePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Change password; ends every other session"
+      }
+    },
+    "/v1/me/totp": {
+      "post": {
+        "operationId": "postMeTotp",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TOTPOffer"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Offer a new TOTP secret"
+      }
+    },
+    "/v1/me/totp/confirm": {
+      "post": {
+        "operationId": "postMeTotpConfirm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TOTPCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Confirm the offered TOTP secret with a code"
+      }
+    },
+    "/v1/me/totp/disable": {
+      "post": {
+        "operationId": "postMeTotpDisable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TOTPCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Turn TOTP off (not allowed for Admins)"
+      }
+    },
+    "/v1/nodes": {
+      "post": {
+        "operationId": "postNodes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateNodeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Create a Node, or get a fresh enrollment token for one"
+      }
+    },
+    "/v1/nodes/{id}": {
+      "get": {
+        "operationId": "getNodesId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeStatus"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "apiToken": []
+          }
+        ],
+        "summary": "Read a Node and its latest health"
+      }
+    }
+  }
+}

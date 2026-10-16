@@ -53,6 +53,7 @@ func (a *AdminClient) Do(t testing.TB, method, path string, in, out any) int {
 	if err != nil {
 		t.Fatal(err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 	if a.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+a.Token)
 	}

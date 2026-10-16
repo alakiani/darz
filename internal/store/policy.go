@@ -63,27 +63,9 @@ type Device struct {
 func (s *Store) CreateDevice(ctx context.Context, userID, name, publicKey string) (Device, error) {
 	d := Device{ID: "dv_" + randomHex(8), UserID: userID, Name: name, PublicKey: publicKey}
 	err := s.tx(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.Query(`SELECT address FROM devices`)
+		a, err := nextDeviceAddr(tx)
 		if err != nil {
 			return err
-		}
-		used := map[netip.Addr]bool{}
-		for rows.Next() {
-			var a string
-			if err := rows.Scan(&a); err != nil {
-				rows.Close()
-				return err
-			}
-			used[netip.MustParseAddr(a)] = true
-		}
-		rows.Close()
-		// Skip the network address and the resolver's.
-		a := DevicePool.Addr().Next().Next()
-		for used[a] {
-			a = a.Next()
-		}
-		if !DevicePool.Contains(a) {
-			return errors.New("device pool exhausted")
 		}
 		d.Address = a
 		var uid any

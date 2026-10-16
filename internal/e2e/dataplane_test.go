@@ -364,7 +364,11 @@ func dumpNetOnFailure(t *testing.T, l *lab.Lab, names ...string) {
 				{"ip", "route", "show", "table", "all"},
 				{"ip", "-s", "link"},
 				{"nstat", "-az", "IpInNoRoutes", "IpExtInNoRoutes", "TcpExtIPReversePathFilter", "IpForwDatagrams", "IpInAddrErrors", "IpOutNoRoutes", "IpInDelivers", "UdpNoPorts"},
-				{"cat", "/proc/sys/net/ipv4/ip_forward", "/proc/sys/net/ipv4/conf/all/rp_filter"},
+				{"sh", "-c", "for f in /proc/sys/net/ipv4/conf/*/rp_filter /proc/sys/net/ipv4/conf/*/src_valid_mark; do echo $f $(cat $f); done"},
+				// How the kernel routes a reply to each phone arriving from a site.
+				{"ip", "route", "get", "10.77.0.2", "from", "2.144.0.10", "iif", "wan0"},
+				{"ip", "route", "get", "10.77.0.3", "from", "2.144.0.10", "iif", "wan0"},
+				{"ip", "route", "get", "10.77.0.2", "from", "93.184.215.14", "iif", "wan0"},
 			} {
 				out, _ := n.Command(cmd[0], cmd[1:]...).CombinedOutput()
 				fmt.Fprintf(&b, "$ %s\n%s\n", strings.Join(cmd, " "), out)

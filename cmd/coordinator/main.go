@@ -25,6 +25,7 @@ import (
 
 	"github.com/alakiani/darz/internal/ca"
 	"github.com/alakiani/darz/internal/coordinator"
+	"github.com/alakiani/darz/internal/irfeed"
 	"github.com/alakiani/darz/internal/store"
 )
 
@@ -59,6 +60,8 @@ func serve(args []string, log *slog.Logger) error {
 	agentListen := fs.String("agent-listen", ":8443", "Agent API listen address")
 	agentHosts := fs.String("agent-hosts", "4miz.ir", "comma-separated hostnames and IPs Agents dial")
 	panelURL := fs.String("panel-url", "https://4miz.ir", "where the panel is served; Invite links point here")
+	feedURL := fs.String("feed-url", irfeed.DefaultURL, "the IR feed (list.rsc)")
+	ripeURL := fs.String("ripestat-url", irfeed.DefaultRIPEstatURL, "RIPEstat's list for the cross-check; empty to skip it")
 	fs.Parse(args)
 	if *showVersion {
 		fmt.Println(version)
@@ -76,6 +79,7 @@ func serve(args []string, log *slog.Logger) error {
 	}
 	c := coordinator.New(s, authority, log)
 	c.PanelURL = *panelURL
+	c.FeedURL, c.RIPEstatURL = *feedURL, *ripeURL
 	c.SecureCookies = *adminCert != "" // plain HTTP is for development only
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

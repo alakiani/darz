@@ -235,15 +235,24 @@ func (c *Coordinator) createNode(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
+	if resp, ok := c.ensureNode(w, r, req); ok {
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+// ensureNode creates a Node, or finds the one by that name, and mints an
+// enrollment token unless it already enrolled and no re-enrollment was
+// asked for. It answers errors itself and reports whether it succeeded.
+func (c *Coordinator) ensureNode(w http.ResponseWriter, r *http.Request, req protocol.CreateNodeRequest) (protocol.CreateNodeResponse, bool) {
 	req.Roles, req.Tags = normalize(req.Roles), normalize(req.Tags)
 	if req.Name == "" || len(req.Roles) == 0 {
 		writeError(w, http.StatusBadRequest, "name and at least one role are required")
-		return
+		return protocol.CreateNodeResponse{}, false
 	}
 	for _, role := range req.Roles {
 		if !role.Valid() {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown role %q", role))
-			return
+			return protocol.CreateNodeResponse{}, false
 		}
 	}
 
@@ -251,21 +260,20 @@ func (c *Coordinator) createNode(w http.ResponseWriter, r *http.Request) {
 	n, err := c.store.NodeByName(ctx, req.Name)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		if n, err = c.store.CreateNode(ctx, req.Name, req.Roles, req.Tags); err != nil {
-			c.internalError(w, err)
-			return
+		if n, err = c.store.CreateNode(ctx, req.Name, req.Roles, req.Tags); err == nil {
+			err = c.Reconcile(ctx)
 		}
-		if err := c.Reconcile(ctx); err != nil {
+		if err != nil {
 			c.internalError(w, err)
-			return
+			return protocol.CreateNodeResponse{}, false
 		}
 	case err != nil:
 		c.internalError(w, err)
-		return
+		return protocol.CreateNodeResponse{}, false
 	case !slices.Equal(n.Roles, req.Roles) || !slices.Equal(n.Tags, req.Tags):
 		// Rerunning the playbook must not silently change a live Node.
 		writeError(w, http.StatusConflict, fmt.Sprintf("node %q exists with roles %v and tags %v", n.Name, n.Roles, n.Tags))
-		return
+		return protocol.CreateNodeResponse{}, false
 	}
 
 	resp := protocol.CreateNodeResponse{Node: c.nodeStatus(ctx, n)}
@@ -273,11 +281,11 @@ func (c *Coordinator) createNode(w http.ResponseWriter, r *http.Request) {
 		token, expires, err := c.store.MintEnrollmentToken(ctx, n.ID, EnrollmentTokenTTL)
 		if err != nil {
 			c.internalError(w, err)
-			return
+			return protocol.CreateNodeResponse{}, false
 		}
 		resp.EnrollmentToken, resp.TokenExpiresAt = token, &expires
 	}
-	writeJSON(w, http.StatusOK, resp)
+	return resp, true
 }
 
 func (c *Coordinator) getNode(w http.ResponseWriter, r *http.Request) {

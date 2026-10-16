@@ -62,3 +62,24 @@ dd { margin: 0; }
 table.usage { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
 table.usage th, table.usage td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--line); text-align: start; }
 .recent { color: var(--muted); }
+
+/* The admin panel: English, left to right, denser. */
+.admin { max-width: 72rem; margin: 0 auto; padding: 0 1rem 3rem; }
+.admin-nav { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--line); margin-bottom: 1.5rem; }
+.admin-nav a.current { font-weight: 700; text-decoration: none; color: var(--fg); }
+.admin-login { max-width: 24rem; margin: 3rem auto; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.75rem; }
+.tile { display: flex; flex-direction: column; gap: 0.15rem; background: var(--card); border: 1px solid var(--line); border-radius: 0.75rem; padding: 0.75rem 1rem; color: var(--fg); text-decoration: none; font-size: 0.9rem; }
+table.list, table.matrix { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 1rem; }
+table.list th, table.list td, table.matrix th, table.matrix td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); text-align: start; vertical-align: top; }
+table.matrix td.up { color: #1a7f37; }
+table.matrix td.down { color: var(--danger); }
+.actions button { margin-inline-end: 0.4rem; }
+input.cap { display: inline-block; width: 4.5rem; padding: 0.2rem 0.4rem; margin: 0; }
+form.inline { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; }
+form.inline label { margin: 0; }
+label.check { display: inline-flex; align-items: center; gap: 0.3rem; margin-inline-end: 1rem; }
+label.check input { width: auto; margin: 0; }
+textarea, select { display: block; width: 100%; margin-top: 0.25rem; padding: 0.5rem; border: 1px solid var(--line); border-radius: 0.5rem; background: var(--bg); color: var(--fg); font: inherit; }
+pre { white-space: pre-wrap; word-break: break-all; background: var(--card); padding: 0.75rem; border-radius: 0.5rem; }
+code { word-break: break-all; }

@@ -153,7 +153,7 @@ func (s *Store) DestinationSets(ctx context.Context) ([]DestinationSet, error) {
 // SetFeedContent records a feed update that passed its gates as the set's
 // last good feed content, and refreshes the set's content.
 func (s *Store) SetFeedContent(ctx context.Context, setID uint64, content []netip.Prefix) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE destination_sets SET feed_content = ?, feed_updated_at = ? WHERE id = ?`,
+	_, err := s.db.ExecContext(ctx, `UPDATE destination_sets SET feed_previous = feed_content, feed_content = ?, feed_updated_at = ? WHERE id = ?`,
 		mustJSON(nonNil(content)), s.unix(), setID)
 	if err != nil {
 		return err

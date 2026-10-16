@@ -48,6 +48,8 @@ type Coordinator struct {
 	Egress EgressTargets
 	// Upstreams are the resolvers abroad Bridges forward DNS to.
 	Upstreams []string
+	// Scoring is pushed to every Bridge (ADR 0008).
+	Scoring protocol.Scoring
 	// FeedURL and RIPEstatURL are where the IR feed and its cross-check
 	// come from; HTTPClient fetches them.
 	FeedURL, RIPEstatURL string
@@ -62,7 +64,7 @@ type Coordinator struct {
 // New returns a Coordinator over s and c.
 func New(s *store.Store, c *ca.CA, log *slog.Logger) *Coordinator {
 	return &Coordinator{store: s, ca: c, log: log, LongPoll: 60 * time.Second,
-		LinkTiming: protocol.DefaultLinkTiming, Egress: DefaultEgressTargets, Upstreams: DefaultUpstreams,
+		LinkTiming: protocol.DefaultLinkTiming, Egress: DefaultEgressTargets, Upstreams: DefaultUpstreams, Scoring: protocol.DefaultScoring,
 		FeedURL: irfeed.DefaultURL, RIPEstatURL: irfeed.DefaultRIPEstatURL, HTTPClient: http.DefaultClient,
 		changed: make(chan struct{})}
 }

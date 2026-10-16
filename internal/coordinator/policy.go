@@ -68,6 +68,7 @@ func (c *Coordinator) bridgeState(ctx context.Context) (*protocol.BridgeState, e
 		Address:    netip.PrefixFrom(store.DevicePool.Addr().Next(), store.DevicePool.Bits()).String(),
 		Upstreams:  c.Upstreams,
 		Devices:    []protocol.Device{},
+		Scoring:    c.Scoring,
 	}
 
 	devices, err := c.store.Devices(ctx)

@@ -18,8 +18,8 @@ import (
 type resolver struct {
 	listen       string // host:port
 	upstreams    []string
-	upstreamPort string // "53"; tests point it elsewhere
-	dialer       *net.Dialer
+	upstreamPort string        // "53"; tests point it elsewhere
+	mark         func() uint32 // the mark upstream sockets carry, read per query
 
 	udpAddr, tcpAddr string // where it ended up listening
 
@@ -32,9 +32,14 @@ const (
 	tcpIdle         = 10 * time.Second
 )
 
-func newResolver(listen string, upstreams []string, mark uint32) *resolver {
-	return &resolver{listen: listen, upstreams: upstreams, upstreamPort: "53",
-		dialer: &net.Dialer{Timeout: upstreamTimeout, Control: markControl(mark)}}
+func newResolver(listen string, upstreams []string, mark func() uint32) *resolver {
+	return &resolver{listen: listen, upstreams: upstreams, upstreamPort: "53", mark: mark}
+}
+
+// dialer carries the mark in force now, so the resolver's queries follow
+// the default Rule's buckets as they move.
+func (r *resolver) dialer() *net.Dialer {
+	return &net.Dialer{Timeout: upstreamTimeout, Control: markControl(r.mark())}
 }
 
 // start listens on both UDP and TCP.
@@ -106,7 +111,7 @@ func (r *resolver) askUDP(ctx context.Context, query []byte) ([]byte, error) {
 	err := errors.New("no upstream resolver")
 	for _, up := range r.upstreams {
 		var c net.Conn
-		if c, err = r.dialer.DialContext(ctx, "udp4", net.JoinHostPort(up, r.upstreamPort)); err != nil {
+		if c, err = r.dialer().DialContext(ctx, "udp4", net.JoinHostPort(up, r.upstreamPort)); err != nil {
 			continue
 		}
 		c.SetDeadline(time.Now().Add(upstreamTimeout))
@@ -147,7 +152,7 @@ func (r *resolver) askTCP(ctx context.Context, query []byte) ([]byte, error) {
 	err := errors.New("no upstream resolver")
 	for _, up := range r.upstreams {
 		var c net.Conn
-		if c, err = r.dialer.DialContext(ctx, "tcp4", net.JoinHostPort(up, r.upstreamPort)); err != nil {
+		if c, err = r.dialer().DialContext(ctx, "tcp4", net.JoinHostPort(up, r.upstreamPort)); err != nil {
 			continue
 		}
 		c.SetDeadline(time.Now().Add(upstreamTimeout))

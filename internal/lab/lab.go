@@ -226,6 +226,12 @@ func DropAll(n *Node) FilterMatch {
 	return FilterMatch{fmt.Sprintf("ip daddr %s", n.addr)}
 }
 
+// DropBetween matches every packet between two Nodes, in both directions.
+func DropBetween(a, b *Node) FilterMatch {
+	set := fmt.Sprintf("{ %s, %s }", a.addr, b.addr)
+	return FilterMatch{fmt.Sprintf("ip saddr %s ip daddr %s", set, set)}
+}
+
 // FilterRule is one rule installed in the filter.
 type FilterRule struct {
 	lab    *Lab

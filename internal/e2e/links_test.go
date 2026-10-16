@@ -187,9 +187,11 @@ func TestLinks(t *testing.T) {
 		t.Errorf("crossing link has %d instances, want 2", n)
 	}
 	same := m.linkID("ir1", "ir2")
-	if lh := m.link("ir1", same); lh.Transport != protocol.TransportWireGuard {
-		t.Errorf("same-side link carried by %q, want wireguard first", lh.Transport)
-	}
+	// WireGuard is preferred. If AmneziaWG came up a moment sooner, the
+	// Link moves to WireGuard after the switch-back time.
+	testutil.Eventually(t, 45*time.Second, "same-side link carried by wireguard", func() bool {
+		return m.link("ir1", same).Transport == protocol.TransportWireGuard
+	})
 
 	// Blocking the active instance's port moves the Link within seconds to
 	// its other instance, once that one is Up as a warm standby.

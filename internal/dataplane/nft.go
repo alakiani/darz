@@ -91,6 +91,9 @@ func render(r ruleset) string {
 			w("\tmap dev_%d { type ipv4_addr : mark; elements = { %s } }", rule.ID, bucketElements(rule.Device))
 			w("\tmap tr_%d { type ipv4_addr : mark; elements = { %s } }", rule.ID, bucketElements(rule.Transit))
 		}
+		// Metering: bytes per Device address per candidate mark.
+		w("\tset usage_up { type ipv4_addr . mark; flags dynamic; size 65536; }")
+		w("\tset usage_down { type ipv4_addr . mark; flags dynamic; size 65536; }")
 		if len(r.TransitIfaces) > 0 {
 			w("\tset transit_ifaces { type ifname; elements = { %s } }", quoteAll(r.TransitIfaces))
 		} else {
@@ -148,6 +151,14 @@ func render(r ruleset) string {
 	w("\tchain forward {")
 	w("\t\ttype filter hook forward priority mangle; policy accept;")
 	w("\t\ttcp flags syn / syn,rst tcp option maxseg size set rt mtu")
+	if r.Bridge {
+		// A Device's connection remembers its candidate, tagged so the
+		// return-over-a-Link rule never takes it for a Link's mark; then
+		// both directions are counted by that candidate.
+		w("\t\tiifname %q ct state new ct mark set meta mark or %#x", DeviceIface, deviceConnBit)
+		w("\t\tiifname %q update @usage_up { ip saddr . meta mark counter }", DeviceIface)
+		w("\t\toifname %q update @usage_down { ip daddr . ct mark counter }", DeviceIface)
+	}
 	w("\t}")
 
 	w("\tchain postrouting {")

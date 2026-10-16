@@ -389,6 +389,13 @@ func (c *Coordinator) health(w http.ResponseWriter, r *http.Request) {
 		c.internalError(w, err)
 		return
 	}
+	// Metering comes from Bridges only (ADR 0002).
+	if len(h.Usage) > 0 && isBridge(n) {
+		if _, err := c.store.PutUsage(r.Context(), n.ID, h.Usage); err != nil {
+			c.internalError(w, err)
+			return
+		}
+	}
 	// A new public address changes the endpoint the Node's peers dial.
 	changed := prev == nil || prev.SeenAddr != seen
 	linksChanged, err := c.takeLinkHealth(r.Context(), n, h)

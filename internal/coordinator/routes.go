@@ -54,6 +54,7 @@ func (c *Coordinator) routes() []route {
 		{"POST", "/v1/me/totp/disable", authUser, "Turn TOTP off (not allowed for Admins)", protocol.TOTPCode{}, protocol.Me{}, c.disableTOTP},
 		{"GET", "/v1/me/devices", authUser, "My Devices", nil, []protocol.DeviceInfo{}, c.myDevices},
 		{"POST", "/v1/me/devices", authUser, "Create a Device from a public key made in the browser", protocol.NewDevice{}, protocol.IssuedDevice{}, c.createDevice},
+		{"GET", "/v1/me/devices/{id}/usage", authUser, "One of my Devices' usage: hourly, daily and monthly", nil, protocol.DeviceUsage{}, c.deviceUsage},
 		{"POST", "/v1/me/devices/{id}/revoke", authUser, "Revoke one of my Devices", nil, protocol.DeviceInfo{}, c.revokeMyDevice},
 		{"POST", "/v1/me/devices/{id}/replace", authUser, "Issue a new Device and revoke this one in one step", protocol.NewDevice{}, protocol.IssuedDevice{}, c.replaceDevice},
 

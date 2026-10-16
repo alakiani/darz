@@ -569,3 +569,44 @@ func TestLogoutEverywhere(t *testing.T) {
 	cl.must(401, "GET", "/v1/me", nil, nil)
 	other.must(401, "GET", "/v1/me", nil, nil)
 }
+
+func TestDeviceUsage(t *testing.T) {
+	a := newAPI(t)
+	exit, _ := a.s.CreateNode(context.Background(), "ab1", []protocol.Role{protocol.RoleExit}, nil)
+	admin := a.admin()
+	cl, me := a.user("maryam")
+	var issued protocol.IssuedDevice
+	cl.must(200, "POST", "/v1/me/devices", protocol.NewDevice{Name: "phone", PublicKey: pubKey(t)}, &issued)
+	hour := a.clock.UTC().Truncate(time.Hour)
+	if _, err := a.s.PutUsage(context.Background(), "nd_bridge", []protocol.UsageBucket{
+		{Hour: hour.Unix(), Device: issued.Device.Address, Exit: exit.ID, Up: 1000, Down: 5000},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var u protocol.DeviceUsage
+	cl.must(200, "GET", "/v1/me/devices/"+issued.Device.ID+"/usage", nil, &u)
+	if len(u.Hourly) != 1 || u.Hourly[0].Exit != "ab1" || u.Hourly[0].Up != 1000 || u.Hourly[0].Down != 5000 {
+		t.Errorf("hourly = %+v", u.Hourly)
+	}
+	if len(u.Daily) != 1 || len(u.Monthly) != 1 || u.Monthly[0].Exit != "" {
+		t.Errorf("daily %+v, monthly %+v", u.Daily, u.Monthly)
+	}
+	var list []protocol.DeviceInfo
+	cl.must(200, "GET", "/v1/me/devices", nil, &list)
+	if list[0].RecentBytes != 6000 {
+		t.Errorf("recent bytes = %d", list[0].RecentBytes)
+	}
+
+	other, _ := a.user("reza")
+	other.must(404, "GET", "/v1/me/devices/"+issued.Device.ID+"/usage", nil, nil)
+
+	// Admins see a total per User, not per Device.
+	var users []protocol.UserInfo
+	admin.must(200, "GET", "/v1/admin/users", nil, &users)
+	for _, u := range users {
+		if u.ID == me.ID && u.MonthBytes != 6000 {
+			t.Errorf("month bytes = %d", u.MonthBytes)
+		}
+	}
+}

@@ -8,6 +8,8 @@ export type DeviceInfo = components["schemas"]["DeviceInfo"];
 export type IssuedDevice = components["schemas"]["IssuedDevice"];
 export type InviteInfo = components["schemas"]["InviteInfo"];
 export type TOTPOffer = components["schemas"]["TOTPOffer"];
+export type DeviceUsage = components["schemas"]["DeviceUsage"];
+export type UsageRow = components["schemas"]["UsageRow"];
 
 // Every request is JSON: the API refuses anything else that changes state.
 export const api = createClient<paths>({ baseUrl: "", headers: { "Content-Type": "application/json" } });

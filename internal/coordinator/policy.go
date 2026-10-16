@@ -209,6 +209,23 @@ func (c *Coordinator) fetchPrefixes(ctx context.Context, url string, parse func(
 	return parse(io.LimitReader(resp.Body, 32<<20))
 }
 
+// RunRollUps folds usage into coarser totals now and then every interval
+// until ctx ends (ADR 0003).
+func (c *Coordinator) RunRollUps(ctx context.Context, interval time.Duration) {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		if err := c.store.RollUp(ctx); err != nil {
+			c.log.Error("usage roll-up", "err", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
 // RunIRFeed refreshes the IR feed now and then every interval until ctx
 // ends.
 func (c *Coordinator) RunIRFeed(ctx context.Context, interval time.Duration) {

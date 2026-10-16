@@ -285,7 +285,7 @@ func TestDataPlane(t *testing.T) {
 		addrs[i] = d.Address
 	}
 
-	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}}
+	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{}}
 	m.startAgent("ir1", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ir2", []protocol.Role{protocol.RoleExit}, []string{"IR"})
 	m.startAgent("ir3", []protocol.Role{protocol.RoleBridge, protocol.RoleExit}, []string{"IR"})

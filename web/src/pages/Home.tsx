@@ -35,7 +35,10 @@ export function HomePage({ me }: { me: Me }) {
           <li key={d.id}>
             <a href={`#/devices/${d.id}`}>
               <strong>{d.name}</strong>
-              <span className={`state ${d.state}`}>{stateLabel(d)}</span>
+              <span className={`state ${d.state}`}>
+                {stateLabel(d)}
+                {d.recent_bytes > 0 && <small className="recent"> · {fa.usedRecently}</small>}
+              </span>
             </a>
           </li>
         ))}

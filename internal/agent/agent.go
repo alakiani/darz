@@ -47,6 +47,13 @@ type Reporter interface {
 	Report(h *protocol.Health)
 }
 
+// Acker is implemented by an Applier that needs to know a health report
+// reached the Coordinator, such as the meter, which then drops the usage it
+// carried.
+type Acker interface {
+	Acked(h *protocol.Health)
+}
+
 // Fetch fetches a path of the Agent API, such as /v1/sets/{hash}, and
 // returns its body.
 type Fetch func(ctx context.Context, path string) ([]byte, error)
@@ -74,6 +81,14 @@ func (as Appliers) Report(h *protocol.Health) {
 	for _, a := range as {
 		if r, ok := a.(Reporter); ok {
 			r.Report(h)
+		}
+	}
+}
+
+func (as Appliers) Acked(h *protocol.Health) {
+	for _, a := range as {
+		if k, ok := a.(Acker); ok {
+			k.Acked(h)
 		}
 	}
 }
@@ -408,6 +423,9 @@ func (a *agent) sendHealth(ctx context.Context) error {
 	}
 	if _, err := a.do(ctx, a.client, http.MethodPost, "/v1/health", h, nil, a.cfg.RequestTimeout); err != nil {
 		return err
+	}
+	if k, ok := a.cfg.Applier.(Acker); ok {
+		k.Acked(&h)
 	}
 	if len(h.ApplyFailed) > 0 {
 		a.mu.Lock()

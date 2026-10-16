@@ -253,6 +253,19 @@ type Health struct {
 	Links     []LinkHealth   `json:"links,omitempty"`
 	// Paths are a Bridge's bucket shares per candidate per Rule (ADR 0008).
 	Paths []RuleHealth `json:"paths,omitempty"`
+	// Usage carries metering from Bridges: hourly buckets, each sent until
+	// a health POST carrying it succeeds (ADR 0002).
+	Usage []UsageBucket `json:"usage,omitempty"`
+}
+
+// UsageBucket is one Device's bytes through one Exit in one hour, by the
+// Bridge's clock. Uploads replace, never add, so resending is harmless.
+type UsageBucket struct {
+	Hour   int64  `json:"hour"`   // Unix time of the hour's start
+	Device string `json:"device"` // the Device's tunnel address
+	Exit   string `json:"exit"`   // the Exit's Node id; a transit Bridge's while in transit
+	Up     uint64 `json:"up"`     // bytes from the Device
+	Down   uint64 `json:"down"`   // bytes to the Device
 }
 
 // RuleHealth is how a Bridge is carrying one Rule.

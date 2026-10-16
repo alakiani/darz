@@ -83,6 +83,7 @@ func serve(args []string, log *slog.Logger) error {
 		return err
 	}
 	go c.RunIRFeed(ctx, 24*time.Hour)
+	go c.RunRollUps(ctx, time.Hour)
 
 	agentTLS, err := c.AgentTLSConfig(strings.Split(*agentHosts, ","))
 	if err != nil {

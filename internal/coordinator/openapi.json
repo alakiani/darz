@@ -212,6 +212,9 @@
           "reason": {
             "type": "string"
           },
+          "recent_bytes": {
+            "type": "integer"
+          },
           "revoked": {
             "type": "boolean"
           },
@@ -224,8 +227,37 @@
           "created_at",
           "id",
           "name",
+          "recent_bytes",
           "revoked",
           "state"
+        ],
+        "type": "object"
+      },
+      "DeviceUsage": {
+        "properties": {
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/UsageRow"
+            },
+            "type": "array"
+          },
+          "hourly": {
+            "items": {
+              "$ref": "#/components/schemas/UsageRow"
+            },
+            "type": "array"
+          },
+          "monthly": {
+            "items": {
+              "$ref": "#/components/schemas/UsageRow"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "daily",
+          "hourly",
+          "monthly"
         ],
         "type": "object"
       },
@@ -307,6 +339,12 @@
           "time": {
             "format": "date-time",
             "type": "string"
+          },
+          "usage": {
+            "items": {
+              "$ref": "#/components/schemas/UsageBucket"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -650,6 +688,55 @@
         ],
         "type": "object"
       },
+      "UsageBucket": {
+        "properties": {
+          "device": {
+            "type": "string"
+          },
+          "down": {
+            "type": "integer"
+          },
+          "exit": {
+            "type": "string"
+          },
+          "hour": {
+            "type": "integer"
+          },
+          "up": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "device",
+          "down",
+          "exit",
+          "hour",
+          "up"
+        ],
+        "type": "object"
+      },
+      "UsageRow": {
+        "properties": {
+          "down": {
+            "type": "integer"
+          },
+          "exit": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "up": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "down",
+          "period",
+          "up"
+        ],
+        "type": "object"
+      },
       "UserInfo": {
         "properties": {
           "admin": {
@@ -667,6 +754,9 @@
           "id": {
             "type": "string"
           },
+          "month_bytes": {
+            "type": "integer"
+          },
           "suspended": {
             "type": "boolean"
           },
@@ -680,6 +770,7 @@
           "device_count",
           "handle",
           "id",
+          "month_bytes",
           "suspended",
           "totp_enabled"
         ],
@@ -1447,6 +1538,49 @@
           }
         ],
         "summary": "Revoke one of my Devices"
+      }
+    },
+    "/v1/me/devices/{id}/usage": {
+      "get": {
+        "operationId": "getMeDevicesIdUsage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceUsage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "One of my Devices' usage: hourly, daily and monthly"
       }
     },
     "/v1/me/logout-everywhere": {

@@ -40,6 +40,10 @@ func TestBridgeRuleset(t *testing.T) {
 		`ct state new counter ct mark set iifname map { "dz3i" : 0x20003, "dz4i" : 0x20004, "dz9i" : 0x20009 }`,
 		`ct direction reply ct mark & 0xffff0000 == 0x20000 counter meta mark set ct mark`,
 		"tcp option maxseg size set rt mtu",
+		"set usage_up { type ipv4_addr . mark; flags dynamic; size 65536; }",
+		`iifname "darz0" ct state new ct mark set meta mark or 0x10000`,
+		`iifname "darz0" update @usage_up { ip saddr . meta mark counter }`,
+		`oifname "darz0" update @usage_down { ip daddr . ct mark counter }`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("ruleset lacks %q:\n%s", want, got)

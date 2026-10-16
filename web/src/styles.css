@@ -59,3 +59,6 @@ dd { margin: 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; }
 .secret { font-family: ui-monospace, monospace; word-break: break-all; }
 .help article { margin-bottom: 1.5rem; }
+table.usage { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
+table.usage th, table.usage td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--line); text-align: start; }
+.recent { color: var(--muted); }

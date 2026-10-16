@@ -30,10 +30,11 @@ func binDir(t *testing.T) string {
 
 // mesh is the lab mesh of this test: Nodes running the real Agent binary.
 type mesh struct {
-	t   *testing.T
-	l   *lab.Lab
-	co  *coord
-	ids map[string]string // Node name -> id
+	t      *testing.T
+	l      *lab.Lab
+	co     *coord
+	ids    map[string]string // Node name -> id
+	agents map[string]*agentProc
 }
 
 func (m *mesh) startAgent(name string, roles []protocol.Role, tags []string) {
@@ -50,16 +51,46 @@ func (m *mesh) startAgent(name string, roles []protocol.Role, tags []string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := m.l.Node(name).Command(filepath.Join(bin, "agent"),
+	ap := &agentProc{t: t, node: m.l.Node(name), log: log, args: []string{filepath.Join(bin, "agent"),
 		"-coordinators", m.co.agentURL, "-ca", caFile, "-state-dir", filepath.Join(dir, "state"),
 		"-enroll-token-file", tokenFile, "-awg-runner", "exec", "-awg-binary", filepath.Join(bin, "amneziawg-go"),
-		"-health-interval", "1s")
-	cmd.Stdout, cmd.Stderr = log, log
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
+		"-health-interval", "1s"}}
+	ap.start()
 	dumpOnFailure(t, "agent "+name, logFile)
-	t.Cleanup(func() { cmd.Process.Kill(); cmd.Wait() })
+	t.Cleanup(ap.stop)
+	m.agents[name] = ap
+}
+
+// agentProc is a running Agent binary in a lab Node.
+type agentProc struct {
+	t    *testing.T
+	node *lab.Node
+	args []string
+	log  *os.File
+	cmd  *exec.Cmd
+}
+
+func (a *agentProc) start() {
+	a.t.Helper()
+	a.cmd = a.node.Command(a.args[0], a.args[1:]...)
+	a.cmd.Stdout, a.cmd.Stderr = a.log, a.log
+	if err := a.cmd.Start(); err != nil {
+		a.t.Fatal(err)
+	}
+}
+
+func (a *agentProc) stop() {
+	if a.cmd != nil && a.cmd.Process != nil {
+		a.cmd.Process.Kill()
+		a.cmd.Wait()
+	}
+}
+
+// restart kills the Agent and starts it again on the same state; tunnels
+// and nftables state live on, as on a real Node.
+func (a *agentProc) restart() {
+	a.stop()
+	a.start()
 }
 
 // linkID is the id of the Link between two Nodes.
@@ -140,7 +171,7 @@ func TestLinks(t *testing.T) {
 	l := lab.Start(t, "coord", "ir1", "ir2", "ab1", "ab2")
 	co := startCoordinator(t, l.Node("coord"))
 	co.c.LinkTiming = protocol.LinkTiming{SwitchBackSeconds: 15, RetryMinSeconds: 2, RetryMaxSeconds: 4, ReplaceAfterSeconds: 25}
-	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}}
+	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{}}
 
 	// Plain WireGuard handshake initiations: a 148-byte UDP payload that
 	// starts with message type 1. Counted in both directions.

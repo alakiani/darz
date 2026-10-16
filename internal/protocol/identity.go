@@ -80,6 +80,24 @@ type DeviceInfo struct {
 	// State is the effective state: active, blocked or throttled.
 	State  string `json:"state"`
 	Reason string `json:"reason,omitempty"`
+	// RecentBytes is what the Device moved in this hour and the last: the
+	// "used in the last hour" mark. Never connection times (ADR 0003).
+	RecentBytes uint64 `json:"recent_bytes"`
+}
+
+// DeviceUsage is a Device's usage at each resolution ADR 0003 keeps.
+type DeviceUsage struct {
+	Hourly  []UsageRow `json:"hourly"`  // the last 7 days, per Exit
+	Daily   []UsageRow `json:"daily"`   // the last 90 days, per Exit
+	Monthly []UsageRow `json:"monthly"` // every month, all Exits together
+}
+
+// UsageRow is bytes in one period through one Exit.
+type UsageRow struct {
+	Period string `json:"period"` // an RFC 3339 hour, a YYYY-MM-DD day, or a YYYY-MM month
+	Exit   string `json:"exit,omitempty"`
+	Up     uint64 `json:"up"`
+	Down   uint64 `json:"down"`
 }
 
 // IssuedDevice is a new Device and everything its configs need, except the
@@ -129,6 +147,9 @@ type UserInfo struct {
 	TOTPEnabled bool   `json:"totp_enabled"`
 	DeviceCap   int    `json:"device_cap"`
 	DeviceCount int    `json:"device_count"`
+	// MonthBytes is the User's total this calendar month: Admins see
+	// totals per User, not per Device.
+	MonthBytes uint64 `json:"month_bytes"`
 }
 
 // SetDeviceCap changes a User's Device cap.

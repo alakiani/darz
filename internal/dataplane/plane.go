@@ -50,7 +50,13 @@ type Config struct {
 	Log      *slog.Logger
 }
 
-const syncInterval = 500 * time.Millisecond
+const (
+	syncInterval  = 500 * time.Millisecond
+	usageInterval = 10 * time.Second
+	// maxUsagePerReport keeps a health report small after a long outage;
+	// the rest goes in the reports after it.
+	maxUsagePerReport = 500
+)
 
 // Plane is the Agent's Applier for the data plane.
 type Plane struct {
@@ -72,6 +78,8 @@ type Plane struct {
 	applied map[string][buckets]string // nft map name -> buckets in force
 	paths   []protocol.RuleHealth
 	transit []uint32
+
+	meter *meter
 }
 
 type uplink struct{ dev, gateway string }
@@ -88,8 +96,12 @@ func New(cfg Config) (*Plane, error) {
 	if err := os.MkdirAll(filepath.Join(cfg.StateDir, "sets"), 0o700); err != nil {
 		return nil, err
 	}
+	m, err := openMeter(filepath.Join(cfg.StateDir, "usage.json"), time.Now)
+	if err != nil {
+		return nil, err
+	}
 	return &Plane{cfg: cfg, log: cfg.Log, wg: c, dev: map[uint64]*bucketState{}, tr: map[uint64]*bucketState{},
-		avail: map[string]*availability{}, applied: map[string][buckets]string{}}, nil
+		avail: map[string]*availability{}, applied: map[string][buckets]string{}, meter: m}, nil
 }
 
 // UseFetch implements agent.FetchUser.
@@ -150,9 +162,15 @@ func (p *Plane) Apply(ctx context.Context, st protocol.State) error {
 		deleteLink(ctx, DeviceIface)
 	}
 
+	// Count what moved under the old ruleset before its counters go, also
+	// right after an Agent restart, when the old ruleset is still loaded.
+	if st.Bridge != nil {
+		p.collectUsage(ctx, &st)
+	}
 	if err := nft(ctx, render(rs)); err != nil {
 		return err
 	}
+	p.meter.reset()
 	clear(p.applied)
 	for _, r := range rs.Rules {
 		p.applied[fmt.Sprintf("dev_%d", r.ID)] = r.Device
@@ -168,8 +186,16 @@ func (p *Plane) Apply(ctx context.Context, st protocol.State) error {
 func (p *Plane) Run(ctx context.Context) {
 	t := time.NewTicker(syncInterval)
 	defer t.Stop()
+	usage := time.NewTicker(usageInterval)
+	defer usage.Stop()
 	for {
 		select {
+		case <-usage.C:
+			p.mu.Lock()
+			if p.st != nil && p.st.Bridge != nil {
+				p.collectUsage(ctx, p.st)
+			}
+			p.mu.Unlock()
 		case <-ctx.Done():
 			p.mu.Lock()
 			if p.resolver != nil {
@@ -416,11 +442,87 @@ func (p *Plane) syncPaths(ctx context.Context) {
 	p.applied = next
 }
 
-// Report adds bucket shares per candidate per Rule to a health report.
+// Report adds bucket shares per candidate per Rule, and usage, to a
+// health report.
 func (p *Plane) Report(h *protocol.Health) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	h.Paths = slices.Clone(p.paths)
+	p.mu.Unlock()
+	h.Usage = p.meter.report(maxUsagePerReport)
+}
+
+// Acked drops the usage the Coordinator now has.
+func (p *Plane) Acked(h *protocol.Health) { p.meter.acked(h.Usage) }
+
+// collectUsage reads the counting sets into the meter, naming Exits by st.
+// Call with mu held.
+func (p *Plane) collectUsage(ctx context.Context, st *protocol.State) {
+	peers := map[uint32]string{}
+	for _, l := range st.Links {
+		peers[linkMark(l.ID)] = l.Peer.ID
+	}
+	self := st.Node.ID
+	exitOf := func(mark uint32) string {
+		if mark == localMark {
+			return self
+		}
+		return peers[mark] // a transit Bridge's id while in transit
+	}
+	if err := p.meter.collect(func(set string) ([]counterElem, error) { return readCounters(ctx, set) }, exitOf); err != nil {
+		p.log.Warn("read usage counters", "err", err)
+	}
+}
+
+// readCounters lists a counting set's elements and their byte counters.
+func readCounters(ctx context.Context, set string) ([]counterElem, error) {
+	out, err := exec.CommandContext(ctx, "nft", "-j", "list", "set", "inet", "darz", set).Output()
+	if err != nil {
+		return nil, err
+	}
+	return parseCounters(out)
+}
+
+// parseCounters reads `nft -j list set` output for sets of
+// ipv4_addr . mark with per-element counters.
+func parseCounters(b []byte) ([]counterElem, error) {
+	var doc struct {
+		Nftables []struct {
+			Set *struct {
+				Elem []json.RawMessage `json:"elem"`
+			} `json:"set"`
+		} `json:"nftables"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		return nil, err
+	}
+	var out []counterElem
+	for _, item := range doc.Nftables {
+		if item.Set == nil {
+			continue
+		}
+		for _, raw := range item.Set.Elem {
+			var e struct {
+				Elem struct {
+					Val struct {
+						Concat []json.RawMessage `json:"concat"`
+					} `json:"val"`
+					Counter struct {
+						Bytes uint64 `json:"bytes"`
+					} `json:"counter"`
+				} `json:"elem"`
+			}
+			if err := json.Unmarshal(raw, &e); err != nil || len(e.Elem.Val.Concat) != 2 {
+				continue
+			}
+			var addr string
+			var mark uint32
+			if json.Unmarshal(e.Elem.Val.Concat[0], &addr) != nil || json.Unmarshal(e.Elem.Val.Concat[1], &mark) != nil {
+				continue
+			}
+			out = append(out, counterElem{addr: addr, mark: mark, bytes: e.Elem.Counter.Bytes})
+		}
+	}
+	return out, nil
 }
 
 // resolverMark is the mark of the resolver's own queries: those of a

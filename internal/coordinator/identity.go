@@ -352,10 +352,57 @@ func (c *Coordinator) respondMe(w http.ResponseWriter, r *http.Request, userID s
 	writeJSON(w, http.StatusOK, me)
 }
 
-func (c *Coordinator) deviceInfo(d store.UserDevice, acct store.Account) protocol.DeviceInfo {
+func (c *Coordinator) deviceInfo(r *http.Request, d store.UserDevice, acct store.Account) protocol.DeviceInfo {
 	state, reason := effectiveState(d.Revoked, acct.Suspended)
+	recent, err := c.store.RecentBytes(r.Context(), d.ID)
+	if err != nil {
+		c.log.Error("recent usage", "device", d.ID, "err", err)
+	}
 	return protocol.DeviceInfo{ID: d.ID, Name: d.Name, Address: d.Address.String(), CreatedAt: d.CreatedAt,
-		Revoked: d.Revoked, State: string(state), Reason: reason}
+		Revoked: d.Revoked, State: string(state), Reason: reason, RecentBytes: recent}
+}
+
+func (c *Coordinator) deviceUsage(w http.ResponseWriter, r *http.Request) {
+	cl := callerFrom(r)
+	d, err := c.store.UserDevice(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) || err == nil && d.UserID != cl.account.ID {
+		writeError(w, http.StatusNotFound, "no such Device of yours")
+		return
+	}
+	var u store.DeviceUsage
+	if err == nil {
+		u, err = c.store.Usage(r.Context(), d.ID)
+	}
+	var names map[string]string
+	if err == nil {
+		names, err = c.nodeNames(r)
+	}
+	if err != nil {
+		c.internalError(w, err)
+		return
+	}
+	conv := func(rows []store.UsageRow) []protocol.UsageRow {
+		out := []protocol.UsageRow{}
+		for _, row := range rows {
+			exit := names[row.Exit]
+			if exit == "" && row.Exit != "" {
+				exit = "?" // a Node since deleted
+			}
+			out = append(out, protocol.UsageRow{Period: row.Period, Exit: exit, Up: row.Up, Down: row.Down})
+		}
+		return out
+	}
+	writeJSON(w, http.StatusOK, protocol.DeviceUsage{Hourly: conv(u.Hourly), Daily: conv(u.Daily), Monthly: conv(u.Monthly)})
+}
+
+// nodeNames maps Node ids to names, which usage shows Exits by.
+func (c *Coordinator) nodeNames(r *http.Request) (map[string]string, error) {
+	nodes, err := c.store.Nodes(r.Context())
+	names := map[string]string{}
+	for _, n := range nodes {
+		names[n.ID] = n.Name
+	}
+	return names, err
 }
 
 func (c *Coordinator) myDevices(w http.ResponseWriter, r *http.Request) {
@@ -370,7 +417,7 @@ func (c *Coordinator) listDevices(w http.ResponseWriter, r *http.Request, acct s
 	}
 	out := []protocol.DeviceInfo{}
 	for _, d := range devs {
-		out = append(out, c.deviceInfo(d, acct))
+		out = append(out, c.deviceInfo(r, d, acct))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -423,7 +470,7 @@ func (c *Coordinator) issueDevice(w http.ResponseWriter, r *http.Request, replac
 		c.internalError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, protocol.IssuedDevice{Device: c.deviceInfo(d, cl.account), Config: cfg})
+	writeJSON(w, http.StatusOK, protocol.IssuedDevice{Device: c.deviceInfo(r, d, cl.account), Config: cfg})
 }
 
 // deviceConfig is what the browser needs to render a Device's three
@@ -474,7 +521,7 @@ func (c *Coordinator) revoke(w http.ResponseWriter, r *http.Request, d store.Use
 		c.internalError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, c.deviceInfo(d, owner))
+	writeJSON(w, http.StatusOK, c.deviceInfo(r, d, owner))
 }
 
 func (c *Coordinator) issueInvite(w http.ResponseWriter, r *http.Request, inv store.Invite) {
@@ -504,8 +551,12 @@ func (c *Coordinator) adminCreateInvite(w http.ResponseWriter, r *http.Request) 
 
 func (c *Coordinator) userInfo(r *http.Request, a store.Account) (protocol.UserInfo, error) {
 	devs, err := c.store.UserDevices(r.Context(), a.ID)
+	if err != nil {
+		return protocol.UserInfo{}, err
+	}
+	month, err := c.store.UserMonthBytes(r.Context(), a.ID)
 	return protocol.UserInfo{ID: a.ID, Handle: a.Handle, Admin: a.Admin, Suspended: a.Suspended,
-		TOTPEnabled: a.TOTPSecret != "", DeviceCap: a.DeviceCap, DeviceCount: activeCount(devs)}, err
+		TOTPEnabled: a.TOTPSecret != "", DeviceCap: a.DeviceCap, DeviceCount: activeCount(devs), MonthBytes: month}, err
 }
 
 func (c *Coordinator) adminUsers(w http.ResponseWriter, r *http.Request) {

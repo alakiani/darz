@@ -15,6 +15,26 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # The Coordinator embeds the panel, so it is built before any Go step.
+      - name: Build and test the panel
+        working-directory: web
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Install the browser for the panel's lab test
+        working-directory: web
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/pw
+        run: npx playwright install --with-deps chromium
+
       - name: Install lab dependencies
         run: |
           sudo apt-get update
@@ -40,4 +60,4 @@ jobs:
         run: go build -o "$RUNNER_TEMP/darz-bin/" ./cmd/agent github.com/amnezia-vpn/amneziawg-go
 
       - name: Test, with the lab (as root)
-        run: go test -exec "sudo env DARZ_BIN=$RUNNER_TEMP/darz-bin" -race -count=1 -v -timeout 15m ./...
+        run: go test -exec "sudo env DARZ_BIN=$RUNNER_TEMP/darz-bin PATH=$PATH PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/pw" -race -count=1 -v -timeout 20m ./...

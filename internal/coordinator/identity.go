@@ -234,6 +234,15 @@ func (c *Coordinator) logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (c *Coordinator) logoutEverywhere(w http.ResponseWriter, r *http.Request) {
+	if err := c.store.DeleteUserSessions(r.Context(), callerFrom(r).account.ID, ""); err != nil {
+		c.internalError(w, err)
+		return
+	}
+	clearSession(w, c.SecureCookies)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (c *Coordinator) me(w http.ResponseWriter, r *http.Request) {
 	cl := callerFrom(r)
 	me, err := c.meOf(r, cl.account, cl.session.MFA)

@@ -559,3 +559,13 @@ func TestNodesRoutesAndSpec(t *testing.T) {
 		t.Errorf("served spec = %v", spec["openapi"])
 	}
 }
+
+func TestLogoutEverywhere(t *testing.T) {
+	a := newAPI(t)
+	cl, _ := a.user("maryam")
+	other := a.client()
+	other.must(200, "POST", "/v1/login", protocol.Login{Handle: "maryam", Password: password}, nil)
+	cl.must(204, "POST", "/v1/me/logout-everywhere", nil, nil)
+	cl.must(401, "GET", "/v1/me", nil, nil)
+	other.must(401, "GET", "/v1/me", nil, nil)
+}

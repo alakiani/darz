@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/alakiani/darz/internal/panel"
 	"github.com/alakiani/darz/internal/protocol"
 	"github.com/alakiani/darz/internal/store"
 )
@@ -43,6 +44,7 @@ func (c *Coordinator) routes() []route {
 		{"POST", "/v1/invites/accept", authNone, "Redeem an Invite and sign in", protocol.AcceptInvite{}, protocol.Me{}, c.acceptInvite},
 		{"POST", "/v1/login", authNone, "Sign in", protocol.Login{}, protocol.Me{}, c.login},
 		{"POST", "/v1/logout", authUser, "End this session", nil, nil, c.logout},
+		{"POST", "/v1/me/logout-everywhere", authUser, "End every session of mine, this one too", nil, nil, c.logoutEverywhere},
 
 		// The signed-in User.
 		{"GET", "/v1/me", authUser, "The signed-in User", nil, protocol.Me{}, c.me},
@@ -91,6 +93,7 @@ func (c *Coordinator) AdminHandler() http.Handler {
 		}
 		mux.Handle(r.method+" "+r.path, h)
 	}
+	mux.Handle("GET /", panel.Handler())
 	return mux
 }
 

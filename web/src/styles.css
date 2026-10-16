@@ -1,0 +1,61 @@
+/* System fonts only: phones ship Farsi faces, and font CDNs are unreliable
+   from Iran. */
+:root {
+  --bg: #f6f7f9;
+  --fg: #1d2330;
+  --muted: #667085;
+  --card: #ffffff;
+  --line: #dde1e7;
+  --accent: #1f6feb;
+  --danger: #c4321d;
+  --warn-bg: #fff4d6;
+  font-family: system-ui, -apple-system, "Segoe UI", Tahoma, "Noto Sans Arabic", sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418;
+    --fg: #e6e9ee;
+    --muted: #98a2b3;
+    --card: #1a1f26;
+    --line: #2b323c;
+    --accent: #5b9dff;
+    --danger: #ff7a66;
+    --warn-bg: #3a2f12;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; line-height: 1.7; }
+.app { max-width: 46rem; margin: 0 auto; padding: 0 1rem 3rem; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--line); margin-bottom: 1.5rem; }
+header nav a { margin-inline-start: 1rem; }
+.brand { font-size: 1.4rem; font-weight: 700; color: var(--fg); text-decoration: none; }
+.brand small { display: block; font-size: 0.75rem; font-weight: 400; color: var(--muted); }
+a { color: var(--accent); }
+h1 { font-size: 1.4rem; }
+h1 small { color: var(--muted); font-weight: 400; font-size: 1rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 1rem; }
+label { display: block; margin: 0.75rem 0; }
+input { display: block; width: 100%; margin-top: 0.25rem; padding: 0.6rem; border: 1px solid var(--line); border-radius: 0.5rem; background: var(--bg); color: var(--fg); font: inherit; }
+button, .button { display: inline-block; padding: 0.6rem 1.2rem; border: 0; border-radius: 0.5rem; background: var(--accent); color: #fff; font: inherit; cursor: pointer; text-decoration: none; margin: 0.25rem 0; }
+button:disabled { opacity: 0.6; }
+button.danger { background: var(--danger); }
+button.link { background: none; color: var(--accent); padding: 0; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.devices { list-style: none; padding: 0; }
+.devices li a { display: flex; justify-content: space-between; padding: 0.9rem 1rem; margin-bottom: 0.5rem; background: var(--card); border: 1px solid var(--line); border-radius: 0.75rem; color: var(--fg); text-decoration: none; }
+.state { font-size: 0.85rem; color: var(--muted); }
+.state.active { color: #1a7f37; }
+.error { color: var(--danger); }
+.notice, .warning { background: var(--warn-bg); padding: 0.75rem 1rem; border-radius: 0.5rem; }
+.hint, .muted { color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem; margin: 1rem 0; }
+figure { margin: 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: 0.75rem; padding: 0.75rem; }
+figure img { width: 100%; max-width: 14rem; background: #fff; border-radius: 0.25rem; }
+figcaption { font-weight: 700; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
+dd { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; }
+.secret { font-family: ui-monospace, monospace; word-break: break-all; }
+.help article { margin-bottom: 1.5rem; }

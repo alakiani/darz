@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -201,12 +202,18 @@ func (p *phone) askTCP(target string, dns bool) (string, error) {
 // want, failing the test otherwise.
 func (p *phone) leavesFrom(what string, ask func() (string, error), want string, timeout time.Duration) {
 	p.t.Helper()
+	p.leavesFromAny(what, ask, []string{want}, timeout)
+}
+
+// leavesFromAny is leavesFrom with several acceptable sources.
+func (p *phone) leavesFromAny(what string, ask func() (string, error), want []string, timeout time.Duration) {
+	p.t.Helper()
 	var last string
 	var lastErr error
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		last, lastErr = ask()
-		if lastErr == nil && last == want {
+		if lastErr == nil && slices.Contains(want, last) {
 			return
 		}
 		time.Sleep(250 * time.Millisecond)
@@ -312,7 +319,10 @@ func TestDataPlane(t *testing.T) {
 
 	// Abroad through the abroad Exit, domestic through an IR Node.
 	p1.leavesFrom("phone1 to a site abroad", udp(p1, webAb), ab1, 120*time.Second)
-	p1.leavesFrom("phone1 to a site in Iran", udp(p1, webIR), ir2, 30*time.Second)
+	// ir1 has two IR Exits, ir2 and the dual-role ir3; its buckets spread
+	// over both (ADR 0008), so the phone may leave from either.
+	irExits := []string{ir2, ir3}
+	p1.leavesFromAny("phone1 to a site in Iran", udp(p1, webIR), irExits, 30*time.Second)
 	// A dual-role IR Bridge exits IR traffic from its own NIC.
 	p2.leavesFrom("phone2 to a site in Iran", udp(p2, webIR), ir3, 60*time.Second)
 	p2.leavesFrom("phone2 to a site abroad", udp(p2, webAb), ab1, 30*time.Second)
@@ -332,7 +342,7 @@ func TestDataPlane(t *testing.T) {
 	}
 	time.Sleep(3 * time.Second)
 	p1.leavesFrom("phone1 abroad after the hostile update", udp(p1, webAb), ab1, 5*time.Second)
-	p1.leavesFrom("phone1 domestic after the hostile update", udp(p1, webIR), ir2, 5*time.Second)
+	p1.leavesFromAny("phone1 domestic after the hostile update", udp(p1, webIR), irExits, 5*time.Second)
 
 	// Revoking a Device removes it from every Bridge.
 	devs, _ := co.store.Devices(ctx)

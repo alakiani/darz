@@ -129,9 +129,10 @@ func TestPathSelection(t *testing.T) {
 	if moved > 10*time.Second {
 		t.Errorf("moving off a dead Exit took %v, want seconds", moved)
 	}
-	if rh := m.ruleHealth("ir1", defaultRule); len(rh.Shares) != 1 {
-		t.Errorf("default Rule shares after the Exit died: %v, want all on the survivor", rh.Shares)
-	}
+	// The shares come in ir1's next health report.
+	testutil.Eventually(t, 5*time.Second, "every default-Rule bucket on the surviving Exit", func() bool {
+		return len(m.ruleHealth("ir1", defaultRule).Shares) == 1
+	})
 	kill.Remove()
 
 	// Cutting ir1 off from both abroad Exits hands its traffic to ir3.

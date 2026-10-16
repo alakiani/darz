@@ -33,7 +33,7 @@ A candidate is **eligible** while both of these hold:
 
 1. Every Link on it is Up (ADR 0007). Up already requires loss under 10%, so loss is not counted again.
 2. The far end's latest probe reply sets the flag the candidate relies on:
-   - **egress OK**, for a direct candidate. The Exit's Agent checks its own internet every 5 s by resolving through two public resolvers and fetching a small object.
+   - **egress OK**, for a direct candidate. The Exit's Agent checks its own internet every 5 s by resolving through two public resolvers and fetching a small object. *(The targets depend on the Exit's Tags: an Exit tagged `IR` checks domestic resolvers and a domestic object, every other Exit checks targets abroad. Otherwise an international shutdown would fail the check on every domestic Exit and pull them out of IR traffic exactly when they matter. The Coordinator pushes both target lists in the snapshot. Decided in [MVP 03](https://github.com/alakiani/darz/issues/19).)*
    - **transit OK for this Rule**, for a transit candidate. The neighbouring Bridge sets it while it has an eligible direct or local candidate for the Rule.
 
 The flags travel in the 1-per-second Link probe that ADR 0007 already runs, so a Bridge notices that a neighbour has lost its direct Paths within about 3 s. **This answers the question ADR 0004 left open:** when the Coordinator is unreachable, Bridges still learn transit from their neighbours over Links they already have. A Bridge enrolled during the outage stays unknown until contact returns, which is accepted.

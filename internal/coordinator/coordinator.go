@@ -40,6 +40,13 @@ type Coordinator struct {
 	// LongPoll is how long GET /v1/state waits for a newer version before
 	// answering 204 No Content.
 	LongPoll time.Duration
+	// LinkTiming is pushed to every Agent; ReplaceAfterSeconds is also when
+	// the Coordinator replaces an instance that stays down.
+	LinkTiming protocol.LinkTiming
+	// Egress is what Exits check for egress OK.
+	Egress EgressTargets
+
+	reconcileMu sync.Mutex // one Reconcile at a time
 
 	mu      sync.Mutex
 	changed chan struct{} // closed and replaced whenever a snapshot changes
@@ -47,20 +54,30 @@ type Coordinator struct {
 
 // New returns a Coordinator over s and c.
 func New(s *store.Store, c *ca.CA, log *slog.Logger) *Coordinator {
-	return &Coordinator{store: s, ca: c, log: log, LongPoll: 60 * time.Second, changed: make(chan struct{})}
+	return &Coordinator{store: s, ca: c, log: log, LongPoll: 60 * time.Second,
+		LinkTiming: protocol.DefaultLinkTiming, Egress: DefaultEgressTargets, changed: make(chan struct{})}
 }
 
-// Reconcile works out every Node's desired state and stores a new snapshot
-// version for each Node whose state changed. It is safe to run any number
-// of times.
+// Reconcile derives the mesh's Links, works out every Node's desired state,
+// and stores a new snapshot version for each Node whose state changed. It is
+// safe to run any number of times.
 func (c *Coordinator) Reconcile(ctx context.Context) error {
+	c.reconcileMu.Lock()
+	defer c.reconcileMu.Unlock()
 	nodes, err := c.store.Nodes(ctx)
+	if err != nil {
+		return err
+	}
+	if err := c.deriveLinks(ctx, nodes); err != nil {
+		return fmt.Errorf("derive links: %w", err)
+	}
+	mesh, err := c.loadMesh(ctx, nodes)
 	if err != nil {
 		return err
 	}
 	changed := false
 	for _, n := range nodes {
-		body, err := json.Marshal(desiredState(n))
+		body, err := json.Marshal(c.desiredState(n, mesh))
 		if err != nil {
 			return err
 		}
@@ -82,10 +99,22 @@ func (c *Coordinator) Reconcile(ctx context.Context) error {
 	return nil
 }
 
-// desiredState is everything a Node is told. Later sessions add Links,
-// Devices, Rules and Path scoring here, filtered by the Node's Roles.
-func desiredState(n store.Node) protocol.State {
-	return protocol.State{Node: protocol.NodeInfo{ID: n.ID, Name: n.Name, Roles: n.Roles, Tags: n.Tags}}
+// desiredState is everything a Node is told. Later sessions add Devices,
+// Rules and Path scoring here, filtered by the Node's Roles.
+func (c *Coordinator) desiredState(n store.Node, mesh meshView) protocol.State {
+	st := protocol.State{
+		Node:       protocol.NodeInfo{ID: n.ID, Name: n.Name, Roles: n.Roles, Tags: n.Tags},
+		Links:      linksFor(n, mesh),
+		LinkTiming: c.LinkTiming,
+	}
+	if slices.Contains(n.Roles, protocol.RoleExit) {
+		check := c.Egress.Abroad
+		if isIR(n) {
+			check = c.Egress.IR
+		}
+		st.EgressCheck = &check
+	}
+	return st
 }
 
 // UpdateNode replaces a Node's Roles and Tags and reconciles.
@@ -331,9 +360,27 @@ func (c *Coordinator) health(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	seen, _, _ := net.SplitHostPort(r.RemoteAddr)
+	prev, err := c.store.Health(r.Context(), n.ID)
+	if err != nil {
+		c.internalError(w, err)
+		return
+	}
 	if err := c.store.PutHealth(r.Context(), n.ID, h, seen); err != nil {
 		c.internalError(w, err)
 		return
+	}
+	// A new public address changes the endpoint the Node's peers dial.
+	changed := prev == nil || prev.SeenAddr != seen
+	linksChanged, err := c.takeLinkHealth(r.Context(), n, h)
+	if err != nil {
+		c.internalError(w, err)
+		return
+	}
+	if changed || linksChanged {
+		if err := c.Reconcile(r.Context()); err != nil {
+			c.internalError(w, err)
+			return
+		}
 	}
 	for _, v := range h.ApplyFailed {
 		c.log.Warn("node reverted a snapshot", "node", n.Name, "version", v)

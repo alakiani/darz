@@ -58,6 +58,18 @@ func TestLab(t *testing.T) {
 		mustEcho(t, n1, n2, 5000)
 	}
 
+	// Counters count matching packets, including ones the filter drops.
+	{
+		toN4 := l.Count("ip daddr " + n4.Addr().String() + " udp dport 5001")
+		rule := l.Filter(lab.DropUDP(n4, 5001))
+		mustNotEcho(t, n1, n4, 5001)
+		mustEcho(t, n1, n4, 5000)
+		rule.Remove()
+		if got := toN4.Packets(); got != 1 {
+			t.Errorf("counter saw %d packets to n4:5001, want 1", got)
+		}
+	}
+
 	// Filter drops UDP to one port.
 	{
 		rule := l.Filter(lab.DropUDP(n2, 5000))

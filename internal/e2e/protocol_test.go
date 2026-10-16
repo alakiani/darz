@@ -6,19 +6,12 @@ package e2e
 
 import (
 	"context"
-	"crypto/tls"
-	"log/slog"
 	"net"
-	"net/http"
-	"net/http/httptest"
-	"path/filepath"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/alakiani/darz/internal/agent"
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/coordinator"
 	"github.com/alakiani/darz/internal/lab"
 	"github.com/alakiani/darz/internal/protocol"
 	"github.com/alakiani/darz/internal/store"
@@ -47,44 +40,9 @@ func (c cutter) Apply(_ context.Context, s protocol.State) error {
 // contact with the Coordinator is reverted and marked bad for that Node.
 func TestAgentsEnrollAndBadSnapshotIsReverted(t *testing.T) {
 	l := lab.Start(t, "coord", "n1", "n2", "n3")
-	coordNode := l.Node("coord")
+	co := startCoordinator(t, l.Node("coord"))
+	coord, s, admin := co.c, co.store, co.admin
 	ctx := context.Background()
-
-	s, err := store.Open(filepath.Join(t.TempDir(), "darz.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	authority, err := ca.LoadOrCreate(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	coord := coordinator.New(s, authority, slog.New(slog.DiscardHandler))
-	coord.LongPoll = 2 * time.Second
-
-	// The Agent API listens inside the Coordinator's namespace.
-	agentAddr := net.JoinHostPort(coordNode.Addr().String(), "8443")
-	var ln net.Listener
-	if err := coordNode.Do(func() (err error) { ln, err = net.Listen("tcp", agentAddr); return err }); err != nil {
-		t.Fatal(err)
-	}
-	tlsConfig, err := coord.AgentTLSConfig([]string{coordNode.Addr().String()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv := &http.Server{Handler: coord.AgentHandler()}
-	go srv.Serve(tls.NewListener(ln, tlsConfig))
-	defer srv.Close()
-
-	// The Admin API is the operator's laptop talking to the Coordinator; it
-	// does not need to cross the lab.
-	adminSrv := httptest.NewServer(coord.AdminHandler())
-	defer adminSrv.Close()
-	secret, _, err := s.CreateAPIToken(ctx, store.ScopeNodesEnroll, "laptop", time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	admin := &testutil.AdminClient{URL: adminSrv.URL, Token: secret}
 
 	// Enroll an Agent on each of n1, n2, n3.
 	ids := map[string]string{}
@@ -95,8 +53,8 @@ func TestAgentsEnrollAndBadSnapshotIsReverted(t *testing.T) {
 		created := admin.CreateNode(t, protocol.CreateNodeRequest{Name: name, Roles: []protocol.Role{"bridge"}})
 		ids[name] = created.Node.ID
 		cfg := agent.Config{
-			Coordinators:    []string{"https://" + agentAddr},
-			CACertPEM:       authority.CertPEM(),
+			Coordinators:    []string{co.agentURL},
+			CACertPEM:       co.caPEM,
 			StateDir:        t.TempDir(),
 			EnrollmentToken: created.EnrollmentToken,
 			Applier:         cutter{l, node},
@@ -124,9 +82,19 @@ func TestAgentsEnrollAndBadSnapshotIsReverted(t *testing.T) {
 		}
 		return h.AppliedVersion
 	}
+	// Versions are not predictable: adding a Node gives every other Node's
+	// state a Link, and a new version.
+	latest := func(name string) store.Snapshot {
+		snap, err := s.LatestSnapshot(ctx, ids[name])
+		if err != nil {
+			t.Fatal(err)
+		}
+		return snap
+	}
+	upToDate := func(name string) bool { return appliedVersion(name) == latest(name).Version }
 	for name := range ids {
-		testutil.Eventually(t, 10*time.Second, name+" enrolls and confirms version 1", func() bool {
-			return appliedVersion(name) == 1
+		testutil.Eventually(t, 10*time.Second, name+" enrolls and confirms its latest version", func() bool {
+			return upToDate(name)
 		})
 		h := admin.GetNode(t, ids[name]).LastHealth
 		if want := l.Node(name).Addr().String(); h.Addr != want || h.SeenAddr != want {
@@ -134,38 +102,43 @@ func TestAgentsEnrollAndBadSnapshotIsReverted(t *testing.T) {
 		}
 	}
 
-	// Version 2 of n1's state cuts n1 off.
+	// The next version of n1's state cuts n1 off.
+	good := latest("n1").Version
 	if err := coord.UpdateNode(ctx, ids["n1"], []protocol.Role{"bridge"}, []string{"cut-contact"}); err != nil {
 		t.Fatal(err)
 	}
-	testutil.Eventually(t, 15*time.Second, "n1 reverts version 2 and the Coordinator marks it bad", func() bool {
-		snap, err := s.LatestSnapshot(ctx, ids["n1"])
-		return err == nil && snap.Version == 2 && snap.Bad
+	bad := latest("n1").Version
+	if bad == good {
+		t.Fatal("the update made no new version")
+	}
+	testutil.Eventually(t, 15*time.Second, "n1 reverts the cutting version and the Coordinator marks it bad", func() bool {
+		snap := latest("n1")
+		return snap.Version == bad && snap.Bad
 	})
-	if v := appliedVersion("n1"); v != 1 {
-		t.Errorf("n1 reports version %d applied, want 1", v)
+	if v := appliedVersion("n1"); v != good {
+		t.Errorf("n1 reports version %d applied, want %d", v, good)
 	}
 
-	// n1 stays on version 1 instead of taking the bad version again, and
+	// n1 stays on the good version instead of taking the bad one again, and
 	// keeps reporting.
 	before := admin.GetNode(t, ids["n1"]).LastHealth.ReceivedAt
 	time.Sleep(4 * time.Second)
-	if h := admin.GetNode(t, ids["n1"]).LastHealth; h.AppliedVersion != 1 || !h.ReceivedAt.After(before) {
+	if h := admin.GetNode(t, ids["n1"]).LastHealth; h.AppliedVersion != good || !h.ReceivedAt.After(before) {
 		t.Errorf("n1 after the revert: %+v", h)
 	}
 
-	// The other Nodes were never affected.
+	// The other Nodes kept up, including with the new Tags their Links show
+	// for n1.
 	for _, name := range []string{"n2", "n3"} {
-		if v := appliedVersion(name); v != 1 {
-			t.Errorf("%s reports version %d, want 1", name, v)
-		}
+		testutil.Eventually(t, 10*time.Second, name+" is on its latest version", func() bool { return upToDate(name) })
 	}
 
 	// A further change is a new version and applies.
 	if err := coord.UpdateNode(ctx, ids["n1"], []protocol.Role{"bridge"}, []string{"IR"}); err != nil {
 		t.Fatal(err)
 	}
-	testutil.Eventually(t, 10*time.Second, "n1 confirms version 3", func() bool {
-		return appliedVersion("n1") == 3
+	testutil.Eventually(t, 10*time.Second, "n1 confirms the version after the bad one", func() bool {
+		v := appliedVersion("n1")
+		return v > bad && v == latest("n1").Version
 	})
 }

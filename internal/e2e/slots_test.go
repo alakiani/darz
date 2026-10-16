@@ -135,7 +135,7 @@ func TestEndpointSlots(t *testing.T) {
 	}
 
 	// Toggling the tunnel re-resolves slot a and reaches ir3.
-	p.setEndpoint(resolve("a"), coordinator.DefaultDevicePort)
+	p.toggle(resolve("a"), coordinator.DefaultDevicePort)
 	p.leavesFrom("abroad through slot a, re-pointed", abroad, ab1, 30*time.Second)
 
 	// ir1 recovers. Its probe passes again, but the slots stay on ir3.
@@ -171,9 +171,9 @@ func TestEndpointSlots(t *testing.T) {
 	}
 }
 
-// setEndpoint points the phone's tunnel at another Bridge, as toggling the
-// tunnel does after its slot was re-pointed.
-func (p *phone) setEndpoint(bridge *lab.Node, port int) {
+// toggle turns the phone's tunnel off and on, resolving its slot afresh to
+// bridge: the old session goes, and the next packet starts a handshake.
+func (p *phone) toggle(bridge *lab.Node, port int) {
 	p.t.Helper()
 	gw := netip.PrefixFrom(p.node.Addr(), 24).Masked().Addr().Next()
 	if out, err := p.node.Command("ip", "route", "replace", bridge.Addr().String()+"/32", "via", gw.String(), "dev", "wan0").CombinedOutput(); err != nil {
@@ -185,8 +185,13 @@ func (p *phone) setEndpoint(bridge *lab.Node, port int) {
 			return err
 		}
 		defer c.Close()
-		return c.ConfigureDevice("wg0", wgtypes.Config{Peers: []wgtypes.PeerConfig{{PublicKey: p.bridgeKey, UpdateOnly: true,
-			Endpoint: &net.UDPAddr{IP: bridge.Addr().AsSlice(), Port: port}}}})
+		keepalive := 5 * time.Second
+		return c.ConfigureDevice("wg0", wgtypes.Config{ReplacePeers: true, Peers: []wgtypes.PeerConfig{{
+			PublicKey:                   p.bridgeKey,
+			Endpoint:                    &net.UDPAddr{IP: bridge.Addr().AsSlice(), Port: port},
+			AllowedIPs:                  []net.IPNet{{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)}},
+			PersistentKeepaliveInterval: &keepalive,
+		}}})
 	})
 	if err != nil {
 		p.t.Fatal(err)

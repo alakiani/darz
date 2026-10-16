@@ -136,8 +136,8 @@ func (s *Store) CreateInvite(ctx context.Context, inv Invite, ttl time.Duration)
 	if inv.DeviceCap > 0 {
 		cap = inv.DeviceCap
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO invites (hash, kind, user_id, is_admin, device_cap, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`, hash(token), inv.Kind, uid, inv.Admin, cap, s.unix(), expires.Unix())
+	_, err := s.db.ExecContext(ctx, `INSERT INTO invites (hash, id, kind, user_id, is_admin, device_cap, created_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, hash(token), "inv_"+randomHex(8), inv.Kind, uid, inv.Admin, cap, s.unix(), expires.Unix())
 	return token, expires, err
 }
 
@@ -156,7 +156,7 @@ func (s *Store) lookupInvite(ctx context.Context, q queryer, token string) (Invi
 	var cap sql.NullInt64
 	var expires int64
 	err := q.QueryRowContext(ctx, `SELECT kind, user_id, is_admin, device_cap, expires_at FROM invites
-		WHERE hash = ? AND used_at IS NULL`, hash(token)).Scan(&inv.Kind, &uid, &inv.Admin, &cap, &expires)
+		WHERE hash = ? AND used_at IS NULL AND withdrawn_at IS NULL`, hash(token)).Scan(&inv.Kind, &uid, &inv.Admin, &cap, &expires)
 	if errors.Is(err, sql.ErrNoRows) || err == nil && s.unix() > expires {
 		return Invite{}, ErrInvalidToken
 	}

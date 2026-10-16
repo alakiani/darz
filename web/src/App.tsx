@@ -9,9 +9,15 @@ import { NewDevicePage } from "./pages/NewDevice";
 import { DevicePage } from "./pages/Device";
 import { AccountPage } from "./pages/Account";
 import { HelpPage } from "./pages/Help";
+import { AdminApp } from "./admin/AdminApp";
 
 export function App() {
   const route = useRoute();
+  if (route === "/admin" || route.startsWith("/admin/")) return <AdminApp route={route} />;
+  return <UserApp route={route} />;
+}
+
+function UserApp({ route }: { route: string }) {
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined: not known yet
 
   const refresh = useCallback(async () => {

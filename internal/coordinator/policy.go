@@ -159,11 +159,6 @@ var ErrFeedRejected = errors.New("IR feed update rejected")
 // RefreshIRFeed fetches the IR feed, checks it against the gates, and makes
 // it the IR set's feed content if it passes (ADR 0004).
 func (c *Coordinator) RefreshIRFeed(ctx context.Context) error {
-	next, err := c.fetchPrefixes(ctx, c.FeedURL, irfeed.Parse)
-	if err != nil {
-		c.log.Error("IR feed rejected", "err", err)
-		return fmt.Errorf("%w: %v", ErrFeedRejected, err)
-	}
 	sets, err := c.store.DestinationSets(ctx)
 	if err != nil {
 		return err
@@ -173,9 +168,17 @@ func (c *Coordinator) RefreshIRFeed(ctx context.Context) error {
 		return errors.New("no Destination Set is fed by the IR feed")
 	}
 	set := sets[i]
-	if err := irfeed.Gate(set.FeedContent, next); err != nil {
+	reject := func(err error) error {
 		c.log.Error("IR feed rejected; the last good set stays", "err", err)
+		c.store.RecordFeedAttempt(ctx, set.ID, err.Error())
 		return fmt.Errorf("%w: %v", ErrFeedRejected, err)
+	}
+	next, err := c.fetchPrefixes(ctx, c.FeedURL, irfeed.Parse)
+	if err != nil {
+		return reject(err)
+	}
+	if err := irfeed.Gate(set.FeedContent, next); err != nil {
+		return reject(err)
 	}
 	if c.RIPEstatURL != "" {
 		if ripe, err := c.fetchPrefixes(ctx, c.RIPEstatURL, irfeed.ParseRIPEstat); err != nil {
@@ -187,6 +190,7 @@ func (c *Coordinator) RefreshIRFeed(ctx context.Context) error {
 	if err := c.store.SetFeedContent(ctx, set.ID, next); err != nil {
 		return err
 	}
+	c.store.RecordFeedAttempt(ctx, set.ID, "")
 	c.log.Info("IR feed accepted", "prefixes", len(next))
 	return c.Reconcile(ctx)
 }

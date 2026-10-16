@@ -280,6 +280,24 @@
         ],
         "type": "object"
       },
+      "EnrollCommand": {
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "node": {
+            "$ref": "#/components/schemas/NodeStatus"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "type": "object"
+      },
       "Error": {
         "properties": {
           "error": {
@@ -384,6 +402,29 @@
         ],
         "type": "object"
       },
+      "InstanceTile": {
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "listen_port": {
+            "type": "integer"
+          },
+          "transport": {
+            "type": "string"
+          },
+          "up": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "listen_port",
+          "transport",
+          "up"
+        ],
+        "type": "object"
+      },
       "InviteInfo": {
         "properties": {
           "admin": {
@@ -404,6 +445,45 @@
           "admin",
           "expires_at",
           "kind"
+        ],
+        "type": "object"
+      },
+      "InviteRecord": {
+        "properties": {
+          "admin": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "device_cap": {
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "admin",
+          "created_at",
+          "expires_at",
+          "id",
+          "kind",
+          "status"
         ],
         "type": "object"
       },
@@ -450,6 +530,21 @@
           "expires_at",
           "token",
           "url"
+        ],
+        "type": "object"
+      },
+      "IssuedToken": {
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "token": {
+            "$ref": "#/components/schemas/TokenInfo"
+          }
+        },
+        "required": [
+          "secret",
+          "token"
         ],
         "type": "object"
       },
@@ -500,6 +595,51 @@
           "peer_egress_ok",
           "rtt_ms",
           "up"
+        ],
+        "type": "object"
+      },
+      "LinkTile": {
+        "properties": {
+          "a": {
+            "type": "string"
+          },
+          "b": {
+            "type": "string"
+          },
+          "crosses": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/InstanceTile"
+            },
+            "type": "array"
+          },
+          "rtt_ms": {
+            "type": "number"
+          },
+          "transport": {
+            "type": "string"
+          },
+          "up_a": {
+            "type": "boolean"
+          },
+          "up_b": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "crosses",
+          "id",
+          "instances",
+          "rtt_ms",
+          "up_a",
+          "up_b"
         ],
         "type": "object"
       },
@@ -589,6 +729,95 @@
         ],
         "type": "object"
       },
+      "NewNode": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "reenroll": {
+            "type": "boolean"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ssh_host": {
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "roles",
+          "ssh_host",
+          "tags"
+        ],
+        "type": "object"
+      },
+      "NewToken": {
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "NodeDetail": {
+        "properties": {
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkTile"
+            },
+            "type": "array"
+          },
+          "node": {
+            "$ref": "#/components/schemas/NodeTile"
+          },
+          "paths": {
+            "items": {
+              "$ref": "#/components/schemas/PathInfo"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "links",
+          "node",
+          "paths"
+        ],
+        "type": "object"
+      },
+      "NodeEdit": {
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles",
+          "tags"
+        ],
+        "type": "object"
+      },
       "NodeStatus": {
         "properties": {
           "enrolled": {
@@ -625,6 +854,157 @@
         ],
         "type": "object"
       },
+      "NodeTile": {
+        "properties": {
+          "addr": {
+            "type": "string"
+          },
+          "agent_version": {
+            "type": "string"
+          },
+          "applied_version": {
+            "type": "integer"
+          },
+          "enrolled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "last_contact": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "latest_version": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "seen_addr": {
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "applied_version",
+          "enrolled",
+          "id",
+          "latest_version",
+          "name",
+          "roles",
+          "tags"
+        ],
+        "type": "object"
+      },
+      "Overrides": {
+        "properties": {
+          "additions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "removals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "additions",
+          "removals"
+        ],
+        "type": "object"
+      },
+      "Overview": {
+        "properties": {
+          "backup": {
+            "type": "string"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/LinkTile"
+            },
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NodeTile"
+            },
+            "type": "array"
+          },
+          "sets": {
+            "items": {
+              "$ref": "#/components/schemas/SetInfo"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "backup",
+          "links",
+          "nodes",
+          "sets"
+        ],
+        "type": "object"
+      },
+      "PathInfo": {
+        "properties": {
+          "eligible": {
+            "type": "integer"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/Share"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "eligible",
+          "mode",
+          "rule",
+          "shares"
+        ],
+        "type": "object"
+      },
+      "RuleEdit": {
+        "properties": {
+          "fallback": {
+            "type": "string"
+          },
+          "required_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "fallback",
+          "required_tags"
+        ],
+        "type": "object"
+      },
       "RuleHealth": {
         "properties": {
           "eligible": {
@@ -651,6 +1031,44 @@
         ],
         "type": "object"
       },
+      "RuleInfo": {
+        "properties": {
+          "builtin": {
+            "type": "boolean"
+          },
+          "fallback": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "required_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "set": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "builtin",
+          "fallback",
+          "id",
+          "name",
+          "priority",
+          "required_tags",
+          "set"
+        ],
+        "type": "object"
+      },
       "SetDeviceCap": {
         "properties": {
           "device_cap": {
@@ -659,6 +1077,80 @@
         },
         "required": [
           "device_cap"
+        ],
+        "type": "object"
+      },
+      "SetInfo": {
+        "properties": {
+          "additions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "addresses": {
+            "type": "integer"
+          },
+          "can_roll_back": {
+            "type": "boolean"
+          },
+          "feed": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "last_attempt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prefixes": {
+            "type": "integer"
+          },
+          "removals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "additions",
+          "addresses",
+          "can_roll_back",
+          "id",
+          "name",
+          "prefixes",
+          "removals"
+        ],
+        "type": "object"
+      },
+      "Share": {
+        "properties": {
+          "buckets": {
+            "type": "integer"
+          },
+          "candidate": {
+            "type": "string"
+          },
+          "transit": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "buckets",
+          "candidate",
+          "transit"
         ],
         "type": "object"
       },
@@ -685,6 +1177,55 @@
         "required": [
           "secret",
           "uri"
+        ],
+        "type": "object"
+      },
+      "TokenInfo": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expires_at",
+          "id",
+          "name",
+          "revoked",
+          "scope"
+        ],
+        "type": "object"
+      },
+      "TransportList": {
+        "properties": {
+          "enabled": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "known": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled",
+          "known"
         ],
         "type": "object"
       },
@@ -841,6 +1382,41 @@
       }
     },
     "/v1/admin/invites": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminInvites",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InviteRecord"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Invites, newest first"
+      },
       "post": {
         "description": "Admins only, with a session that proved TOTP.",
         "operationId": "postAdminInvites",
@@ -882,6 +1458,798 @@
           }
         ],
         "summary": "Create a new-User Invite"
+      }
+    },
+    "/v1/admin/invites/{id}/withdraw": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminInvitesIdWithdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Withdraw an open Invite"
+      }
+    },
+    "/v1/admin/links": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminLinks",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LinkTile"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Every Link with its health"
+      }
+    },
+    "/v1/admin/nodes": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminNodes",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NodeTile"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Every Node"
+      },
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminNodes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewNode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollCommand"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Add a Node and get its enroll command"
+      }
+    },
+    "/v1/admin/nodes/{id}": {
+      "delete": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "deleteAdminNodesId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Delete a Node; its certificate stops working"
+      },
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminNodesId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDetail"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "A Node with its Links and Paths"
+      },
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminNodesId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodeEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeStatus"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Change a Node's Roles and Tags"
+      }
+    },
+    "/v1/admin/overview": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminOverview",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "The status board: Nodes, Links, the feed"
+      }
+    },
+    "/v1/admin/rules": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminRules",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "The Rules"
+      }
+    },
+    "/v1/admin/rules/{id}": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminRulesId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Change the IR Rule's Tags and fallback"
+      }
+    },
+    "/v1/admin/sets": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminSets",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SetInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Destination Sets with their feeds"
+      }
+    },
+    "/v1/admin/sets/{id}/fetch": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminSetsIdFetch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SetInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Fetch a set's feed now"
+      }
+    },
+    "/v1/admin/sets/{id}/overrides": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminSetsIdOverrides",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Overrides"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SetInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Replace a set's Admin additions and removals"
+      }
+    },
+    "/v1/admin/sets/{id}/rollback": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminSetsIdRollback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SetInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Roll a set's feed back to its previous good update"
+      }
+    },
+    "/v1/admin/tokens": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminTokens",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TokenInfo"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "API tokens"
+      },
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminTokens",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedToken"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Make a nodes:enroll token; its secret is shown once"
+      }
+    },
+    "/v1/admin/tokens/{id}/revoke": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminTokensIdRevoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Revoke an API token"
+      }
+    },
+    "/v1/admin/transports": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminTransports",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "The candidate Transport list"
+      },
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminTransports",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransportList"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Change the candidate Transport list"
       }
     },
     "/v1/admin/users": {

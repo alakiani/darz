@@ -187,6 +187,10 @@ type Impairment struct {
 	Delay  time.Duration
 	Jitter time.Duration
 	Loss   float64 // percent, 0 to 100
+	// Rate limits the uplink to this many bits per second, with a queue
+	// of about 50 ms beyond the delay, as on a real bottleneck: a deep
+	// queue would delay probes by seconds while a throughput test runs.
+	Rate uint64
 }
 
 // Netem impairs n's uplink, replacing any earlier impairment.
@@ -201,6 +205,12 @@ func (l *Lab) Netem(n *Node, imp Impairment) {
 	}
 	if imp.Loss > 0 {
 		args = append(args, "loss", fmt.Sprintf("%g%%", imp.Loss))
+	}
+	if imp.Rate > 0 {
+		args = append(args, "rate", fmt.Sprintf("%dbit", imp.Rate))
+		// netem's limit counts packets, delayed ones included.
+		queue := (2*imp.Delay + imp.Jitter + 50*time.Millisecond).Seconds()
+		args = append(args, "limit", fmt.Sprint(max(16, int(float64(imp.Rate)/8*queue/1500))))
 	}
 	l.run(n.ns, append([]string{"tc", "qdisc", "replace", "dev", n.uplink, "root"}, args...)...)
 	l.run(l.wan, append([]string{"tc", "qdisc", "replace", "dev", n.wanEnd, "root"}, args...)...)

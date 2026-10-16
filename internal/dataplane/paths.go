@@ -39,6 +39,7 @@ type candidate struct {
 	linkID   uint64
 	eligible bool
 	rtt      time.Duration
+	mbps     float64 // the Link's throughput figure; 0 until measured
 	weight   float64
 }
 
@@ -53,24 +54,47 @@ func deriveCandidates(r protocol.Rule, self protocol.NodeInfo, selfEgress bool, 
 	for _, l := range links {
 		if slices.Contains(l.Peer.Roles, protocol.RoleExit) && r.Matches(l.Peer.Tags) {
 			out = append(out, candidate{key: linkKey(l.ID), kind: candDirect, linkID: l.ID, rtt: l.RTT,
-				eligible: l.Up && l.PeerEgressOK})
+				mbps: l.ThroughputMbps, eligible: l.Up && l.PeerEgressOK})
 			continue
 		}
 		if !transitView && slices.Contains(l.Peer.Roles, protocol.RoleBridge) {
 			out = append(out, candidate{key: linkKey(l.ID), kind: candTransit, linkID: l.ID, rtt: l.RTT,
-				eligible: l.Up && slices.Contains(l.PeerTransitRules, uint32(r.ID))})
+				mbps: l.ThroughputMbps, eligible: l.Up && slices.Contains(l.PeerTransitRules, uint32(r.ID))})
 		}
 	}
 	return out
 }
 
-// weight is availability² × rtt_factor; throughput joins it in session 12.
-func weight(availability float64, rtt time.Duration, sc protocol.Scoring) float64 {
+// weight is ADR 0008's throughput_mbps × availability² × rtt_factor, where
+// rtt_factor is 1 up to the RTT floor and floor/RTT above it.
+func weight(mbps, availability float64, rtt time.Duration, sc protocol.Scoring) float64 {
 	f := 1.0
 	if ms := float64(rtt.Microseconds()) / 1000; ms > sc.RTTFloorMillis {
 		f = sc.RTTFloorMillis / ms
 	}
-	return availability * availability * f
+	return mbps * availability * availability * f
+}
+
+// fillThroughput gives a candidate whose Link has no figure yet the best
+// figure among the others of its kind (direct or transit, which never
+// share buckets), so a new candidate is not cut off before its first test;
+// it still fills only through rebalancing. With nothing of its kind
+// measured yet, every candidate counts at 1, and throughput leaves the
+// weights alone. The local candidate needs no figure: it takes every bucket.
+func fillThroughput(cs []candidate) {
+	best := map[candKind]float64{}
+	for _, c := range cs {
+		best[c.kind] = math.Max(best[c.kind], c.mbps)
+	}
+	for i := range cs {
+		if cs[i].mbps > 0 {
+			continue
+		}
+		cs[i].mbps = best[cs[i].kind]
+		if cs[i].mbps == 0 {
+			cs[i].mbps = 1
+		}
+	}
 }
 
 // availability is the fraction of the window a candidate was eligible, with

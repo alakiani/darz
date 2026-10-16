@@ -88,6 +88,14 @@ type Scoring struct {
 	RebalanceThresholdShare float64 `json:"rebalance_threshold"`   // off target by more than this share...
 	RebalanceAfterSec       int     `json:"rebalance_after_s"`     // ...for this long...
 	RebalanceEverySec       int     `json:"rebalance_every_s"`     // ...moves one bucket this often
+
+	// The throughput test on each of a Bridge's Links: every so often,
+	// give or take the jitter, the far end sends up to MaxBytes for up to
+	// MaxSec. Zero means the default, for snapshots from before these.
+	ThroughputEverySec  int   `json:"throughput_every_s,omitempty"`
+	ThroughputJitterSec int   `json:"throughput_jitter_s,omitempty"`
+	ThroughputMaxBytes  int64 `json:"throughput_max_bytes,omitempty"`
+	ThroughputMaxSec    int   `json:"throughput_max_s,omitempty"`
 }
 
 // DefaultScoring is ADR 0008's.
@@ -100,6 +108,12 @@ var DefaultScoring = Scoring{
 	RebalanceThresholdShare: 0.10,
 	RebalanceAfterSec:       15 * 60,
 	RebalanceEverySec:       5 * 60,
+	// About 4 MB or 3 s, every 2 hours with jitter. The first test of a
+	// Link comes within the jitter, ahead of the first rebalancing move.
+	ThroughputEverySec:  2 * 3600,
+	ThroughputJitterSec: 10 * 60,
+	ThroughputMaxBytes:  4 << 20,
+	ThroughputMaxSec:    3,
 }
 
 // Device is one Device peer of a Bridge.
@@ -320,9 +334,13 @@ type LinkHealth struct {
 	LastSuccessSeconds float64 `json:"last_success_s"`
 	// PeerEgressOK and PeerTransitRules are the flags in the peer's latest
 	// probe reply on the active instance (ADR 0008).
-	PeerEgressOK     bool             `json:"peer_egress_ok"`
-	PeerTransitRules []uint32         `json:"peer_transit_rules,omitempty"`
-	Instances        []InstanceHealth `json:"instances"`
+	PeerEgressOK     bool     `json:"peer_egress_ok"`
+	PeerTransitRules []uint32 `json:"peer_transit_rules,omitempty"`
+	// ThroughputMbps is what the far end can still send this end, from the
+	// throughput test and raised by observed peaks; 0 until the first test.
+	// Only Bridges measure it (ADR 0008).
+	ThroughputMbps float64          `json:"throughput_mbps,omitempty"`
+	Instances      []InstanceHealth `json:"instances"`
 }
 
 // InstanceHealth is one instance as this end measures it.

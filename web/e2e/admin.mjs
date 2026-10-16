@@ -137,11 +137,11 @@ try {
 
   step("API tokens: create, see the secret once, revoke");
   await screen("/admin/tokens", "API tokens");
-  await page.fill("input[name=name]", "laptop");
+  await page.fill("input[name=name]", "ops-laptop");
   await page.getByRole("button", { name: "Make a nodes:enroll token" }).click();
   await page.locator("[data-testid=token-secret]", { hasText: "darz_" }).waitFor();
-  await page.locator("[data-testid=token-laptop]").getByRole("button", { name: "Revoke" }).click();
-  await page.locator("[data-testid=token-laptop] .status", { hasText: "revoked" }).waitFor();
+  await page.locator("[data-testid=token-ops-laptop]").getByRole("button", { name: "Revoke" }).click();
+  await page.locator("[data-testid=token-ops-laptop] .status", { hasText: "revoked" }).waitFor();
 
   console.log("walked every admin screen");
 } catch (e) {

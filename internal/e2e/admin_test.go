@@ -134,8 +134,8 @@ func TestAdminPanel(t *testing.T) {
 	}
 	toks, revoked, _ := co.store.APITokens(ctx)
 	for i, tk := range toks {
-		if tk.Name == "laptop" && !revoked[i] {
-			t.Error("the laptop token was not revoked")
+		if tk.Name == "ops-laptop" && !revoked[i] {
+			t.Error("the ops-laptop token was not revoked")
 		}
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -91,4 +92,9 @@ func dumpOnFailure(t *testing.T, name, path string) {
 			t.Logf("---- %s log ----\n%s", name, b)
 		}
 	})
+}
+
+// execCommand runs a command in the root namespace.
+func execCommand(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).CombinedOutput()
 }

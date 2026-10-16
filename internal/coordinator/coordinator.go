@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/alakiani/darz/internal/ca"
+	"github.com/alakiani/darz/internal/irfeed"
 	"github.com/alakiani/darz/internal/protocol"
 	"github.com/alakiani/darz/internal/store"
 )
@@ -45,6 +46,12 @@ type Coordinator struct {
 	LinkTiming protocol.LinkTiming
 	// Egress is what Exits check for egress OK.
 	Egress EgressTargets
+	// Upstreams are the resolvers abroad Bridges forward DNS to.
+	Upstreams []string
+	// FeedURL and RIPEstatURL are where the IR feed and its cross-check
+	// come from; HTTPClient fetches them.
+	FeedURL, RIPEstatURL string
+	HTTPClient           *http.Client
 
 	reconcileMu sync.Mutex // one Reconcile at a time
 
@@ -55,7 +62,9 @@ type Coordinator struct {
 // New returns a Coordinator over s and c.
 func New(s *store.Store, c *ca.CA, log *slog.Logger) *Coordinator {
 	return &Coordinator{store: s, ca: c, log: log, LongPoll: 60 * time.Second,
-		LinkTiming: protocol.DefaultLinkTiming, Egress: DefaultEgressTargets, changed: make(chan struct{})}
+		LinkTiming: protocol.DefaultLinkTiming, Egress: DefaultEgressTargets, Upstreams: DefaultUpstreams,
+		FeedURL: irfeed.DefaultURL, RIPEstatURL: irfeed.DefaultRIPEstatURL, HTTPClient: http.DefaultClient,
+		changed: make(chan struct{})}
 }
 
 // Reconcile derives the mesh's Links, works out every Node's desired state,
@@ -74,6 +83,9 @@ func (c *Coordinator) Reconcile(ctx context.Context) error {
 	mesh, err := c.loadMesh(ctx, nodes)
 	if err != nil {
 		return err
+	}
+	if mesh.bridge, err = c.bridgeState(ctx); err != nil {
+		return fmt.Errorf("bridge state: %w", err)
 	}
 	changed := false
 	for _, n := range nodes {
@@ -106,6 +118,9 @@ func (c *Coordinator) desiredState(n store.Node, mesh meshView) protocol.State {
 		Node:       protocol.NodeInfo{ID: n.ID, Name: n.Name, Roles: n.Roles, Tags: n.Tags},
 		Links:      linksFor(n, mesh),
 		LinkTiming: c.LinkTiming,
+	}
+	if isBridge(n) {
+		st.Bridge = mesh.bridge
 	}
 	if slices.Contains(n.Roles, protocol.RoleExit) {
 		check := c.Egress.Abroad
@@ -146,6 +161,7 @@ func (c *Coordinator) AgentHandler() http.Handler {
 	mux.HandleFunc("POST /v1/enroll", c.enroll)
 	mux.Handle("GET /v1/state", c.requireNode(c.state))
 	mux.Handle("POST /v1/health", c.requireNode(c.health))
+	mux.Handle("GET /v1/sets/{hash}", c.requireNode(c.setBlob))
 	return mux
 }
 

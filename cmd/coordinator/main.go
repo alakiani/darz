@@ -75,6 +75,7 @@ func serve(args []string, log *slog.Logger) error {
 	if err := c.Reconcile(ctx); err != nil {
 		return err
 	}
+	go c.RunIRFeed(ctx, 24*time.Hour)
 
 	agentTLS, err := c.AgentTLSConfig(strings.Split(*agentHosts, ","))
 	if err != nil {

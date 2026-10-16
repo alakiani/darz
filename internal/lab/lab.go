@@ -52,15 +52,36 @@ type Node struct {
 	wanEnd string // the internet's end of the same pair, inside the internet namespace
 }
 
+// Spec describes one Node. A zero Addr gets the next 10.200.<n>.2.
+type Spec struct {
+	Name string
+	Addr netip.Addr
+}
+
+// At is a Spec for a Node with a chosen address, such as a host standing
+// for a site in Iran. Each Node gets the /24 around its address, with the
+// internet namespace on its .1.
+func At(name, addr string) Spec { return Spec{Name: name, Addr: netip.MustParseAddr(addr)} }
+
 // Start brings up one Node per name. It skips the test unless it runs as
 // root on Linux, and fails it if the lab cannot be built.
 func Start(t testing.TB, names ...string) *Lab {
 	t.Helper()
+	var specs []Spec
+	for _, n := range names {
+		specs = append(specs, Spec{Name: n})
+	}
+	return StartSpecs(t, specs...)
+}
+
+// StartSpecs brings up one Node per Spec, like Start.
+func StartSpecs(t testing.TB, specs ...Spec) *Lab {
+	t.Helper()
 	if os.Geteuid() != 0 {
 		t.Skip("the lab needs root: run with go test -exec sudo")
 	}
-	if len(names) == 0 || len(names) > 250 {
-		t.Fatalf("lab: want 1 to 250 Nodes, got %d", len(names))
+	if len(specs) == 0 || len(specs) > 250 {
+		t.Fatalf("lab: want 1 to 250 Nodes, got %d", len(specs))
 	}
 
 	suffix := make([]byte, 3)
@@ -76,30 +97,38 @@ func Start(t testing.TB, names ...string) *Lab {
 		chain forward { type filter hook forward priority 0; policy accept; }
 	}`)
 
-	seen := map[string]bool{}
-	for i, name := range names {
-		if seen[name] {
-			t.Fatalf("lab: duplicate Node name %q", name)
+	seen, subnets := map[string]bool{}, map[netip.Prefix]bool{}
+	for i, spec := range specs {
+		if seen[spec.Name] {
+			t.Fatalf("lab: duplicate Node name %q", spec.Name)
 		}
-		seen[name] = true
+		seen[spec.Name] = true
+		addr := spec.Addr
+		if !addr.IsValid() {
+			addr = netip.AddrFrom4([4]byte{10, 200, byte(i + 1), 2})
+		}
+		subnet := netip.PrefixFrom(addr, 24).Masked()
+		gw := subnet.Addr().Next()
+		if subnets[subnet] || !addr.Is4() || addr == gw || addr == subnet.Addr() {
+			t.Fatalf("lab: Node %s needs an IPv4 address alone in its /24 and not on .0 or .1, got %s", spec.Name, addr)
+		}
+		subnets[subnet] = true
 
-		subnet := i + 1 // Node i lives in 10.200.<i+1>.0/24
 		n := &Node{
 			lab:    l,
-			name:   name,
-			ns:     fmt.Sprintf("%s-n%d", l.prefix, subnet),
-			addr:   netip.AddrFrom4([4]byte{10, 200, byte(subnet), 2}),
+			name:   spec.Name,
+			ns:     fmt.Sprintf("%s-n%d", l.prefix, i+1),
+			addr:   addr,
 			uplink: "wan0",
-			wanEnd: fmt.Sprintf("v%d", subnet),
+			wanEnd: fmt.Sprintf("v%d", i+1),
 		}
-		gateway := fmt.Sprintf("10.200.%d.1", subnet)
-
+		gateway := gw.String()
 		l.ip("netns", "add", n.ns)
 		l.run(n.ns, "ip", "link", "set", "lo", "up")
 		l.run(l.wan, "ip", "link", "add", n.wanEnd, "type", "veth", "peer", "name", n.uplink, "netns", n.ns)
 		l.run(l.wan, "ip", "addr", "add", gateway+"/24", "dev", n.wanEnd)
 		l.run(l.wan, "ip", "link", "set", n.wanEnd, "up")
-		l.run(n.ns, "ip", "addr", "add", n.addr.String()+"/24", "dev", n.uplink)
+		l.run(n.ns, "ip", "addr", "add", netip.PrefixFrom(n.addr, 24).String(), "dev", n.uplink)
 		l.run(n.ns, "ip", "link", "set", n.uplink, "up")
 		l.run(n.ns, "ip", "route", "add", "default", "via", gateway)
 		l.nodes = append(l.nodes, n)

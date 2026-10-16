@@ -126,6 +126,7 @@ type meshView struct {
 	links     []store.Link
 	instances map[uint64][]store.Instance // by Link id, oldest first
 	seenAddr  map[string]string           // a Node's public address, as the Coordinator sees it
+	bridge    *protocol.BridgeState       // shared by every Bridge
 }
 
 func (c *Coordinator) loadMesh(ctx context.Context, nodes []store.Node) (meshView, error) {

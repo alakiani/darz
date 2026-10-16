@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/alakiani/darz/internal/agent"
+	"github.com/alakiani/darz/internal/dataplane"
 	"github.com/alakiani/darz/internal/link"
 	"github.com/alakiani/darz/internal/protocol"
 )
@@ -89,11 +90,16 @@ func run(log *slog.Logger, o options) error {
 	if err != nil {
 		return err
 	}
+	plane, err := dataplane.New(dataplane.Config{StateDir: o.stateDir, Links: links, Log: log})
+	if err != nil {
+		return err
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	linkErr := make(chan error, 1)
 	go func() { linkErr <- links.Run(ctx) }()
+	go plane.Run(ctx)
 
 	log.Info("agent starting", "version", version, "link_key", links.PublicKey())
 	err = agent.Run(ctx, agent.Config{
@@ -101,7 +107,7 @@ func run(log *slog.Logger, o options) error {
 		CACertPEM:       caPEM,
 		StateDir:        o.stateDir,
 		EnrollmentToken: token,
-		Applier:         links,
+		Applier:         agent.Appliers{links, plane}, // Links first: the data plane routes over them
 		Version:         version,
 		Log:             log,
 		HealthInterval:  o.healthInterval,

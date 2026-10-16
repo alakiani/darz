@@ -344,10 +344,7 @@ func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
 				st = &bucketState{}
 				view.states[r.ID] = st
 			}
-			for _, m := range st.step(now, cands, b.Scoring) {
-				p.log.Info("bucket moved", "rule", r.Name, "view", view.name, "bucket", m.bucket,
-					"from", orNone(m.from), "to", orNone(m.to), "kind", m.kind, "reason", m.reason)
-			}
+			logMoves(p.log, r.Name, view.name, st.step(now, cands, b.Scoring))
 			if !view.transit {
 				if ownEligible {
 					transit = append(transit, uint32(r.ID))
@@ -371,6 +368,24 @@ func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
 	}
 	p.cfg.Links.SetTransitRules(transit)
 	return dev, tr
+}
+
+// logMoves logs one line per kind of move, with how many buckets went.
+func logMoves(log *slog.Logger, rule, view string, moves []move) {
+	type group struct{ from, to, kind, reason string }
+	counts := map[group]int{}
+	var order []group
+	for _, m := range moves {
+		g := group{orNone(m.from), orNone(m.to), m.kind, m.reason}
+		if counts[g] == 0 {
+			order = append(order, g)
+		}
+		counts[g]++
+	}
+	for _, g := range order {
+		log.Info("buckets moved", "rule", rule, "view", view, "count", counts[g], "from", g.from, "to", g.to,
+			"kind", g.kind, "reason", g.reason)
+	}
 }
 
 // syncPaths moves whatever buckets changed, one atomic nft transaction for

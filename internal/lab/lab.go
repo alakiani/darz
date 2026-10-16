@@ -164,6 +164,14 @@ func (l *Lab) Namespaces() []string {
 // qdiscs and nftables tables with it. Close is safe to call more than once.
 func (l *Lab) Close() {
 	l.closeOnce.Do(func() {
+		// Kill what runs in the namespaces first: a daemon that outlives
+		// its namespace would hold on to sockets the next lab reuses.
+		for _, ns := range l.Namespaces() {
+			out, _ := exec.Command("ip", "netns", "pids", ns).Output()
+			for _, pid := range strings.Fields(string(out)) {
+				exec.Command("kill", "-9", pid).Run()
+			}
+		}
 		for _, ns := range l.Namespaces() {
 			if out, err := exec.Command("ip", "netns", "del", ns).CombinedOutput(); err != nil &&
 				!bytes.Contains(out, []byte("No such file")) {

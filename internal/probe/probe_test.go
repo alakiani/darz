@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -125,16 +126,16 @@ func TestCheckFails(t *testing.T) {
 	}
 }
 
-func TestCheckRunsTheBindInsideEnter(t *testing.T) {
+func TestCheckOpensItsSocketInsideEnter(t *testing.T) {
 	bridge, probeKey := keys(t)
 	ep := fakeBridge(t, bridge, probeKey.PublicKey(), 0)
-	entered := 0
+	var entered atomic.Int32
 	p := &Prober{PrivateKey: probeKey, Address: probeAddr, Hostname: "www.gstatic.com", Timeout: 5 * time.Second,
-		Enter: func(fn func() error) error { entered++; return fn() }}
+		Enter: func(fn func() error) error { entered.Add(1); return fn() }}
 	if err := p.Check(context.Background(), ep, bridge.PublicKey(), resolverAddr); err != nil {
 		t.Fatal(err)
 	}
-	if entered != 1 {
-		t.Errorf("Enter ran %d times, want 1", entered)
+	if entered.Load() == 0 {
+		t.Error("the socket opened outside Enter")
 	}
 }

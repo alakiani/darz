@@ -45,18 +45,18 @@ func (p *Prober) Check(ctx context.Context, endpoint netip.AddrPort, bridgeKey w
 	if err != nil {
 		return err
 	}
-	dev := device.NewDevice(tun, conn.NewStdNetBind(), device.NewLogger(device.LogLevelSilent, ""))
+	enter := p.Enter
+	if enter == nil {
+		enter = func(fn func() error) error { return fn() }
+	}
+	dev := device.NewDevice(tun, enteredBind{conn.NewStdNetBind(), enter}, device.NewLogger(device.LogLevelSilent, ""))
 	defer dev.Close()
 	cfg := fmt.Sprintf("private_key=%s\npublic_key=%s\nendpoint=%s\nallowed_ip=0.0.0.0/0\n",
 		hex.EncodeToString(p.PrivateKey[:]), hex.EncodeToString(bridgeKey[:]), endpoint)
 	if err := dev.IpcSet(cfg); err != nil {
 		return err
 	}
-	enter := p.Enter
-	if enter == nil {
-		enter = func(fn func() error) error { return fn() }
-	}
-	if err := enter(dev.Up); err != nil { // the UDP socket opens here
+	if err := dev.Up(); err != nil {
 		return err
 	}
 
@@ -108,6 +108,22 @@ func handshook(dev *device.Device) bool {
 		}
 	}
 	return false
+}
+
+// enteredBind opens its sockets inside enter. The device opens them from
+// whichever goroutine brings it up first, including its own TUN event
+// reader, so wrapping Up alone would leave a race.
+type enteredBind struct {
+	conn.Bind
+	enter func(fn func() error) error
+}
+
+func (b enteredBind) Open(port uint16) (fns []conn.ReceiveFunc, actual uint16, err error) {
+	err = b.enter(func() (err error) {
+		fns, actual, err = b.Bind.Open(port)
+		return err
+	})
+	return fns, actual, err
 }
 
 // dnsQuery is an A query for host with a random id.

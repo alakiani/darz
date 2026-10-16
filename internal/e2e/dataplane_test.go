@@ -247,6 +247,7 @@ func TestDataPlane(t *testing.T) {
 	ctx := context.Background()
 	co := startCoordinator(t, l.Node("coord"))
 	co.c.Upstreams = []string{"9.9.9.9"}
+	dumpNetOnFailure(t, l, "ir1", "ir2", "ir3", "ab1", "phone1", "phone2")
 
 	// The IR feed, served to the Coordinator.
 	var feed atomic.Value
@@ -345,4 +346,44 @@ func TestDataPlane(t *testing.T) {
 		return err != nil
 	})
 	p2.leavesFrom("the other phone still works", udp(p2, webAb), ab1, 5*time.Second)
+}
+
+// dumpNetOnFailure prints each Node's ruleset, rules, routes and links if
+// the test fails.
+func dumpNetOnFailure(t *testing.T, l *lab.Lab, names ...string) {
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+		for _, name := range names {
+			n := l.Node(name)
+			var b strings.Builder
+			for _, cmd := range [][]string{
+				{"nft", "list", "ruleset"},
+				{"ip", "rule"},
+				{"ip", "route", "show", "table", "all"},
+				{"ip", "-s", "-br", "link"},
+				{"cat", "/proc/sys/net/ipv4/ip_forward", "/proc/sys/net/ipv4/conf/all/rp_filter"},
+			} {
+				out, _ := n.Command(cmd[0], cmd[1:]...).CombinedOutput()
+				fmt.Fprintf(&b, "$ %s\n%s\n", strings.Join(cmd, " "), out)
+			}
+			n.Do(func() error {
+				c, err := wgctrl.New()
+				if err != nil {
+					return err
+				}
+				defer c.Close()
+				devs, _ := c.Devices()
+				for _, d := range devs {
+					for _, p := range d.Peers {
+						fmt.Fprintf(&b, "wg %s peer %s endpoint %v handshake %v rx %d tx %d\n",
+							d.Name, p.PublicKey.String()[:8], p.Endpoint, p.LastHandshakeTime, p.ReceiveBytes, p.TransmitBytes)
+					}
+				}
+				return nil
+			})
+			t.Logf("---- network state of %s ----\n%s", name, b.String())
+		}
+	})
 }

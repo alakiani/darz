@@ -79,9 +79,9 @@ func render(r ruleset) string {
 		// IPv6 is black-holed (ADR 0003).
 		w("\t\tiifname %q meta nfproto ipv6 drop", DeviceIface)
 		// DNS over TLS goes abroad whatever its destination (ADR 0004).
-		w("\t\tiifname %q tcp dport 853 meta mark set %#x accept", DeviceIface, ruleMark(r.DefaultRule))
+		w("\t\tiifname %q tcp dport 853 counter meta mark set %#x accept", DeviceIface, ruleMark(r.DefaultRule))
 		for _, rule := range r.Rules {
-			w("\t\tiifname %q ip daddr @rule_%d meta mark set %#x accept", DeviceIface, rule.ID, ruleMark(rule.ID))
+			w("\t\tiifname %q ip daddr @rule_%d counter meta mark set %#x accept", DeviceIface, rule.ID, ruleMark(rule.ID))
 		}
 	}
 	if len(r.ExitIfaces) > 0 {
@@ -89,16 +89,16 @@ func render(r ruleset) string {
 		for _, iface := range slices.Sorted(maps.Keys(r.ExitIfaces)) {
 			entries = append(entries, fmt.Sprintf("%q : %#x", iface, linkMark(r.ExitIfaces[iface])))
 		}
-		w("\t\tct state new ct mark set iifname map { %s }", strings.Join(entries, ", "))
+		w("\t\tct state new counter ct mark set iifname map { %s }", strings.Join(entries, ", "))
 	}
 	// Replies to connections that arrived over a Link go back over it.
-	w("\t\tiifname != \"dz*\" ct mark & %#x == %#x meta mark set ct mark", markKind, linkMarkBase)
+	w("\t\tiifname != \"dz*\" ct mark & %#x == %#x counter meta mark set ct mark", markKind, linkMarkBase)
 	w("\t}")
 
 	if r.Bridge {
 		w("\tchain dns {")
 		w("\t\ttype nat hook prerouting priority dstnat; policy accept;")
-		w("\t\tiifname %q meta l4proto { tcp, udp } th dport 53 dnat ip to %s:53", DeviceIface, r.ResolverAddr)
+		w("\t\tiifname %q meta l4proto { tcp, udp } th dport 53 counter dnat ip to %s:53", DeviceIface, r.ResolverAddr)
 		w("\t}")
 	}
 
@@ -112,10 +112,10 @@ func render(r ruleset) string {
 	w("\t\ttype nat hook postrouting priority srcnat; policy accept;")
 	if len(r.ExitIfaces) > 0 {
 		// NAT happens only at the Exit (ADR 0004).
-		w("\t\toifname %q ct mark & %#x == %#x masquerade", r.Uplink, markKind, linkMarkBase)
+		w("\t\toifname %q ct mark & %#x == %#x counter masquerade", r.Uplink, markKind, linkMarkBase)
 	}
 	if r.Bridge && r.LocalExit {
-		w("\t\toifname %q ip saddr %s masquerade", r.Uplink, devicePool)
+		w("\t\toifname %q ip saddr %s counter masquerade", r.Uplink, devicePool)
 	}
 	w("\t}")
 	w("}")

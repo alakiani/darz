@@ -137,7 +137,7 @@ func (in *instance) run() {
 		if dirty {
 			if err := in.transport.Up(ctx, cfg); err != nil {
 				log.Warn("bring instance up", "err", err)
-				in.pause(ctx, bo.next())
+				in.backOff(ctx, bo.next())
 				continue
 			}
 			in.mu.Lock()
@@ -150,7 +150,7 @@ func (in *instance) run() {
 			conn, err = net.ListenUDP("udp4", &net.UDPAddr{IP: cfg.Addr.Addr().AsSlice()})
 			if err != nil {
 				log.Warn("probe socket", "err", err)
-				in.pause(ctx, interval)
+				sleep(ctx, interval)
 				continue
 			}
 		}
@@ -184,16 +184,33 @@ func (in *instance) run() {
 		} else if now.After(tryUntil) {
 			wait := bo.next()
 			log.Info("instance not up; backing off", "wait", wait)
-			in.pause(ctx, wait)
+			in.backOff(ctx, wait)
 			tryUntil = time.Now().Add(lossWindow)
 			continue
 		}
-		in.pause(ctx, time.Until(start.Add(interval)))
+		// The pace stays one probe per interval whatever arrives: waking
+		// here would let two ends' probes trigger each other without end.
+		sleep(ctx, time.Until(start.Add(interval)))
 	}
 }
 
-// pause waits for d, for ctx to end, or for a wake-up.
-func (in *instance) pause(ctx context.Context, d time.Duration) {
+// backOff waits for d, for ctx to end, or for the peer to probe this
+// instance, which shows the peer got through and is worth answering now.
+func (in *instance) backOff(ctx context.Context, d time.Duration) {
+	select { // forget probes that arrived before the backoff began
+	case <-in.wakeC:
+	default:
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C:
+	case <-in.wakeC:
+	}
+}
+
+func sleep(ctx context.Context, d time.Duration) {
 	if d <= 0 {
 		return
 	}
@@ -202,7 +219,6 @@ func (in *instance) pause(ctx context.Context, d time.Duration) {
 	select {
 	case <-ctx.Done():
 	case <-t.C:
-	case <-in.wakeC:
 	}
 }
 

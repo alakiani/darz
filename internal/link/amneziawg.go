@@ -109,7 +109,14 @@ func (a *AmneziaWG) Up(ctx context.Context, c InstanceConfig) error {
 	if c.AWG == nil {
 		return errors.New("amneziawg: no parameters")
 	}
-	if _, err := a.uapi(c.Iface, "get=1\n\n"); err != nil {
+	_, err := a.uapi(c.Iface, "get=1\n\n")
+	if err == nil && !linkExists(ctx, c.Iface) {
+		// A daemon answers but its interface is not here: it is a stale one
+		// whose interface is gone. Start afresh on a new socket.
+		os.Remove(a.socket(c.Iface))
+		err = errors.New("stale daemon")
+	}
+	if err != nil {
 		if err := a.Runner.Start(ctx, c.Iface); err != nil {
 			return err
 		}

@@ -53,7 +53,7 @@ func fakeUpstream(t *testing.T) string {
 func TestResolverRelaysUDPAndTCP(t *testing.T) {
 	up := fakeUpstream(t)
 	host, port, _ := net.SplitHostPort(up)
-	r := newResolver("127.0.0.1:0", []string{host}, 0)
+	r := newResolver("127.0.0.1:0", []string{host}, func() uint32 { return 0 })
 	r.upstreamPort = port
 	if err := r.start(); err != nil {
 		t.Fatal(err)
@@ -90,7 +90,7 @@ func TestResolverRelaysUDPAndTCP(t *testing.T) {
 func TestResolverTriesTheNextUpstream(t *testing.T) {
 	up := fakeUpstream(t)
 	host, port, _ := net.SplitHostPort(up)
-	r := newResolver("127.0.0.1:0", []string{"127.0.0.2", host}, 0)
+	r := newResolver("127.0.0.1:0", []string{"127.0.0.2", host}, func() uint32 { return 0 })
 	r.upstreamPort = port
 	if err := r.start(); err != nil {
 		t.Fatal(err)

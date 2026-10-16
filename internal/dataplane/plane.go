@@ -1,8 +1,9 @@
 // Package dataplane is the Agent's Bridge and Exit data plane (ADR 0004,
-// ADR 0005): the Device-facing WireGuard interface with the shared Bridge
-// identity, Rule marks over Destination Sets in nftables, policy routing
-// per Rule, the DNS relay and its redirects, the IPv6 drop, and NAT on
-// Exits with replies sent back over the Link they came in on.
+// ADR 0005, ADR 0008): the Device-facing WireGuard interface with the shared
+// Bridge identity, Rules over Destination Sets in nftables, Path selection
+// with 64 buckets per Rule spread over candidates, transit hand-off, the
+// DNS relay and its redirects, the IPv6 drop, and NAT on Exits with replies
+// sent back over the Link they came in on.
 package dataplane
 
 import (
@@ -32,9 +33,13 @@ import (
 	"github.com/alakiani/darz/internal/protocol"
 )
 
-// LinkSource reports this Node's Links as the Link layer sees them.
+// LinkSource is the Link layer as the data plane uses it.
 type LinkSource interface {
 	LinkStatus() []link.Status
+	// EgressOK is this Node's own egress check.
+	EgressOK() bool
+	// SetTransitRules sets the Rules this Node offers transit for.
+	SetTransitRules([]uint32)
 }
 
 // Config configures a Plane.
@@ -58,8 +63,15 @@ type Plane struct {
 	st       *protocol.State
 	uplink   uplink
 	resolver *resolver
-	resKey   string         // what the running resolver was started with
-	routes   map[int]string // table -> route last written
+	resKey   string // what the running resolver was started with
+
+	// Path selection state, per Rule: buckets for this Bridge's own
+	// Devices and for transit traffic, and each candidate's availability.
+	dev, tr map[uint64]*bucketState
+	avail   map[string]*availability
+	applied map[string][buckets]string // nft map name -> buckets in force
+	paths   []protocol.RuleHealth
+	transit []uint32
 }
 
 type uplink struct{ dev, gateway string }
@@ -76,7 +88,8 @@ func New(cfg Config) (*Plane, error) {
 	if err := os.MkdirAll(filepath.Join(cfg.StateDir, "sets"), 0o700); err != nil {
 		return nil, err
 	}
-	return &Plane{cfg: cfg, log: cfg.Log, wg: c, routes: map[int]string{}}, nil
+	return &Plane{cfg: cfg, log: cfg.Log, wg: c, dev: map[uint64]*bucketState{}, tr: map[uint64]*bucketState{},
+		avail: map[string]*availability{}, applied: map[string][buckets]string{}}, nil
 }
 
 // UseFetch implements agent.FetchUser.
@@ -101,15 +114,17 @@ func (p *Plane) Apply(ctx context.Context, st protocol.State) error {
 	}
 	p.uplink = up
 
-	rs := ruleset{Uplink: up.dev, ExitIfaces: map[string]uint64{}}
-	if slices.Contains(st.Node.Roles, protocol.RoleExit) {
-		for _, l := range st.Links {
-			for _, in := range l.Instances {
-				rs.ExitIfaces[in.Iface] = l.ID
+	rs := ruleset{Uplink: up.dev, LinkIfaces: map[string]uint64{}, Exit: slices.Contains(st.Node.Roles, protocol.RoleExit)}
+	for _, l := range st.Links {
+		for _, in := range l.Instances {
+			rs.LinkIfaces[in.Iface] = l.ID
+			if slices.Contains(l.Peer.Roles, protocol.RoleBridge) {
+				rs.TransitIfaces = append(rs.TransitIfaces, in.Iface)
 			}
 		}
 	}
 
+	p.st = &st
 	b := st.Bridge
 	if b != nil && len(b.Rules) > 0 {
 		if err := p.applyDeviceIface(ctx, b); err != nil {
@@ -122,32 +137,34 @@ func (p *Plane) Apply(ctx context.Context, st protocol.State) error {
 			return err
 		}
 		rs.ResolverAddr = addr.Addr().String()
+		dev, tr := p.computePaths()
 		for _, r := range b.Rules {
 			prefixes, err := p.set(ctx, r.SetHash)
 			if err != nil {
 				return fmt.Errorf("rule %s: %w", r.Name, err)
 			}
-			rs.Rules = append(rs.Rules, nftRule{ID: r.ID, Elements: prefixes})
-			if slices.Contains(st.Node.Roles, protocol.RoleExit) && r.Matches(st.Node.Tags) {
-				rs.LocalExit = true
-			}
+			rs.Rules = append(rs.Rules, nftRule{ID: r.ID, Elements: prefixes, Device: dev[r.ID], Transit: tr[r.ID]})
 		}
 	} else {
+		rs.TransitIfaces = nil
 		deleteLink(ctx, DeviceIface)
 	}
 
 	if err := nft(ctx, render(rs)); err != nil {
 		return err
 	}
-	p.st = &st
+	clear(p.applied)
+	for _, r := range rs.Rules {
+		p.applied[fmt.Sprintf("dev_%d", r.ID)] = r.Device
+		p.applied[fmt.Sprintf("tr_%d", r.ID)] = r.Transit
+	}
 	if err := p.syncRules(ctx); err != nil {
 		return err
 	}
-	p.syncRoutes(ctx)
-	return p.syncResolver(rs.DefaultRule)
+	return p.syncResolver()
 }
 
-// Run keeps each Rule's route in step with the Links until ctx ends.
+// Run keeps each Rule's buckets in step with the Links until ctx ends.
 func (p *Plane) Run(ctx context.Context) {
 	t := time.NewTicker(syncInterval)
 	defer t.Stop()
@@ -162,7 +179,7 @@ func (p *Plane) Run(ctx context.Context) {
 			return
 		case <-t.C:
 			p.mu.Lock()
-			p.syncRoutes(ctx)
+			p.syncPaths(ctx)
 			p.mu.Unlock()
 		}
 	}
@@ -249,35 +266,23 @@ func (p *Plane) set(ctx context.Context, hash string) ([]string, error) {
 	return out, nil
 }
 
-// syncRules keeps exactly this plane's ip rules: one per Rule mark and one
-// per Link mark. Device traffic that matches no Rule is dropped by
+// syncRules keeps exactly this plane's ip rules: each Link's mark leads
+// to the Link's table, the local mark to the main table, and the drop mark
+// to a blackhole. Device traffic that matches no Rule is dropped by
 // nftables, not by an ip rule: an "iif darz0" rule would also catch the
 // kernel's reverse-path lookups for replies to Devices and drop them all.
 func (p *Plane) syncRules(ctx context.Context) error {
 	want := map[string]bool{}
-	if b := p.st.Bridge; b != nil {
-		for _, r := range b.Rules {
-			want[fmt.Sprintf("%d fwmark %#x lookup %d", prioRules, ruleMark(r.ID), ruleTable(r.ID))] = true
-		}
-	}
 	for _, l := range p.st.Links {
 		want[fmt.Sprintf("%d fwmark %#x lookup %s", prioLinks, linkMark(l.ID), link.LinkTable(l.ID))] = true
 	}
-	// Tables first, so no rule ever points at an empty table and falls
-	// through to the main table.
-	if b := p.st.Bridge; b != nil {
-		for _, r := range b.Rules {
-			table := ruleTable(r.ID)
-			if _, ok := p.routes[table]; ok {
-				continue
-			}
-			if err := ip(ctx, "route", "replace", "blackhole", "default", "table", fmt.Sprint(table)); err != nil {
-				return err
-			}
-			p.routes[table] = "blackhole default"
+	if p.st.Bridge != nil {
+		if err := ip(ctx, "route", "replace", "blackhole", "default", "table", fmt.Sprint(dropTable)); err != nil {
+			return err
 		}
+		want[fmt.Sprintf("%d fwmark %#x lookup main", prioRules, localMark)] = true
+		want[fmt.Sprintf("%d fwmark %#x lookup %d", prioRules, dropMark, dropTable)] = true
 	}
-
 	have, err := ourRules(ctx)
 	if err != nil {
 		return err
@@ -299,46 +304,145 @@ func (p *Plane) syncRules(ctx context.Context) error {
 	return nil
 }
 
-// syncRoutes points each Rule's table at its chosen route. Call with mu
-// held.
-func (p *Plane) syncRoutes(ctx context.Context) {
+// computePaths steps every Rule's buckets and returns them resolved, for
+// Devices and for transit. Call with mu held.
+func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
+	b := p.st.Bridge
+	if b == nil {
+		return nil, nil
+	}
+	now := time.Now()
+	links := p.cfg.Links.LinkStatus()
+	selfEgress := p.cfg.Links.EgressOK()
+	var transit []uint32
+	var health []protocol.RuleHealth
+	for _, r := range b.Rules {
+		for _, view := range []struct {
+			name    string
+			states  map[uint64]*bucketState
+			transit bool
+		}{{"dev", p.dev, false}, {"tr", p.tr, true}} {
+			cands := deriveCandidates(r, p.st.Node, selfEgress, links, view.transit)
+			eligible, ownEligible := 0, false
+			for i := range cands {
+				c := &cands[i]
+				key := fmt.Sprintf("%d|%s|%s", r.ID, view.name, c.key)
+				a := p.avail[key]
+				if a == nil {
+					a = &availability{}
+					p.avail[key] = a
+				}
+				a.observe(now, c.eligible)
+				c.weight = weight(a.value(now, b.Scoring), c.rtt, b.Scoring)
+				if c.eligible {
+					eligible++
+					ownEligible = ownEligible || c.kind != candTransit
+				}
+			}
+			st := view.states[r.ID]
+			if st == nil {
+				st = &bucketState{}
+				view.states[r.ID] = st
+			}
+			logMoves(p.log, r.Name, view.name, st.step(now, cands, b.Scoring))
+			if !view.transit {
+				if ownEligible {
+					transit = append(transit, uint32(r.ID))
+				}
+				health = append(health, protocol.RuleHealth{RuleID: r.ID, Mode: orNone(st.mode), Eligible: eligible})
+			}
+		}
+	}
+	dev, tr = resolve(b.Rules, p.dev), resolve(b.Rules, p.tr)
+	for i := range health {
+		shares := map[string]int{}
+		for _, k := range dev[health[i].RuleID] {
+			shares[k]++
+		}
+		health[i].Shares = shares
+	}
+	p.paths = health
+	if !slices.Equal(transit, p.transit) {
+		p.log.Info("transit offered", "rules", transit)
+		p.transit = transit
+	}
+	p.cfg.Links.SetTransitRules(transit)
+	return dev, tr
+}
+
+// logMoves logs one line per kind of move, with how many buckets went.
+func logMoves(log *slog.Logger, rule, view string, moves []move) {
+	type group struct{ from, to, kind, reason string }
+	counts := map[group]int{}
+	var order []group
+	for _, m := range moves {
+		g := group{orNone(m.from), orNone(m.to), m.kind, m.reason}
+		if counts[g] == 0 {
+			order = append(order, g)
+		}
+		counts[g]++
+	}
+	for _, g := range order {
+		log.Info("buckets moved", "rule", rule, "view", view, "count", counts[g], "from", g.from, "to", g.to,
+			"kind", g.kind, "reason", g.reason)
+	}
+}
+
+// syncPaths moves whatever buckets changed, one atomic nft transaction for
+// all of them. Call with mu held.
+func (p *Plane) syncPaths(ctx context.Context) {
 	if p.st == nil || p.st.Bridge == nil {
+		if p.st != nil {
+			p.cfg.Links.SetTransitRules(nil)
+		}
 		return
 	}
-	routes := chooseRoutes(p.st.Bridge.Rules, p.st.Node, p.cfg.Links.LinkStatus())
+	dev, tr := p.computePaths()
+	var b strings.Builder
+	next := map[string][buckets]string{}
 	for _, r := range p.st.Bridge.Rules {
-		table := ruleTable(r.ID)
-		args := []string{"route", "replace", "blackhole", "default"}
-		switch rt := routes[r.ID]; rt.kind {
-		case local:
-			args = []string{"route", "replace", "default", "dev", p.uplink.dev}
-			if p.uplink.gateway != "" {
-				args = append(args[:3], "via", p.uplink.gateway, "dev", p.uplink.dev)
-			}
-		case viaLink:
-			args = []string{"route", "replace", "default", "dev", rt.iface}
+		for name, assign := range map[string][buckets]string{fmt.Sprintf("dev_%d", r.ID): dev[r.ID], fmt.Sprintf("tr_%d", r.ID): tr[r.ID]} {
+			b.WriteString(bucketUpdates(name, p.applied[name], assign))
+			next[name] = assign
 		}
-		spec := strings.Join(args[2:], " ")
-		if p.routes[table] == spec {
-			continue
-		}
-		if err := ip(ctx, append(args, "table", fmt.Sprint(table))...); err != nil {
-			p.log.Error("route rule", "rule", r.Name, "err", err)
-			continue
-		}
-		p.log.Info("rule routed", "rule", r.Name, "route", spec)
-		p.routes[table] = spec
 	}
+	if b.Len() == 0 {
+		return
+	}
+	if err := nft(ctx, b.String()); err != nil {
+		p.log.Error("move buckets", "err", err)
+		return
+	}
+	p.applied = next
+}
+
+// Report adds bucket shares per candidate per Rule to a health report.
+func (p *Plane) Report(h *protocol.Health) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	h.Paths = slices.Clone(p.paths)
+}
+
+// resolverMark is the mark of the resolver's own queries: those of a
+// Device at the resolver's address, in the default Rule. Call with mu held.
+func (p *Plane) resolverMark() uint32 {
+	b := p.st.Bridge
+	if b == nil || len(b.Rules) == 0 {
+		return dropMark
+	}
+	addr, _ := netip.ParsePrefix(b.Address)
+	bucket := int(addr.Addr().As4()[3]) % buckets
+	return markFor(p.applied[fmt.Sprintf("dev_%d", b.Rules[len(b.Rules)-1].ID)][bucket])
 }
 
 // syncResolver runs the DNS relay on a Bridge, restarting it when what it
 // relays changes. Call with mu held.
-func (p *Plane) syncResolver(defaultRule uint64) error {
+func (p *Plane) syncResolver() error {
 	b := p.st.Bridge
 	key := ""
 	if b != nil {
 		addr, _ := netip.ParsePrefix(b.Address)
-		key = fmt.Sprintf("%s|%s|%d", addr.Addr(), strings.Join(b.Upstreams, ","), defaultRule)
+		key = fmt.Sprintf("%s|%s", addr.Addr(), strings.Join(b.Upstreams, ","))
 	}
 	if key == p.resKey {
 		return nil
@@ -352,7 +456,11 @@ func (p *Plane) syncResolver(defaultRule uint64) error {
 		return nil
 	}
 	addr, _ := netip.ParsePrefix(b.Address)
-	r := newResolver(net.JoinHostPort(addr.Addr().String(), "53"), b.Upstreams, ruleMark(defaultRule))
+	r := newResolver(net.JoinHostPort(addr.Addr().String(), "53"), b.Upstreams, func() uint32 {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return p.resolverMark()
+	})
 	if err := r.start(); err != nil {
 		return fmt.Errorf("resolver: %w", err)
 	}
@@ -370,7 +478,6 @@ func ourRules(ctx context.Context) (map[string]bool, error) {
 	var rules []struct {
 		Priority int    `json:"priority"`
 		Fwmark   string `json:"fwmark"`
-		Iif      string `json:"iif"`
 		Table    string `json:"table"`
 	}
 	if err := json.Unmarshal(out, &rules); err != nil {
@@ -382,8 +489,6 @@ func ourRules(ctx context.Context) (map[string]bool, error) {
 		case r.Priority < prioRules || r.Priority > prioMax:
 		case r.Fwmark != "":
 			have[fmt.Sprintf("%d fwmark %s lookup %s", r.Priority, r.Fwmark, r.Table)] = true
-		case r.Iif != "":
-			have[fmt.Sprintf("%d iif %s lookup %s", r.Priority, r.Iif, r.Table)] = true
 		}
 	}
 	return have, nil

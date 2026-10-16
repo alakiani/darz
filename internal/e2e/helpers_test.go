@@ -98,3 +98,91 @@ func dumpOnFailure(t *testing.T, name, path string) {
 func execCommand(name string, args ...string) ([]byte, error) {
 	return exec.Command(name, args...).CombinedOutput()
 }
+
+// egressTargets serves what Exits' egress checks reach (ADR 0008): on each
+// host, a resolver that answers every A query with the host's own address,
+// and an HTTP endpoint that answers 204. It points the Coordinator's
+// targets at them: domestic for IR Exits, abroad for the rest.
+func egressTargets(t *testing.T, co *coord, abroad, domestic *lab.Node) {
+	t.Helper()
+	for _, n := range []*lab.Node{abroad, domestic} {
+		serveEgress(t, n)
+	}
+	co.c.Egress = coordinator.EgressTargets{
+		Abroad: protocol.EgressCheck{Resolvers: []string{abroad.Addr().String()}, Hostname: "check.abroad",
+			URL: "http://" + abroad.Addr().String() + "/generate_204"},
+		IR: protocol.EgressCheck{Resolvers: []string{domestic.Addr().String()}, Hostname: "check.ir",
+			URL: "http://" + domestic.Addr().String() + "/"},
+	}
+}
+
+func serveEgress(t *testing.T, n *lab.Node) {
+	t.Helper()
+	var udp net.PacketConn
+	var tcp net.Listener
+	if err := n.Do(func() (err error) {
+		if udp, err = net.ListenPacket("udp4", net.JoinHostPort(n.Addr().String(), "53")); err != nil {
+			return err
+		}
+		tcp, err = net.Listen("tcp4", net.JoinHostPort(n.Addr().String(), "80"))
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { udp.Close(); tcp.Close() })
+	go func() {
+		buf := make([]byte, 512)
+		for {
+			k, from, err := udp.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			if answer := answerA(buf[:k], n.Addr().As4()); answer != nil {
+				udp.WriteTo(answer, from)
+			}
+		}
+	}()
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})}
+	go srv.Serve(tcp)
+}
+
+// answerA answers a DNS query: an A query gets addr, any other type an
+// empty NOERROR answer.
+func answerA(q []byte, addr [4]byte) []byte {
+	if len(q) < 12 {
+		return nil
+	}
+	end := 12
+	for end < len(q) && q[end] != 0 {
+		end += int(q[end]) + 1
+	}
+	end += 5 // the root label, then type and class
+	if end > len(q) {
+		return nil
+	}
+	isA := q[end-4] == 0 && q[end-3] == 1
+	out := append([]byte{}, q[:2]...)   // id
+	out = append(out, 0x81, 0x80, 0, 1) // a response, recursion available; one question
+	if isA {
+		out = append(out, 0, 1, 0, 0, 0, 0) // one answer
+	} else {
+		out = append(out, 0, 0, 0, 0, 0, 0)
+	}
+	out = append(out, q[12:end]...)
+	if isA {
+		out = append(out, 0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4)
+		out = append(out, addr[:]...)
+	}
+	return out
+}
+
+// serveFeed serves a fixed IR feed and returns its URL.
+func serveFeed(t *testing.T, body string) string {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL
+}

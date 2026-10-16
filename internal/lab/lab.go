@@ -164,6 +164,14 @@ func (l *Lab) Namespaces() []string {
 // qdiscs and nftables tables with it. Close is safe to call more than once.
 func (l *Lab) Close() {
 	l.closeOnce.Do(func() {
+		// Kill what runs in the namespaces first: a daemon that outlives
+		// its namespace would hold on to sockets the next lab reuses.
+		for _, ns := range l.Namespaces() {
+			out, _ := exec.Command("ip", "netns", "pids", ns).Output()
+			for _, pid := range strings.Fields(string(out)) {
+				exec.Command("kill", "-9", pid).Run()
+			}
+		}
 		for _, ns := range l.Namespaces() {
 			if out, err := exec.Command("ip", "netns", "del", ns).CombinedOutput(); err != nil &&
 				!bytes.Contains(out, []byte("No such file")) {
@@ -224,6 +232,12 @@ func DropUDP(n *Node, port uint16) FilterMatch {
 // DropAll matches every packet to n's IP.
 func DropAll(n *Node) FilterMatch {
 	return FilterMatch{fmt.Sprintf("ip daddr %s", n.addr)}
+}
+
+// DropBetween matches every packet between two Nodes, in both directions.
+func DropBetween(a, b *Node) FilterMatch {
+	set := fmt.Sprintf("{ %s, %s }", a.addr, b.addr)
+	return FilterMatch{fmt.Sprintf("ip saddr %s ip daddr %s", set, set)}
 }
 
 // FilterRule is one rule installed in the filter.

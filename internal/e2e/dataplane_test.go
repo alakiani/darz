@@ -243,10 +243,13 @@ func TestDataPlane(t *testing.T) {
 		lab.At("web-ir", "2.144.0.10"),    // a site in Iran
 		lab.At("web-ab", "93.184.215.14"), // a site abroad, inside 0.0.0.0/1
 		lab.At("dns-ab", "9.9.9.9"),       // a public resolver abroad
+		lab.At("egress-ab", "1.0.0.10"),   // what abroad Exits' egress checks reach
+		lab.At("egress-ir", "2.188.0.10"), // what IR Exits' egress checks reach
 	)
 	ctx := context.Background()
 	co := startCoordinator(t, l.Node("coord"))
 	co.c.Upstreams = []string{"9.9.9.9"}
+	egressTargets(t, co, l.Node("egress-ab"), l.Node("egress-ir"))
 	dumpNetOnFailure(t, l, "ir1", "ir2", "ir3", "ab1", "phone1", "phone2")
 
 	// The IR feed, served to the Coordinator.

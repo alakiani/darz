@@ -52,6 +52,33 @@ type BridgeState struct {
 	Devices []Device `json:"devices"`
 	// Rules in priority order, the default Rule last.
 	Rules []Rule `json:"rules"`
+	// Scoring is how the Bridge ranks and balances candidates (ADR 0008).
+	Scoring Scoring `json:"scoring"`
+}
+
+// Scoring holds ADR 0008's constants, pushed so they can be tuned without
+// a release and shortened in tests.
+type Scoring struct {
+	RTTFloorMillis          float64 `json:"rtt_floor_ms"`          // RTT counts only above this
+	AvailabilityWindowSec   int     `json:"availability_window_s"` // sliding window for availability
+	FlapPenaltySec          int     `json:"flap_penalty_s"`        // extra downtime per eligible-to-ineligible switch
+	FlapWindowSec           int     `json:"flap_window_s"`         // how far back switches are penalised
+	Cutoff                  float64 `json:"cutoff"`                // below this fraction of the best weight: no buckets
+	RebalanceThresholdShare float64 `json:"rebalance_threshold"`   // off target by more than this share...
+	RebalanceAfterSec       int     `json:"rebalance_after_s"`     // ...for this long...
+	RebalanceEverySec       int     `json:"rebalance_every_s"`     // ...moves one bucket this often
+}
+
+// DefaultScoring is ADR 0008's.
+var DefaultScoring = Scoring{
+	RTTFloorMillis:          150,
+	AvailabilityWindowSec:   6 * 3600,
+	FlapPenaltySec:          60,
+	FlapWindowSec:           3600,
+	Cutoff:                  0.25,
+	RebalanceThresholdShare: 0.10,
+	RebalanceAfterSec:       15 * 60,
+	RebalanceEverySec:       5 * 60,
 }
 
 // Device is one Device peer of a Bridge.
@@ -224,6 +251,19 @@ type Health struct {
 	// instances it listens on.
 	Listening []ListenChoice `json:"listening,omitempty"`
 	Links     []LinkHealth   `json:"links,omitempty"`
+	// Paths are a Bridge's bucket shares per candidate per Rule (ADR 0008).
+	Paths []RuleHealth `json:"paths,omitempty"`
+}
+
+// RuleHealth is how a Bridge is carrying one Rule.
+type RuleHealth struct {
+	RuleID uint64 `json:"rule_id"`
+	// Mode is "local", "direct", "transit" or "fallback".
+	Mode string `json:"mode"`
+	// Shares counts buckets per candidate, such as "local", "link:4" or
+	// "drop"; a Rule in fallback reports the buckets of the Rule it fell to.
+	Shares   map[string]int `json:"shares"`
+	Eligible int            `json:"eligible"`
 }
 
 // ListenChoice is a listening end's choice for one instance.

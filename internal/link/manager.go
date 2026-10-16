@@ -57,6 +57,7 @@ type Manager struct {
 	stop context.CancelFunc
 
 	egressOK atomic.Bool
+	transit  atomic.Pointer[[]uint32] // Rules this Node carries transit for
 
 	mu      sync.Mutex
 	timing  protocol.LinkTiming
@@ -132,7 +133,13 @@ func (m *Manager) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("probe port: %w", err)
 	}
-	go serveProbes(ctx, &wakingConn{conn, m}, func() Flags { return Flags{EgressOK: m.egressOK.Load()} })
+	go serveProbes(ctx, &wakingConn{conn, m}, func() Flags {
+		f := Flags{EgressOK: m.egressOK.Load()}
+		if t := m.transit.Load(); t != nil {
+			f.TransitRules = *t
+		}
+		return f
+	})
 	go m.egressLoop(ctx)
 
 	t := time.NewTicker(selectInterval)
@@ -366,6 +373,13 @@ func (m *Manager) selectActive(ctx context.Context) {
 	}
 }
 
+// SetTransitRules sets the Rules this Node tells its neighbours it can
+// carry transit for, in every probe reply (ADR 0008).
+func (m *Manager) SetTransitRules(rules []uint32) { m.transit.Store(&rules) }
+
+// EgressOK reports this Node's own latest egress check.
+func (m *Manager) EgressOK() bool { return m.egressOK.Load() }
+
 // Status is a Link as the data plane needs it.
 type Status struct {
 	ID   uint64
@@ -376,6 +390,11 @@ type Status struct {
 	Iface string
 	// Table is the routing table that carries the Link.
 	Table string
+	// RTT, and the flags in the peer's latest probe reply, on the active
+	// instance.
+	RTT              time.Duration
+	PeerEgressOK     bool
+	PeerTransitRules []uint32
 }
 
 // LinkStatus returns every Link of this Node, by id.
@@ -388,6 +407,10 @@ func (m *Manager) LinkStatus() []Status {
 		st := Status{ID: id, Peer: ls.peer, Up: ls.active != 0 && ls.routed, Table: linkTable(id)}
 		if in := m.insts[ls.active]; st.Up && in != nil {
 			st.Iface = in.iface()
+			in.mu.Lock()
+			st.RTT = in.meter.rtt(time.Now())
+			st.PeerEgressOK, st.PeerTransitRules = in.flags.EgressOK, slices.Clone(in.flags.TransitRules)
+			in.mu.Unlock()
 		}
 		out = append(out, st)
 	}

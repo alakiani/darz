@@ -229,7 +229,9 @@ func TestLinks(t *testing.T) {
 	})
 	wgBlock.Remove()
 	unblocked := time.Now()
-	testutil.Eventually(t, 45*time.Second, "same-side link switches back to wireguard", func() bool {
+	// WireGuard counts as Up again once the losses from the block leave
+	// its 30 s window, and the Link returns 15 s after that.
+	testutil.Eventually(t, 75*time.Second, "same-side link switches back to wireguard", func() bool {
 		return m.link("ir1", same).Transport == protocol.TransportWireGuard
 	})
 	if back := time.Since(unblocked); back < 15*time.Second {

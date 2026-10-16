@@ -118,8 +118,9 @@ func dnsServer(t *testing.T, n *lab.Node) {
 // phone is a lab Node set up as a Device: stock WireGuard to a Bridge, with
 // everything routed into the tunnel.
 type phone struct {
-	t    *testing.T
-	node *lab.Node
+	t         *testing.T
+	node      *lab.Node
+	bridgeKey wgtypes.Key
 }
 
 func newPhone(t *testing.T, n *lab.Node, key wgtypes.Key, addr netip.Addr, bridge *lab.Node, bridgeKey wgtypes.Key, port int) *phone {
@@ -153,7 +154,7 @@ func newPhone(t *testing.T, n *lab.Node, key wgtypes.Key, addr netip.Addr, bridg
 	run("ip", "link", "set", "wg0", "up")
 	run("ip", "route", "add", bridge.Addr().String()+"/32", "via", gw.String(), "dev", "wan0")
 	run("ip", "route", "replace", "default", "dev", "wg0")
-	return &phone{t: t, node: n}
+	return &phone{t: t, node: n, bridgeKey: bridgeKey}
 }
 
 // ask sends one UDP datagram and returns the reply.

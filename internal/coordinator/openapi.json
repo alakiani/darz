@@ -934,6 +934,9 @@
           "backup": {
             "type": "string"
           },
+          "endpoint_slots": {
+            "$ref": "#/components/schemas/SlotStatus"
+          },
           "links": {
             "items": {
               "$ref": "#/components/schemas/LinkTile"
@@ -955,6 +958,7 @@
         },
         "required": [
           "backup",
+          "endpoint_slots",
           "links",
           "nodes",
           "sets"
@@ -984,6 +988,25 @@
           "mode",
           "rule",
           "shares"
+        ],
+        "type": "object"
+      },
+      "ProbeResult": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "at",
+          "ok"
         ],
         "type": "object"
       },
@@ -1151,6 +1174,80 @@
           "buckets",
           "candidate",
           "transit"
+        ],
+        "type": "object"
+      },
+      "SlotBridge": {
+        "properties": {
+          "eligible": {
+            "type": "boolean"
+          },
+          "ineligible_since": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "probe": {
+            "$ref": "#/components/schemas/ProbeResult"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "eligible",
+          "name"
+        ],
+        "type": "object"
+      },
+      "SlotStatus": {
+        "properties": {
+          "bridges": {
+            "items": {
+              "$ref": "#/components/schemas/SlotBridge"
+            },
+            "type": "array"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/SlotTile"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "bridges",
+          "slots"
+        ],
+        "type": "object"
+      },
+      "SlotTile": {
+        "properties": {
+          "addr": {
+            "type": "string"
+          },
+          "bridge": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "repoints": {
+            "type": "integer"
+          },
+          "since": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "repoints"
         ],
         "type": "object"
       },

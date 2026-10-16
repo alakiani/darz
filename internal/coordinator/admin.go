@@ -150,6 +150,9 @@ func (c *Coordinator) adminOverview(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		o.Sets, err = c.setInfos(ctx)
 	}
+	if err == nil {
+		o.EndpointSlots, err = c.EndpointSlotStatus(ctx)
+	}
 	if err != nil {
 		c.internalError(w, err)
 		return

@@ -54,6 +54,10 @@ type Coordinator struct {
 	PanelURL string
 	// EndpointSlots are the hostnames in Device configs (ADR 0005).
 	EndpointSlots []string
+	// DNS points the Endpoint Slots' records; nil leaves them alone.
+	DNS SlotDNS
+	// Slots holds the Endpoint Slots' timings and the probe's settings.
+	Slots SlotSettings
 	// SecureCookies marks session cookies Secure; off only for plain-HTTP
 	// development.
 	SecureCookies bool
@@ -65,6 +69,7 @@ type Coordinator struct {
 	HTTPClient           *http.Client
 
 	reconcileMu sync.Mutex // one Reconcile at a time
+	slots       slotState
 
 	mu      sync.Mutex
 	changed chan struct{} // closed and replaced whenever a snapshot changes
@@ -74,8 +79,9 @@ type Coordinator struct {
 func New(s *store.Store, c *ca.CA, log *slog.Logger) *Coordinator {
 	return &Coordinator{store: s, ca: c, log: log, LongPoll: 60 * time.Second,
 		LinkTiming: protocol.DefaultLinkTiming, Egress: DefaultEgressTargets, Upstreams: DefaultUpstreams, Scoring: protocol.DefaultScoring,
-		PanelURL: "https://4miz.ir", EndpointSlots: DefaultEndpointSlots, SecureCookies: true,
+		PanelURL: "https://4miz.ir", EndpointSlots: DefaultEndpointSlots, Slots: DefaultSlotSettings, SecureCookies: true,
 		FeedURL: irfeed.DefaultURL, RIPEstatURL: irfeed.DefaultRIPEstatURL, HTTPClient: http.DefaultClient,
+		slots:   slotState{probes: map[string]protocol.ProbeResult{}, inelSince: map[string]time.Time{}, reasons: map[string][]string{}},
 		changed: make(chan struct{})}
 }
 

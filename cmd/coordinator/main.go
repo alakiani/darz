@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alakiani/darz/internal/arvan"
 	"github.com/alakiani/darz/internal/ca"
 	"github.com/alakiani/darz/internal/coordinator"
 	"github.com/alakiani/darz/internal/irfeed"
@@ -62,6 +63,10 @@ func serve(args []string, log *slog.Logger) error {
 	panelURL := fs.String("panel-url", "https://4miz.ir", "where the panel is served; Invite links point here")
 	feedURL := fs.String("feed-url", irfeed.DefaultURL, "the IR feed (list.rsc)")
 	ripeURL := fs.String("ripestat-url", irfeed.DefaultRIPEstatURL, "RIPEstat's list for the cross-check; empty to skip it")
+	arvanKeyFile := fs.String("arvan-api-key-file", "", "file holding the ArvanCloud API key that edits the Endpoint Slots' records; unset leaves the records alone")
+	arvanZone := fs.String("arvan-zone", "4miz.ir", "the ArvanCloud zone holding the Endpoint Slots")
+	arvanTTL := fs.Int("arvan-ttl", 120, "TTL of the Endpoint Slots' records, in seconds: the lowest ArvanCloud allows")
+	arvanURL := fs.String("arvan-url", arvan.DefaultBaseURL, "ArvanCloud's CDN API")
 	fs.Parse(args)
 	if *showVersion {
 		fmt.Println(version)
@@ -81,13 +86,25 @@ func serve(args []string, log *slog.Logger) error {
 	c.PanelURL = *panelURL
 	c.FeedURL, c.RIPEstatURL = *feedURL, *ripeURL
 	c.SecureCookies = *adminCert != "" // plain HTTP is for development only
+	if *arvanKeyFile != "" {
+		key, err := os.ReadFile(*arvanKeyFile)
+		if err != nil {
+			return err
+		}
+		c.DNS = &arvan.Client{BaseURL: *arvanURL, APIKey: strings.TrimSpace(string(key)), Zone: *arvanZone, TTL: *arvanTTL,
+			HTTP: &http.Client{Timeout: 30 * time.Second}}
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if err := c.InitProbe(ctx); err != nil {
+		return err
+	}
 	if err := c.Reconcile(ctx); err != nil {
 		return err
 	}
 	go c.RunIRFeed(ctx, 24*time.Hour)
 	go c.RunRollUps(ctx, time.Hour)
+	go c.RunEndpointSlots(ctx)
 
 	agentTLS, err := c.AgentTLSConfig(strings.Split(*agentHosts, ","))
 	if err != nil {

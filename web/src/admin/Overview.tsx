@@ -69,6 +69,35 @@ export function OverviewScreen() {
         </tbody>
       </table>
 
+      <h2>Endpoint Slots</h2>
+      <table data-testid="endpoint-slots">
+        <tbody>
+          {o.endpoint_slots.slots.map((s) => (
+            <tr key={s.name}>
+              <th>{s.name}</th>
+              <td>{s.bridge ?? "unassigned"}</td>
+              <td className={s.addr ? "" : "error"}>{s.addr ?? "record update due"}</td>
+              <td>
+                since {ago(s.since)}, re-pointed {s.repoints}×
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <table data-testid="slot-bridges">
+        <tbody>
+          {o.endpoint_slots.bridges.map((b) => (
+            <tr key={b.name}>
+              <th>{b.name}</th>
+              <td className={b.eligible ? "up" : "down"}>{b.eligible ? "eligible" : (b.reasons ?? ["not probed yet"]).join(", ")}</td>
+              <td>
+                probe {b.probe ? (b.probe.ok ? "passing" : "failing") : "pending"} {b.probe && ago(b.probe.at)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
       <h2>Coordinator</h2>
       <div className="card">
         {o.sets

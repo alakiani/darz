@@ -9,6 +9,9 @@ type Overview struct {
 	Nodes []NodeTile `json:"nodes"`
 	Links []LinkTile `json:"links"`
 	Sets  []SetInfo  `json:"sets"`
+	// EndpointSlots are the slots and the probe's view of each domestic
+	// Bridge (ADR 0005).
+	EndpointSlots SlotStatus `json:"endpoint_slots"`
 	// Backup describes the nightly backup; session 11 builds it.
 	Backup string `json:"backup"`
 }
@@ -175,4 +178,39 @@ type NewToken struct {
 type IssuedToken struct {
 	Token  TokenInfo `json:"token"`
 	Secret string    `json:"secret"`
+}
+
+// SlotStatus is where the Endpoint Slots point and why.
+type SlotStatus struct {
+	Slots   []SlotTile   `json:"slots"`
+	Bridges []SlotBridge `json:"bridges"`
+}
+
+// SlotTile is one Endpoint Slot.
+type SlotTile struct {
+	Name   string `json:"name"`             // such as a.4miz.ir
+	Bridge string `json:"bridge,omitempty"` // the Bridge's name; absent until one was eligible
+	// Addr is what the DNS record holds; empty while an update is due.
+	Addr     string     `json:"addr,omitempty"`
+	Since    *time.Time `json:"since,omitempty"` // when it last moved
+	Repoints int        `json:"repoints"`
+}
+
+// SlotBridge is one domestic Bridge as slot eligibility judges it.
+type SlotBridge struct {
+	Name     string `json:"name"`
+	Eligible bool   `json:"eligible"`
+	// Reasons say why it is not eligible.
+	Reasons []string     `json:"reasons,omitempty"`
+	Probe   *ProbeResult `json:"probe,omitempty"`
+	// IneligibleSince is when it last became ineligible; its slots move
+	// 60 s later.
+	IneligibleSince *time.Time `json:"ineligible_since,omitempty"`
+}
+
+// ProbeResult is the probe Device's latest check of a Bridge.
+type ProbeResult struct {
+	OK    bool      `json:"ok"`
+	At    time.Time `json:"at"`
+	Error string    `json:"error,omitempty"`
 }

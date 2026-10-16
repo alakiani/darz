@@ -95,6 +95,9 @@ func TestEndpointSlots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := co.c.Reconcile(ctx); err != nil { // the Bridges are already up: tell them
+		t.Fatal(err)
+	}
 	bridgePub, _ := co.c.BridgePublicKey(ctx)
 	bridgeKey, _ := wgtypes.ParseKey(bridgePub)
 	resolve := func(slot string) *lab.Node { return l.Node(record(slot)) }

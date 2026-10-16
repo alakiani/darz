@@ -1449,6 +1449,32 @@
         "summary": "Revoke one of my Devices"
       }
     },
+    "/v1/me/logout-everywhere": {
+      "post": {
+        "operationId": "postMeLogoutEverywhere",
+        "responses": {
+          "204": {
+            "description": "Done"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "End every session of mine, this one too"
+      }
+    },
     "/v1/me/password": {
       "post": {
         "operationId": "postMePassword",

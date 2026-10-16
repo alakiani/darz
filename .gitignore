@@ -1,2 +1,6 @@
 /bin/
 *.test
+/internal/panel/dist/app/
+/web/node_modules/
+/web/src/api/schema.d.ts
+/web/test-results/

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -231,9 +232,11 @@ func TestRestartReappliesPersistedSnapshotWithoutCoordinator(t *testing.T) {
 	dir := t.TempDir()
 	nw := &network{}
 	first := rg.startAgent(t, dir, created.EnrollmentToken, &applier{}, nw)
-	testutil.Eventually(t, 5*time.Second, "version 1 confirmed", func() bool {
-		h := rg.admin.GetNode(t, created.Node.ID).LastHealth
-		return h != nil && h.AppliedVersion == 1
+	// The confirming report reaches the Coordinator a moment before the
+	// Agent writes the snapshot down; wait for the file itself.
+	testutil.Eventually(t, 5*time.Second, "version 1 confirmed and persisted", func() bool {
+		b, err := os.ReadFile(filepath.Join(dir, "state.json"))
+		return err == nil && strings.Contains(string(b), `"version": 1`)
 	})
 	if err := first.stop(); err != nil {
 		t.Fatal(err)

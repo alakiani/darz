@@ -61,6 +61,10 @@ type Coordinator struct {
 	// SecureCookies marks session cookies Secure; off only for plain-HTTP
 	// development.
 	SecureCookies bool
+	// Monitor is the Coordinator's part in monitoring (ADR 0006).
+	Monitor MonitorSettings
+	// Backup configures the nightly backup (ADR 0001).
+	Backup BackupSettings
 
 	limit limiter // failed sign-ins
 	// FeedURL and RIPEstatURL are where the IR feed and its cross-check
@@ -70,6 +74,7 @@ type Coordinator struct {
 
 	reconcileMu sync.Mutex // one Reconcile at a time
 	slots       slotState
+	mon         monitorState
 
 	mu      sync.Mutex
 	changed chan struct{} // closed and replaced whenever a snapshot changes
@@ -80,6 +85,7 @@ func New(s *store.Store, c *ca.CA, log *slog.Logger) *Coordinator {
 	return &Coordinator{store: s, ca: c, log: log, LongPoll: 60 * time.Second,
 		LinkTiming: protocol.DefaultLinkTiming, Egress: DefaultEgressTargets, Upstreams: DefaultUpstreams, Scoring: protocol.DefaultScoring,
 		PanelURL: "https://4miz.ir", EndpointSlots: DefaultEndpointSlots, Slots: DefaultSlotSettings, SecureCookies: true,
+		Monitor: DefaultMonitorSettings, Backup: DefaultBackupSettings, mon: monitorState{poke: make(chan struct{}, 1)},
 		FeedURL: irfeed.DefaultURL, RIPEstatURL: irfeed.DefaultRIPEstatURL, HTTPClient: http.DefaultClient,
 		slots:   slotState{probes: map[string]protocol.ProbeResult{}, inelSince: map[string]time.Time{}, reasons: map[string][]string{}},
 		changed: make(chan struct{})}
@@ -136,6 +142,7 @@ func (c *Coordinator) desiredState(n store.Node, mesh meshView) protocol.State {
 		Node:       protocol.NodeInfo{ID: n.ID, Name: n.Name, Roles: n.Roles, Tags: n.Tags},
 		Links:      linksFor(n, mesh),
 		LinkTiming: c.LinkTiming,
+		Monitor:    c.monitorState(n),
 	}
 	if isBridge(n) {
 		st.Bridge = mesh.bridge

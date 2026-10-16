@@ -48,6 +48,7 @@ type meter struct {
 
 	mu    sync.Mutex
 	state meterState
+	total uint64 // bytes counted since the Agent started
 }
 
 // meterState is what the meter keeps on disk. The last readings are kept
@@ -105,6 +106,7 @@ func (m *meter) collect(read func(set string) ([]counterElem, error), exitOf fun
 			if delta == 0 || exit == "" {
 				continue
 			}
+			m.total += delta
 			if m.state.Buckets[hour] == nil {
 				m.state.Buckets[hour] = map[string]*cell{}
 			}
@@ -123,6 +125,13 @@ func (m *meter) collect(read func(set string) ([]counterElem, error), exitOf fun
 	}
 	m.forget()
 	return m.save()
+}
+
+// metered is every byte counted since the Agent started.
+func (m *meter) metered() uint64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.total
 }
 
 // reset forgets the last readings: the counters restart from zero after a

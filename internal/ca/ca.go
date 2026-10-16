@@ -29,6 +29,18 @@ import (
 // ClientCertLifetime is how long a Node's certificate lasts (ADR 0002).
 const ClientCertLifetime = 365 * 24 * time.Hour
 
+// Names on certificates of the metrics port (ADR 0006).
+const (
+	// AgentServerName is on every Node's certificate, besides its id, so
+	// Prometheus can check any Agent with one name.
+	AgentServerName = "agent.darz"
+	// PrometheusName and CoordinatorName are the client identities the
+	// metrics port admits: Prometheus to /metrics, the Coordinator to the
+	// Telegram relay. Node ids start nd_, so neither names a Node.
+	PrometheusName  = "darz-prometheus"
+	CoordinatorName = "darz-coordinator"
+)
+
 // CA signs certificates with a key loaded from disk.
 type CA struct {
 	cert    *x509.Certificate
@@ -124,8 +136,10 @@ func (c *CA) Pool() *x509.CertPool {
 	return p
 }
 
-// SignClient issues a client certificate for the key in a PEM CSR. The
-// certificate's identity is nodeID, whatever the CSR asks for.
+// SignClient issues a Node's certificate for the key in a PEM CSR. The
+// certificate's identity is nodeID, whatever the CSR asks for. It is the
+// Node's client certificate for the Agent API and the server certificate
+// of its metrics port, named both nodeID and AgentServerName.
 func (c *CA) SignClient(csrPEM []byte, nodeID string, now time.Time) (certPEM []byte, serial string, err error) {
 	block, _ := pem.Decode(csrPEM)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
@@ -144,7 +158,8 @@ func (c *CA) SignClient(csrPEM []byte, nodeID string, now time.Time) (certPEM []
 		NotBefore:    now.Add(-5 * time.Minute),
 		NotAfter:     now.Add(ClientCertLifetime),
 		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{nodeID, AgentServerName},
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, c.cert, csr.PublicKey, c.key)
 	if err != nil {
@@ -156,6 +171,36 @@ func (c *CA) SignClient(csrPEM []byte, nodeID string, now time.Time) (certPEM []
 	}
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), Serial(cert), nil
 }
+
+// IssueClient makes a key and a client certificate named name, such as
+// PrometheusName, both PEM.
+func (c *CA) IssueClient(name string, now time.Time) (certPEM, keyPEM []byte, err error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: randomSerial(),
+		Subject:      pkix.Name{CommonName: name},
+		NotBefore:    now.Add(-5 * time.Minute),
+		NotAfter:     now.Add(ClientCertLifetime),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, c.cert, &key.PublicKey, c.key)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return nil, nil, err
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}),
+		pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}), nil
+}
+
+// NotAfter is when the CA certificate expires.
+func (c *CA) NotAfter() time.Time { return c.cert.NotAfter }
 
 // ServerCert issues a certificate and key for the Agent listener, valid for
 // the given hostnames and IPs. It is made fresh at every start.

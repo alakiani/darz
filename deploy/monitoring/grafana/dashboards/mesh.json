@@ -1,0 +1,113 @@
+{
+  "uid": "darz-mesh",
+  "title": "Mesh",
+  "description": "Nodes, every Link with its latency, loss and transport, active Paths, and the Bridge behind each Endpoint Slot (ADR 0006).",
+  "tags": ["darz"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Nodes",
+      "description": "1 when Prometheus scrapes the Node's Agent.",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [{ "refId": "A", "expr": "up{job=\"agents\"}", "legendFormat": "{{node}}" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "type": "value", "options": { "0": { "text": "down", "color": "red" }, "1": { "text": "up", "color": "green" } } }],
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Endpoint Slots",
+      "description": "The Bridge each slot points to.",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [{ "refId": "A", "expr": "darz_slot_points_to == 1", "format": "table", "instant": true }],
+      "transformations": [{ "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "instance": true, "job": true } } }]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Links",
+      "description": "Every Link: up as either end sees it, round-trip time, loss and the transport in use.",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "max by (link) (darz_link_up)", "format": "table", "instant": true },
+        { "refId": "B", "expr": "max by (link) (darz_link_rtt_seconds)", "format": "table", "instant": true },
+        { "refId": "C", "expr": "max by (link) (darz_link_loss_ratio)", "format": "table", "instant": true },
+        { "refId": "D", "expr": "max by (link, transport) (darz_link_transport)", "format": "table", "instant": true }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "Value #D": true },
+          "renameByName": { "Value #A": "up", "Value #B": "rtt (s)", "Value #C": "loss" } } }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Link latency",
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [{ "refId": "A", "expr": "max by (link) (darz_link_rtt_seconds)", "legendFormat": "{{link}}" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Link loss",
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [{ "refId": "A", "expr": "max by (link) (darz_link_loss_ratio)", "legendFormat": "{{link}}" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Active Paths",
+      "description": "Buckets per candidate per Bridge per Rule (64 per Rule, ADR 0008).",
+      "gridPos": { "x": 0, "y": 21, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [{ "refId": "A", "expr": "darz_path_buckets > 0", "legendFormat": "{{node}} {{rule}} → {{candidate}}" }],
+      "fieldConfig": { "defaults": { "custom": { "stacking": { "mode": "normal" } }, "max": 64 } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Bucket moves",
+      "description": "Moves by kind; Path flapping counts failure moves only.",
+      "gridPos": { "x": 12, "y": 21, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (node, kind) (increase(darz_path_moves_total[1h]))", "legendFormat": "{{node}} {{kind}}" }]
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Slot eligibility",
+      "description": "Each domestic Bridge as the probe Device sees it.",
+      "gridPos": { "x": 0, "y": 29, "w": 24, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [{ "refId": "A", "expr": "darz_slot_bridge_eligible", "legendFormat": "{{node}}" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "type": "value", "options": { "0": { "text": "ineligible", "color": "red" }, "1": { "text": "eligible", "color": "green" } } }],
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    }
+  ]
+}

@@ -36,6 +36,27 @@ type State struct {
 	EgressCheck *EgressCheck `json:"egress_check,omitempty"`
 	// Bridge is set for Bridges only: Exits never see Devices (ADR 0002).
 	Bridge *BridgeState `json:"bridge,omitempty"`
+	// Monitor opens the Node's metrics port (ADR 0006); nil keeps it shut.
+	Monitor *Monitor `json:"monitor,omitempty"`
+}
+
+// Monitor is the Node's one monitoring port: Prometheus scrapes /metrics
+// there, and the Coordinator hands alerts to it for relay to Telegram.
+// Both need a client certificate from the Coordinator's CA.
+type Monitor struct {
+	Port uint16 `json:"port"`
+	// AllowFrom are the only addresses nftables lets reach the port: the
+	// Coordinator VM's. Everyone else is dropped without an answer.
+	AllowFrom []string `json:"allow_from"`
+}
+
+// TelegramMessage is POSTed by the Coordinator to /v1/telegram on an
+// Exit's monitoring port, for the Agent to send on to Telegram, which is
+// blocked domestically (ADR 0006).
+type TelegramMessage struct {
+	BotToken string `json:"bot_token"`
+	ChatID   string `json:"chat_id"`
+	Text     string `json:"text"`
 }
 
 // BridgeState is what a Bridge needs to serve Devices (ADR 0004, ADR 0005).

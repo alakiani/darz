@@ -86,6 +86,10 @@ func TestMeterCountsDeltasPerDeviceExitAndHour(t *testing.T) {
 	if up, _ := total(m.report(100)); up != 150+7+30 {
 		t.Errorf("up after a reload = %d, want 187", up)
 	}
+	// The running total, for the metering-mismatch alert, counts the same.
+	if got := m.metered(); got != 150+7+30+1600 {
+		t.Errorf("metered = %d, want 1787", got)
+	}
 }
 
 func TestMeterKeepsBucketsOnDiskUntilAcked(t *testing.T) {

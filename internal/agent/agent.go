@@ -123,6 +123,16 @@ type Config struct {
 	RetryInterval  time.Duration // default 5 s
 	RequestTimeout time.Duration // per non-long-poll request; default 10 s
 	LongPoll       time.Duration // the Coordinator's long-poll wait; default 60 s
+
+	// MetricsHost is where the monitoring port listens; "" is every
+	// address, with nftables letting only the Coordinator VM in.
+	MetricsHost string
+	// TelegramAPI is where alerts the Coordinator hands over go; default
+	// DefaultTelegramAPI.
+	TelegramAPI string
+	// NodeExporter is node_exporter's URL on localhost, served through
+	// /metrics; "" leaves host metrics out.
+	NodeExporter string
 }
 
 // Files in StateDir.
@@ -154,10 +164,16 @@ type agent struct {
 
 	mu        sync.Mutex
 	st        persisted
-	current   uint64 // version in effect now, confirmed or not
+	current   uint64          // version in effect now, confirmed or not
+	state     *protocol.State // the state of that version
 	urlIndex  int
 	localAddr string
 	client    *http.Client
+	// lastContact is the last answer from a Coordinator, or the start.
+	lastContact   time.Time
+	applyFailures uint64 // snapshots reverted since the start
+
+	mon *monitor
 }
 
 // Run runs the Agent until ctx ends. It returns early only if the Agent
@@ -175,6 +191,9 @@ func Run(ctx context.Context, cfg Config) error {
 	if cfg.Log == nil {
 		cfg.Log = slog.New(slog.DiscardHandler)
 	}
+	if cfg.TelegramAPI == "" {
+		cfg.TelegramAPI = DefaultTelegramAPI
+	}
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM(cfg.CACertPEM) {
 		return errors.New("agent: no certificate in the pinned CA PEM")
@@ -182,7 +201,9 @@ func Run(ctx context.Context, cfg Config) error {
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		return err
 	}
-	a := &agent{cfg: cfg, log: cfg.Log, pool: pool}
+	a := &agent{cfg: cfg, log: cfg.Log, pool: pool, lastContact: time.Now()}
+	a.mon = &monitor{a: a}
+	defer a.mon.close()
 
 	if err := a.load(); err != nil {
 		return err
@@ -192,7 +213,7 @@ func Run(ctx context.Context, cfg Config) error {
 		if err := cfg.Applier.Apply(ctx, a.st.Applied.State); err != nil {
 			a.log.Error("re-apply persisted snapshot", "version", a.st.Applied.Version, "err", err)
 		}
-		a.current = a.st.Applied.Version
+		a.inEffect(a.st.Applied.Version, &a.st.Applied.State)
 		a.log.Info("re-applied persisted snapshot", "version", a.current)
 	}
 
@@ -201,6 +222,7 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 	a.client = a.httpClient(&cert)
+	a.mon.useCert(cert)
 	if u, ok := cfg.Applier.(FetchUser); ok {
 		u.UseFetch(a.fetch)
 	}
@@ -359,6 +381,7 @@ func (a *agent) do(ctx context.Context, client *http.Client, method, path string
 		return 0, err
 	}
 	defer resp.Body.Close()
+	a.contact()
 	if resp.StatusCode >= 300 {
 		var e protocol.Error
 		json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&e)
@@ -396,6 +419,25 @@ func (a *agent) fetch(ctx context.Context, path string) ([]byte, error) {
 		return nil, fmt.Errorf("GET %s: %s", path, resp.Status)
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+}
+
+// contact notes an answer from a Coordinator.
+func (a *agent) contact() {
+	a.mu.Lock()
+	a.lastContact = time.Now()
+	a.mu.Unlock()
+}
+
+// inEffect records the version and state now in effect, and opens or
+// shuts the monitoring port to match. Call with mu held, or before the
+// Agent's goroutines start.
+func (a *agent) inEffect(version uint64, st *protocol.State) {
+	a.current, a.state = version, st
+	var mon *protocol.Monitor
+	if st != nil {
+		mon = st.Monitor
+	}
+	a.mon.set(mon)
 }
 
 func (a *agent) rotate() {
@@ -447,6 +489,7 @@ func (a *agent) healthLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			a.mon.retry()
 		}
 	}
 }
@@ -504,7 +547,11 @@ func (a *agent) applyAndConfirm(ctx context.Context, snap protocol.Snapshot) {
 	log := a.log.With("version", snap.Version)
 	log.Info("applying snapshot")
 	confirmed := false
-	if err := a.cfg.Applier.Apply(ctx, snap.State); err != nil {
+	err := a.cfg.Applier.Apply(ctx, snap.State)
+	a.mu.Lock()
+	a.inEffect(snap.Version, &snap.State) // after Apply: nftables guards the port first
+	a.mu.Unlock()
+	if err != nil {
 		log.Error("apply snapshot", "err", err)
 	} else {
 		deadline := time.Now().Add(a.cfg.ConfirmTimeout)
@@ -532,14 +579,16 @@ func (a *agent) applyAndConfirm(ctx context.Context, snap protocol.Snapshot) {
 		log.Info("snapshot confirmed")
 	} else {
 		log.Warn("reverting snapshot")
+		a.applyFailures++
 		var prevState protocol.State
-		a.current = 0
+		var prevVersion uint64
 		if prev != nil {
-			prevState, a.current = prev.State, prev.Version
+			prevState, prevVersion = prev.State, prev.Version
 		}
 		if err := a.cfg.Applier.Apply(ctx, prevState); err != nil {
 			log.Error("revert to previous snapshot", "err", err)
 		}
+		a.inEffect(prevVersion, &prevState)
 		a.st.Bad = append(a.st.Bad, snap.Version)
 		if len(a.st.Bad) > 32 {
 			a.st.Bad = a.st.Bad[len(a.st.Bad)-32:]

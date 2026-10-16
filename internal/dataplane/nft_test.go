@@ -87,6 +87,30 @@ func TestDualRoleMasqueradesItsDevices(t *testing.T) {
 	}
 }
 
+// The monitoring port answers the Coordinator VM only; everyone else,
+// over IPv4 or IPv6, is dropped without a reply (ADR 0006).
+func TestMonitoringPortIsAllowlisted(t *testing.T) {
+	r := bridgeRuleset()
+	if strings.Contains(render(r), "hook input") {
+		t.Error("an input chain with no monitoring port")
+	}
+	r.MonitorPort, r.MonitorAllow = 9443, []string{"192.0.2.100", "2001:db8::1"}
+	got := render(r)
+	for _, want := range []string{
+		"\tchain input {\n\t\ttype filter hook input priority filter; policy accept;\n",
+		"\t\ttcp dport 9443 ip saddr { 192.0.2.100 } accept\n",
+		"\t\ttcp dport 9443 ip6 saddr { 2001:db8::1 } accept\n",
+		"\t\ttcp dport 9443 drop\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ruleset lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Index(got, "tcp dport 9443 drop") < strings.Index(got, "accept\n\t\ttcp dport 9443 ip6") {
+		t.Error("the drop comes before the allowlist")
+	}
+}
+
 func TestBucketUpdatesTouchOnlyMovedBuckets(t *testing.T) {
 	old := allOn("link:3")
 	moved := old

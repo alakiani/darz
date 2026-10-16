@@ -3,6 +3,7 @@ module github.com/alakiani/darz
 go 1.27.0
 
 require (
+	filippo.io/age v1.3.1
 	golang.org/x/crypto v0.58.0
 	golang.org/x/sys v0.49.0
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173
@@ -11,6 +12,7 @@ require (
 )
 
 require (
+	filippo.io/hpke v0.4.0 // indirect
 	github.com/amnezia-vpn/amneziawg-go v0.2.19 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/btree v1.1.3 // indirect

@@ -59,5 +59,22 @@ jobs:
         # The pinned amneziawg-go is a tool dependency in go.mod.
         run: go build -o "$RUNNER_TEMP/darz-bin/" ./cmd/agent github.com/amnezia-vpn/amneziawg-go
 
+      - name: Download the pinned Prometheus and Alertmanager for the lab
+        # The versions and checksums the Coordinator VM runs (ADR 0006).
+        env:
+          PROMETHEUS: "3.13.4"
+          PROMETHEUS_SHA256: 87f21a66f96c597a189cef8d640e8921b621fc17a9feff707c332c4f3b3ddd56
+          ALERTMANAGER: "0.34.1"
+          ALERTMANAGER_SHA256: 265b9d1e55ef0d5306a436018af6d2b686c2ce051f03d968f7464ecb1372a7e8
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS}/prometheus-${PROMETHEUS}.linux-amd64.tar.gz"
+          curl -fsSLO "https://github.com/prometheus/alertmanager/releases/download/v${ALERTMANAGER}/alertmanager-${ALERTMANAGER}.linux-amd64.tar.gz"
+          echo "${PROMETHEUS_SHA256}  prometheus-${PROMETHEUS}.linux-amd64.tar.gz" | sha256sum -c -
+          echo "${ALERTMANAGER_SHA256}  alertmanager-${ALERTMANAGER}.linux-amd64.tar.gz" | sha256sum -c -
+          tar -xzf "prometheus-${PROMETHEUS}.linux-amd64.tar.gz" --strip-components=1 -C darz-bin "prometheus-${PROMETHEUS}.linux-amd64/prometheus" "prometheus-${PROMETHEUS}.linux-amd64/promtool"
+          tar -xzf "alertmanager-${ALERTMANAGER}.linux-amd64.tar.gz" --strip-components=1 -C darz-bin "alertmanager-${ALERTMANAGER}.linux-amd64/alertmanager" "alertmanager-${ALERTMANAGER}.linux-amd64/amtool"
+
       - name: Test, with the lab (as root)
         run: go test -exec "sudo env DARZ_BIN=$RUNNER_TEMP/darz-bin PATH=$PATH PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/pw" -race -count=1 -v -timeout 20m ./...

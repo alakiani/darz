@@ -6,6 +6,7 @@
 //	coordinator [serve flags]               run the Coordinator
 //	coordinator token create [flags]        mint a scoped API token and print its secret once
 //	coordinator invite create [flags]       make an Invite, such as the first Admin's, and print its link
+//	coordinator backup restore [flags]      decrypt a nightly backup into a new database, on the operator's laptop
 package main
 
 import (
@@ -41,6 +42,8 @@ func main() {
 		err = tokenCreate(os.Args[3:])
 	case len(os.Args) > 2 && os.Args[1] == "invite" && os.Args[2] == "create":
 		err = inviteCreate(os.Args[3:], log)
+	case len(os.Args) > 2 && os.Args[1] == "backup" && os.Args[2] == "restore":
+		err = backupRestore(os.Args[3:])
 	default:
 		err = serve(os.Args[1:], log)
 	}
@@ -67,6 +70,19 @@ func serve(args []string, log *slog.Logger) error {
 	arvanZone := fs.String("arvan-zone", "4miz.ir", "the ArvanCloud zone holding the Endpoint Slots")
 	arvanTTL := fs.Int("arvan-ttl", 120, "TTL of the Endpoint Slots' records, in seconds: the lowest ArvanCloud allows")
 	arvanURL := fs.String("arvan-url", arvan.DefaultBaseURL, "ArvanCloud's CDN API")
+	internalListen := fs.String("internal-listen", "127.0.0.1:9101", "internal listener for Prometheus and Alertmanager; keep it on loopback")
+	monitorPort := fs.Uint("monitor-port", 9443, "every Node's monitoring port (ADR 0006)")
+	monitorFrom := fs.String("monitor-from", "", "comma-separated addresses Nodes see this VM come from; the only ones let into the monitoring port. Unset keeps the port shut")
+	promTLSDir := fs.String("prometheus-tls-dir", "", "where to write Prometheus's client certificate, its key and the CA certificate")
+	tgTokenFile := fs.String("telegram-token-file", "", "file holding the Telegram bot token alerts are sent with")
+	tgChat := fs.String("telegram-chat", "", "the Telegram chat id alerts go to")
+	backupRecipient := fs.String("backup-age-recipient", "", "the operator's age public key (age1...); unset turns nightly backups off")
+	backupDir := fs.String("backup-dir", coordinator.DefaultBackupSettings.Dir, "where encrypted backups are kept; the newest -backup-keep stay")
+	backupKeep := fs.Int("backup-keep", coordinator.DefaultBackupSettings.Keep, "how many encrypted backups stay on this VM")
+	s3Endpoint := fs.String("backup-s3-endpoint", "", "S3-compatible object storage abroad that backups are pushed to, such as https://s3.eu-central-1.amazonaws.com; unset keeps them here only")
+	s3Region := fs.String("backup-s3-region", "us-east-1", "the bucket's region")
+	s3Bucket := fs.String("backup-s3-bucket", "", "the bucket")
+	s3KeyFile := fs.String("backup-s3-key-file", "", "file holding the access key id and the secret key, one per line")
 	fs.Parse(args)
 	if *showVersion {
 		fmt.Println(version)
@@ -94,6 +110,12 @@ func serve(args []string, log *slog.Logger) error {
 		c.DNS = &arvan.Client{BaseURL: *arvanURL, APIKey: strings.TrimSpace(string(key)), Zone: *arvanZone, TTL: *arvanTTL,
 			HTTP: &http.Client{Timeout: 30 * time.Second}}
 	}
+	if err := configureMonitoring(c, *adminCert, uint16(*monitorPort), *monitorFrom, *promTLSDir, *tgTokenFile, *tgChat); err != nil {
+		return err
+	}
+	if err := configureBackups(c, *backupRecipient, *backupDir, *backupKeep, *s3Endpoint, *s3Region, *s3Bucket, *s3KeyFile); err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := c.InitProbe(ctx); err != nil {
@@ -105,6 +127,8 @@ func serve(args []string, log *slog.Logger) error {
 	go c.RunIRFeed(ctx, 24*time.Hour)
 	go c.RunRollUps(ctx, time.Hour)
 	go c.RunEndpointSlots(ctx)
+	go c.RunAlertRelay(ctx)
+	go c.RunBackups(ctx)
 
 	agentTLS, err := c.AgentTLSConfig(strings.Split(*agentHosts, ","))
 	if err != nil {
@@ -116,9 +140,11 @@ func serve(args []string, log *slog.Logger) error {
 	}
 	agentSrv := &http.Server{Handler: c.AgentHandler(), ReadHeaderTimeout: 10 * time.Second}
 	adminSrv := &http.Server{Addr: *adminListen, Handler: c.AdminHandler(), ReadHeaderTimeout: 10 * time.Second}
+	internalSrv := &http.Server{Addr: *internalListen, Handler: c.InternalHandler(), ReadHeaderTimeout: 10 * time.Second}
 
-	errs := make(chan error, 2)
+	errs := make(chan error, 3)
 	go func() { errs <- agentSrv.Serve(tls.NewListener(agentLn, agentTLS)) }()
+	go func() { errs <- internalSrv.ListenAndServe() }()
 	go func() {
 		if *adminCert != "" {
 			errs <- adminSrv.ListenAndServeTLS(*adminCert, *adminKey)
@@ -137,6 +163,7 @@ func serve(args []string, log *slog.Logger) error {
 	defer cancel()
 	agentSrv.Shutdown(shutdown)
 	adminSrv.Shutdown(shutdown)
+	internalSrv.Shutdown(shutdown)
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}

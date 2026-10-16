@@ -1,0 +1,212 @@
+package monitoring
+
+import (
+	"encoding/json"
+	"flag"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/alakiani/darz/internal/ca"
+)
+
+var update = flag.Bool("update", false, "rewrite deploy/monitoring from this package")
+
+// The alert table of ADR 0006, by the names the rules give its rows.
+var alertTable = []string{
+	"NodeUnreachable", "CoordinatorUnreachableFromNode", "LinkDown", "BridgeHasNoDefaultPath", "PathFlapping",
+	"EndpointSlotRepointed", "BridgeLostSlotEligibility", "AllSlotsOnOneBridge", "ArvanCloudDNSFailing",
+	"ProbeFailing", "CertificateOrTokenExpiring", "ClockSkew", "CIDRRefresh", "BackupStale", "MeteringBacklog",
+	"MeteringMismatch", "SnapshotApplyFailed", "DiskFull", "ConntrackFull",
+}
+
+func TestRulesCoverTheAlertTable(t *testing.T) {
+	rules := Rules(ADRTiming)
+	for _, name := range alertTable {
+		if !strings.Contains(rules, "- alert: "+name+"\n") {
+			t.Errorf("no rule for %s", name)
+		}
+	}
+	if got := strings.Count(rules, "- alert: "); got < len(alertTable) {
+		t.Errorf("%d rules for %d rows", got, len(alertTable))
+	}
+	for _, want := range []string{
+		// ADR 0006's durations and severities.
+		`max_over_time(up{job="agents"}[3m]) == 0 and on (node) darz_node_report_age_seconds > 180`,
+		"severity: critical",
+		"for: 2m",
+		`darz_slot_bridge_eligible == 0`,
+		`increase(darz_path_moves_total{kind="failure"}[1h]) > 6`,
+		`darz_client_cert_expiry_timestamp_seconds - time() < 2592000`,
+		`time() - darz_backup_last_success_timestamp_seconds > 129600`,
+	} {
+		// Expressions are quoted in the file.
+		if !strings.Contains(rules, want) && !strings.Contains(rules, quote(want)) {
+			t.Errorf("rules lack %q", want)
+		}
+	}
+	if lab := Rules(LabTiming); !strings.Contains(lab, `[8s]`) {
+		t.Errorf("lab rules are not shortened:\n%s", lab)
+	}
+}
+
+func TestPrometheusConfig(t *testing.T) {
+	got := Prometheus(PrometheusConfig{Internal: "127.0.0.1:9101", Alertmanager: "127.0.0.1:9093", TLSDir: "/etc/darz/prometheus",
+		RuleFiles: []string{"/etc/darz/prometheus/rules.yml"}, Interval: time.Second, SDRefresh: 2 * time.Second})
+	for _, want := range []string{
+		"scrape_interval: 1s", "scrape_timeout: 1s",
+		"url: http://127.0.0.1:9101/v1/sd/agents", "refresh_interval: 2s",
+		"cert_file: /etc/darz/prometheus/prometheus.crt", "server_name: " + ca.AgentServerName,
+		`targets: ["127.0.0.1:9093"]`, `targets: ["127.0.0.1:9101"]`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("config lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "coordinator-host") {
+		t.Error("a host job with no HostExporter")
+	}
+}
+
+func TestAlertmanagerConfig(t *testing.T) {
+	got := Alertmanager(AlertmanagerConfig{Webhook: "http://127.0.0.1:9101/v1/alerts", GroupWait: 30 * time.Second,
+		GroupInterval: 5 * time.Minute, RepeatInterval: 4 * time.Hour})
+	for _, want := range []string{"url: http://127.0.0.1:9101/v1/alerts", "send_resolved: true", "group_wait: 30s", "repeat_interval: 4h"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("config lacks %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestMeshDashboard(t *testing.T) {
+	var d struct {
+		Title  string `json:"title"`
+		UID    string `json:"uid"`
+		Panels []any  `json:"panels"`
+	}
+	if err := json.Unmarshal(MeshDashboard(), &d); err != nil {
+		t.Fatal(err)
+	}
+	if d.Title != "Mesh" || d.UID == "" || len(d.Panels) == 0 {
+		t.Errorf("dashboard = %q %q with %d panels", d.Title, d.UID, len(d.Panels))
+	}
+	qs := MeshDashboardQueries()
+	joined := strings.Join(qs, "\n")
+	// ADR 0006's Mesh dashboard: Nodes, the Link grid, Paths, slots.
+	for _, want := range []string{`up{job="agents"}`, "darz_link_rtt_seconds", "darz_link_loss_ratio", "darz_link_transport",
+		"darz_path_buckets", "darz_slot_points_to"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("no panel queries %s", want)
+		}
+	}
+}
+
+func TestTelegramText(t *testing.T) {
+	var w Webhook
+	err := json.Unmarshal([]byte(`{"status":"firing","alerts":[
+		{"status":"firing","labels":{"alertname":"NodeUnreachable","severity":"critical","node":"ab1"},
+		 "annotations":{"summary":"Node ab1 is unreachable"},"startsAt":"2026-10-16T10:00:00Z"},
+		{"status":"resolved","labels":{"alertname":"LinkDown","severity":"warning","link":"ab1/ir1"},
+		 "annotations":{"summary":"Link ab1/ir1 is down"},"startsAt":"2026-10-16T09:00:00Z"}]}`), &w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := w.Text()
+	for _, want := range []string{"FIRING critical NodeUnreachable: Node ab1 is unreachable", "RESOLVED warning LinkDown: Link ab1/ir1 is down"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("text lacks %q:\n%s", want, got)
+		}
+	}
+	if (Webhook{}).Text() != "" {
+		t.Error("an empty webhook has text")
+	}
+}
+
+func TestDurations(t *testing.T) {
+	for d, want := range map[time.Duration]string{time.Second: "1s", 90 * time.Second: "90s", 2 * time.Minute: "2m",
+		36 * time.Hour: "36h", 1500 * time.Millisecond: "1500ms"} {
+		if got := duration(d); got != want {
+			t.Errorf("duration(%v) = %q, want %q", d, got, want)
+		}
+	}
+}
+
+// deployFiles are the files the playbook installs on the Coordinator VM.
+func deployFiles() map[string][]byte {
+	return map[string][]byte{
+		"prometheus.yml":                []byte(Prometheus(ProductionPrometheus)),
+		"rules.yml":                     []byte(Rules(ADRTiming)),
+		"alertmanager.yml":              []byte(Alertmanager(ProductionAlertmanager)),
+		"grafana/dashboards/mesh.json":  MeshDashboard(),
+		"grafana/provisioning/darz.yml": []byte(GrafanaProvisioning),
+		"grafana/datasources/darz.yml":  []byte(GrafanaDatasource),
+		"README.md":                     []byte(deployReadme),
+	}
+}
+
+func TestDeployFilesAreCurrent(t *testing.T) {
+	root := filepath.Join("..", "..", "deploy", "monitoring")
+	for name, want := range deployFiles() {
+		path := filepath.Join(root, name)
+		if *update {
+			os.MkdirAll(filepath.Dir(path), 0o755)
+			if err := os.WriteFile(path, want, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		got, err := os.ReadFile(path)
+		if err != nil || string(got) != string(want) {
+			t.Errorf("%s is stale: run go test ./internal/monitoring -update", path)
+		}
+	}
+}
+
+// TestConfigsPassPromtool checks the configs with the pinned promtool and
+// amtool, when DARZ_BIN holds them (CI downloads them for the lab).
+func TestConfigsPassPromtool(t *testing.T) {
+	bin := os.Getenv("DARZ_BIN")
+	promtool, amtool := filepath.Join(bin, "promtool"), filepath.Join(bin, "amtool")
+	if _, err := os.Stat(promtool); bin == "" || err != nil {
+		t.Skip("no promtool in DARZ_BIN")
+	}
+	dir := t.TempDir()
+	write := func(name, content string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	run := func(args ...string) {
+		t.Helper()
+		out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
+		if err != nil {
+			t.Errorf("%s: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+	run(promtool, "check", "rules", write("rules.yml", Rules(ADRTiming)))
+	run(promtool, "check", "rules", write("lab-rules.yml", Rules(LabTiming)))
+	for _, f := range []string{"ca.crt", "prometheus.crt", "prometheus.key"} {
+		write(f, "")
+	}
+	cfg := ProductionPrometheus
+	cfg.TLSDir, cfg.RuleFiles = dir, []string{filepath.Join(dir, "rules.yml")}
+	run(promtool, "check", "config", "--syntax-only", write("prometheus.yml", Prometheus(cfg)))
+	run(amtool, "check-config", write("alertmanager.yml", Alertmanager(ProductionAlertmanager)))
+}
+
+func TestRuleExpressionsUseKnownMetrics(t *testing.T) {
+	// Metric names in the rules either come from the exporters this repo
+	// writes (darz_*), Prometheus itself (up), or node_exporter (node_*).
+	re := regexp.MustCompile(`\b([a-z_]+_(?:seconds|total|ratio|bytes|eligible|ok|up|failures|use|limit|entries|rejected))\b`)
+	for _, m := range re.FindAllStringSubmatch(Rules(ADRTiming), -1) {
+		if !strings.HasPrefix(m[1], "darz_") && !strings.HasPrefix(m[1], "node_") && m[1] != "up" {
+			t.Errorf("unknown metric %s", m[1])
+		}
+	}
+}

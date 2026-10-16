@@ -35,6 +35,8 @@ type mesh struct {
 	co     *coord
 	ids    map[string]string // Node name -> id
 	agents map[string]*agentProc
+	// agentArgs are extra flags for every Agent.
+	agentArgs []string
 }
 
 func (m *mesh) startAgent(name string, roles []protocol.Role, tags []string) {
@@ -55,6 +57,7 @@ func (m *mesh) startAgent(name string, roles []protocol.Role, tags []string) {
 		"-coordinators", m.co.agentURL, "-ca", caFile, "-state-dir", filepath.Join(dir, "state"),
 		"-enroll-token-file", tokenFile, "-awg-runner", "exec", "-awg-binary", filepath.Join(bin, "amneziawg-go"),
 		"-health-interval", "1s"}}
+	ap.args = append(ap.args, m.agentArgs...)
 	ap.start()
 	dumpOnFailure(t, "agent "+name, logFile)
 	t.Cleanup(ap.stop)

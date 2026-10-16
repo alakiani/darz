@@ -95,12 +95,14 @@ func render(r ruleset) string {
 	w("\t\tiifname != \"dz*\" ct mark & %#x == %#x counter meta mark set ct mark", markKind, linkMarkBase)
 	w("\t}")
 
+	// A nat chain on prerouting must exist even when empty: without one the
+	// kernel does not translate replies to masqueraded connections back.
+	w("\tchain natpre {")
+	w("\t\ttype nat hook prerouting priority dstnat; policy accept;")
 	if r.Bridge {
-		w("\tchain dns {")
-		w("\t\ttype nat hook prerouting priority dstnat; policy accept;")
 		w("\t\tiifname %q meta l4proto { tcp, udp } th dport 53 counter dnat ip to %s:53", DeviceIface, r.ResolverAddr)
-		w("\t}")
 	}
+	w("\t}")
 
 	// Links carry less than 1500 bytes; clamp TCP to the path.
 	w("\tchain forward {")

@@ -57,6 +57,11 @@ func TestExitRuleset(t *testing.T) {
 	if strings.Contains(got, "darz0") {
 		t.Error("an Exit ruleset mentions the Device interface")
 	}
+	// Replies to masqueraded connections are only translated back while a
+	// nat chain hooks prerouting; an Exit has no DNS redirect to put there.
+	if !strings.Contains(got, "type nat hook prerouting") {
+		t.Errorf("an Exit ruleset has no nat prerouting chain:\n%s", got)
+	}
 }
 
 func TestLocalExitMasqueradesDevices(t *testing.T) {

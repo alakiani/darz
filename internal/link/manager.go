@@ -366,6 +366,37 @@ func (m *Manager) selectActive(ctx context.Context) {
 	}
 }
 
+// Status is a Link as the data plane needs it.
+type Status struct {
+	ID   uint64
+	Peer protocol.Peer
+	// Up is set while an instance carries the Link; Iface is that
+	// instance's interface.
+	Up    bool
+	Iface string
+	// Table is the routing table that carries the Link.
+	Table string
+}
+
+// LinkStatus returns every Link of this Node, by id.
+func (m *Manager) LinkStatus() []Status {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []Status
+	for _, id := range slices.Sorted(maps.Keys(m.links)) {
+		ls := m.links[id]
+		st := Status{ID: id, Peer: ls.peer, Up: ls.active != 0 && ls.routed, Table: linkTable(id)}
+		if in := m.insts[ls.active]; st.Up && in != nil {
+			st.Iface = in.iface()
+		}
+		out = append(out, st)
+	}
+	return out
+}
+
+// LinkTable is the routing table that carries a Link.
+func LinkTable(linkID uint64) string { return linkTable(linkID) }
+
 // Report adds the Link key, the listener's choices and Link health to a
 // health report.
 func (m *Manager) Report(h *protocol.Health) {

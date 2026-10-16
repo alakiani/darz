@@ -34,6 +34,72 @@ type State struct {
 	// EgressCheck is set for Exits: what the Agent checks every 5 s to set
 	// the egress OK flag in its probe replies (ADR 0008).
 	EgressCheck *EgressCheck `json:"egress_check,omitempty"`
+	// Bridge is set for Bridges only: Exits never see Devices (ADR 0002).
+	Bridge *BridgeState `json:"bridge,omitempty"`
+}
+
+// BridgeState is what a Bridge needs to serve Devices (ADR 0004, ADR 0005).
+type BridgeState struct {
+	// PrivateKey is the shared Bridge identity, base64.
+	PrivateKey string `json:"private_key"`
+	ListenPort uint16 `json:"listen_port"`
+	// Address is the Bridge's in-tunnel address with the Device pool's
+	// prefix, such as 10.77.0.1/16. The resolver listens on it.
+	Address string `json:"address"`
+	// Upstreams are the public resolvers abroad the resolver forwards to.
+	Upstreams []string `json:"upstreams"`
+	// Devices are every Device whose effective state lets it connect.
+	Devices []Device `json:"devices"`
+	// Rules in priority order, the default Rule last.
+	Rules []Rule `json:"rules"`
+}
+
+// Device is one Device peer of a Bridge.
+type Device struct {
+	PublicKey string `json:"public_key"`
+	Address   string `json:"address"` // its /32 in the Device pool
+}
+
+// Fallback is what a Rule does when no candidate can carry it.
+type Fallback string
+
+const (
+	FallbackNext Fallback = "next" // on to the next Rule
+	FallbackDrop Fallback = "drop"
+)
+
+// Rule maps a Destination Set to the Tags its Exit must carry.
+type Rule struct {
+	ID       uint64 `json:"id"`
+	Name     string `json:"name"`
+	Priority int    `json:"priority"`
+	// SetHash names the Destination Set's content; fetch it from
+	// GET /v1/sets/{hash}.
+	SetHash string `json:"set_hash"`
+	// RequiredTags are ANDed; "!IR" means the Exit must not carry IR.
+	RequiredTags []string `json:"required_tags"`
+	Fallback     Fallback `json:"fallback"`
+}
+
+// Matches reports whether a Node with tags may be the Exit for r.
+func (r Rule) Matches(tags []string) bool {
+	for _, req := range r.RequiredTags {
+		neg := len(req) > 0 && req[0] == '!'
+		name := req
+		if neg {
+			name = req[1:]
+		}
+		has := false
+		for _, t := range tags {
+			if t == name {
+				has = true
+			}
+		}
+		if has == neg {
+			return false
+		}
+	}
+	return true
 }
 
 // Transport is a way of carrying a Link's traffic.

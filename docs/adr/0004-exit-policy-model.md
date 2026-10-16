@@ -47,7 +47,7 @@ Bridges route each packet by the first matching Rule. A Rule names a Destination
 
 ## DNS is always resolved abroad
 
-- **The config's resolver is on the Bridge** at one fixed in-tunnel address, the same on every Bridge (such as `10.77.0.1`). It forwards only to public resolvers abroad and keeps no query logs.
+- **The config's resolver is on the Bridge** at one fixed in-tunnel address, the same on every Bridge (such as `10.77.0.1`). It forwards only to public resolvers abroad and keeps no query logs. *(It is a DNS relay inside the Agent, at `10.77.0.1`, with the upstream resolvers pushed by the Coordinator; its sockets carry the default Rule's mark. DNS pauses for the second or two an Agent restart takes. Decided in [MVP 04](https://github.com/alakiani/darz/issues/20).)*
 - **The resolver's own outbound queries are policy-routed into the default Rule.** As a local process it would otherwise use the main table and leave through the domestic ISP.
 - **Devices cannot bypass it with plain DNS.** All Device traffic on port 53, UDP and TCP, to any address is redirected to the Bridge resolver, and DNS over TLS on port 853 is forced into the default Rule whatever its destination.
 - **No fallback to domestic.** If the default Rule has no working Path, DNS fails.

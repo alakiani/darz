@@ -34,6 +34,7 @@ Failures of a Bridge's Links or Exits that the mesh can route around (ADR 0004) 
 ## Shared Bridge identity
 
 - **Every Bridge presents one WireGuard keypair**, so a config works on whichever Bridge its slot points at, and all Bridges accept every non-blocked Device (ADR 0004).
+- **Every Bridge listens for Devices on one UDP port**, `61873` by default, held by the Coordinator and written into every config. It is outside the 10000–60000 range Link instances draw from (ADR 0007), so the two never collide on a Bridge, and avoids `51820`, the WireGuard default. Changing it affects only configs issued afterwards. *(Decided in [MVP 04](https://github.com/alakiani/darz/issues/20).)*
 - **The private key is held by the Coordinator and shipped only in Bridge snapshots.** Exits never receive it. It is included in the age-encrypted nightly backup.
 - **Why the Coordinator holds it:** portability. Bridges can be added or rebuilt without the operator's laptop. The rejected alternative was to generate the key on the laptop and distribute it by Ansible only.
 - **Accepted risk:** whoever seizes the domestic Coordinator gets the key that impersonates every Bridge. If ArvanCloud is compelled to re-point the slot records as well, a state actor could intercept Users' traffic before it enters a Link. A seized Bridge leaks the same key.

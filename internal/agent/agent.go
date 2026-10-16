@@ -47,6 +47,45 @@ type Reporter interface {
 	Report(h *protocol.Health)
 }
 
+// Fetch fetches a path of the Agent API, such as /v1/sets/{hash}, and
+// returns its body.
+type Fetch func(ctx context.Context, path string) ([]byte, error)
+
+// FetchUser is implemented by an Applier that fetches content-addressed
+// data, such as Destination Sets, from the Coordinator. The Agent hands it
+// a Fetch once it holds a certificate.
+type FetchUser interface {
+	UseFetch(Fetch)
+}
+
+// Appliers applies each Applier in turn, and passes on reports and Fetch
+// to those that want them.
+type Appliers []Applier
+
+func (as Appliers) Apply(ctx context.Context, s protocol.State) error {
+	var errs []error
+	for _, a := range as {
+		errs = append(errs, a.Apply(ctx, s))
+	}
+	return errors.Join(errs...)
+}
+
+func (as Appliers) Report(h *protocol.Health) {
+	for _, a := range as {
+		if r, ok := a.(Reporter); ok {
+			r.Report(h)
+		}
+	}
+}
+
+func (as Appliers) UseFetch(f Fetch) {
+	for _, a := range as {
+		if u, ok := a.(FetchUser); ok {
+			u.UseFetch(f)
+		}
+	}
+}
+
 // Config configures an Agent.
 type Config struct {
 	// Coordinators are base URLs of the Agent API, such as
@@ -147,6 +186,9 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 	a.client = a.httpClient(&cert)
+	if u, ok := cfg.Applier.(FetchUser); ok {
+		u.UseFetch(a.fetch)
+	}
 
 	go a.healthLoop(ctx)
 	a.pollLoop(ctx)
@@ -316,6 +358,29 @@ func (a *agent) do(ctx context.Context, client *http.Client, method, path string
 		}
 	}
 	return resp.StatusCode, nil
+}
+
+// fetch GETs a path and returns the raw body.
+func (a *agent) fetch(ctx context.Context, path string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 4*a.cfg.RequestTimeout)
+	defer cancel()
+	a.mu.Lock()
+	base := a.cfg.Coordinators[a.urlIndex]
+	a.mu.Unlock()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := a.client.Do(req)
+	if err != nil {
+		a.rotate()
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET %s: %s", path, resp.Status)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 64<<20))
 }
 
 func (a *agent) rotate() {

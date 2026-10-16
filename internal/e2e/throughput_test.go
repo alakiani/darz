@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"maps"
 	"testing"
 	"time"
 
@@ -88,16 +89,19 @@ func TestThroughputWeights(t *testing.T) {
 			}
 			return true
 		}
-		// Settled means inside the bands for 5 s running.
+		// Settled means inside the bands, with no bucket moving, for 5 s
+		// running: a share passing through a band on its way elsewhere
+		// does not count.
 		ok := false
 		var since time.Time
+		var held map[string]int
 		for deadline := time.Now().Add(timeout); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
 			if !inBand() {
 				since = time.Time{}
 				continue
 			}
-			if since.IsZero() {
-				since = time.Now()
+			if since.IsZero() || !maps.Equal(held, last) {
+				since, held = time.Now(), last
 			}
 			if time.Since(since) >= 5*time.Second {
 				ok = true

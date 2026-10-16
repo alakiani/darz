@@ -122,6 +122,8 @@ type Node struct {
 	Tags       []string
 	CertSerial string // empty until the Node enrolls
 	CreatedAt  time.Time
+	// LinkPublicKey is the Node's Link key, empty until its Agent reports it.
+	LinkPublicKey string
 }
 
 // Enrolled reports whether the Node holds a client certificate.
@@ -152,13 +154,13 @@ func (s *Store) UpdateNode(ctx context.Context, id string, roles []protocol.Role
 	return nil
 }
 
-const nodeColumns = `id, name, roles, tags, coalesce(cert_serial, ''), created_at`
+const nodeColumns = `id, name, roles, tags, coalesce(cert_serial, ''), created_at, coalesce(link_public_key, '')`
 
 func scanNode(row interface{ Scan(...any) error }) (Node, error) {
 	var n Node
 	var roles, tags string
 	var created int64
-	if err := row.Scan(&n.ID, &n.Name, &roles, &tags, &n.CertSerial, &created); err != nil {
+	if err := row.Scan(&n.ID, &n.Name, &roles, &tags, &n.CertSerial, &created, &n.LinkPublicKey); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Node{}, ErrNotFound
 		}

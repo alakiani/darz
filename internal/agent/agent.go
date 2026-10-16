@@ -41,6 +41,12 @@ type Applier interface {
 	Apply(ctx context.Context, s protocol.State) error
 }
 
+// Reporter is implemented by an Applier that adds to every health report,
+// such as the Link layer with its Link key and measurements.
+type Reporter interface {
+	Report(h *protocol.Health)
+}
+
 // Config configures an Agent.
 type Config struct {
 	// Coordinators are base URLs of the Agent API, such as
@@ -332,6 +338,9 @@ func (a *agent) sendHealth(ctx context.Context) error {
 		ApplyFailed:    slices.Clone(a.st.Unreported),
 	}
 	a.mu.Unlock()
+	if r, ok := a.cfg.Applier.(Reporter); ok {
+		r.Report(&h)
+	}
 	if _, err := a.do(ctx, a.client, http.MethodPost, "/v1/health", h, nil, a.cfg.RequestTimeout); err != nil {
 		return err
 	}

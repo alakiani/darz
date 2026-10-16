@@ -11,63 +11,104 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alakiani/darz/internal/agent"
+	"github.com/alakiani/darz/internal/link"
 	"github.com/alakiani/darz/internal/protocol"
 )
 
 // version is set at release time with -ldflags "-X main.version=...".
 var version = "dev"
 
-// logApplier stands in for the data plane until later sessions build it.
-type logApplier struct{ log *slog.Logger }
-
-func (a logApplier) Apply(_ context.Context, s protocol.State) error {
-	a.log.Info("state applied (no data plane yet)", "node", s.Node.Name, "roles", s.Node.Roles, "tags", s.Node.Tags)
-	return nil
+type options struct {
+	coordinators, caPath, stateDir, tokenFile string
+	awgBinary, awgRunner                      string
+	healthInterval                            time.Duration
 }
 
 func main() {
+	var o options
 	showVersion := flag.Bool("version", false, "print the version and exit")
-	coordinators := flag.String("coordinators", "https://4miz.ir:8443", "comma-separated Agent API URLs, tried in turn")
-	caPath := flag.String("ca", "/etc/darz/ca.crt", "pinned Coordinator CA certificate")
-	stateDir := flag.String("state-dir", "/var/lib/darz-agent", "key, certificate and last applied state")
-	tokenFile := flag.String("enroll-token-file", "", "file holding a one-time enrollment token, used only if not yet enrolled")
+	flag.StringVar(&o.coordinators, "coordinators", "https://4miz.ir:8443", "comma-separated Agent API URLs, tried in turn")
+	flag.StringVar(&o.caPath, "ca", "/etc/darz/ca.crt", "pinned Coordinator CA certificate")
+	flag.StringVar(&o.stateDir, "state-dir", "/var/lib/darz-agent", "keys, certificate and last applied state")
+	flag.StringVar(&o.tokenFile, "enroll-token-file", "", "file holding a one-time enrollment token, used only if not yet enrolled")
+	flag.StringVar(&o.awgRunner, "awg-runner", "systemd", "how to run amneziawg-go daemons: systemd (darz-awg@<iface>.service) or exec")
+	flag.StringVar(&o.awgBinary, "awg-binary", "/usr/local/lib/darz/amneziawg-go", "amneziawg-go binary, for -awg-runner=exec")
+	flag.DurationVar(&o.healthInterval, "health-interval", 30*time.Second, "how often to report health")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(version)
 		return
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	if err := run(log, *coordinators, *caPath, *stateDir, *tokenFile); err != nil {
+	if err := run(log, o); err != nil {
 		fmt.Fprintln(os.Stderr, "agent:", err)
 		os.Exit(1)
 	}
 }
 
-func run(log *slog.Logger, coordinators, caPath, stateDir, tokenFile string) error {
-	caPEM, err := os.ReadFile(caPath)
+func run(log *slog.Logger, o options) error {
+	caPEM, err := os.ReadFile(o.caPath)
 	if err != nil {
 		return err
 	}
 	var token string
-	if tokenFile != "" {
-		b, err := os.ReadFile(tokenFile)
+	if o.tokenFile != "" {
+		b, err := os.ReadFile(o.tokenFile)
 		if err != nil {
 			return err
 		}
 		token = strings.TrimSpace(string(b))
 	}
+	if err := os.MkdirAll(o.stateDir, 0o700); err != nil {
+		return err
+	}
+
+	var runner link.Runner = link.SystemdRunner{Unit: "darz-awg@%s.service"}
+	switch o.awgRunner {
+	case "systemd":
+	case "exec":
+		runner = &link.ExecRunner{Binary: o.awgBinary, LogDir: o.stateDir}
+	default:
+		return fmt.Errorf("unknown -awg-runner %q", o.awgRunner)
+	}
+	wg, err := link.NewKernelWireGuard()
+	if err != nil {
+		return fmt.Errorf("wireguard netlink: %w", err)
+	}
+	links, err := link.New(link.Config{
+		StateDir: o.stateDir,
+		Log:      log,
+		Transports: map[protocol.Transport]link.Transport{
+			protocol.TransportWireGuard: wg,
+			protocol.TransportAmneziaWG: link.NewAmneziaWG(runner),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	log.Info("agent starting", "version", version)
-	return agent.Run(ctx, agent.Config{
-		Coordinators:    strings.Split(coordinators, ","),
+	linkErr := make(chan error, 1)
+	go func() { linkErr <- links.Run(ctx) }()
+
+	log.Info("agent starting", "version", version, "link_key", links.PublicKey())
+	err = agent.Run(ctx, agent.Config{
+		Coordinators:    strings.Split(o.coordinators, ","),
 		CACertPEM:       caPEM,
-		StateDir:        stateDir,
+		StateDir:        o.stateDir,
 		EnrollmentToken: token,
-		Applier:         logApplier{log},
+		Applier:         links,
 		Version:         version,
 		Log:             log,
+		HealthInterval:  o.healthInterval,
 	})
+	stop()
+	if lerr := <-linkErr; err == nil {
+		err = lerr
+	}
+	return err
 }

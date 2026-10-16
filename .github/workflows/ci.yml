@@ -22,6 +22,7 @@ jobs:
           # sch_netem ships in linux-modules-extra on the runner's Azure kernel.
           sudo apt-get install -y "linux-modules-extra-$(uname -r)" || true
           sudo modprobe sch_netem
+          sudo modprobe wireguard
 
       - name: Check formatting
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
@@ -34,5 +35,9 @@ jobs:
           CGO_ENABLED: "0"
         run: go build -o bin/ ./cmd/...
 
+      - name: Build the lab's binaries
+        # The pinned amneziawg-go is a tool dependency in go.mod.
+        run: go build -o "$RUNNER_TEMP/darz-bin/" ./cmd/agent github.com/amnezia-vpn/amneziawg-go
+
       - name: Test, with the lab (as root)
-        run: go test -exec sudo -race -count=1 -v ./...
+        run: go test -exec "sudo env DARZ_BIN=$RUNNER_TEMP/darz-bin" -race -count=1 -v -timeout 15m ./...

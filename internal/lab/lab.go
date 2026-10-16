@@ -226,6 +226,44 @@ func (r *FilterRule) Remove() {
 	})
 }
 
+// Counter counts packets between Nodes that match an nftables expression.
+type Counter struct {
+	lab    *Lab
+	handle string
+}
+
+var packetsRE = regexp.MustCompile(`counter packets (\d+)`)
+
+// Count starts counting packets that match expr, an nftables match such as
+// "ip saddr 10.200.1.2 udp dport 53". Counters sit ahead of filter rules,
+// so they also count packets the filter then drops.
+func (l *Lab) Count(expr string) *Counter {
+	l.t.Helper()
+	out := l.run(l.wan, "nft", "--echo", "--handle", "insert", "rule", "inet", "lab", "forward", expr, "counter")
+	h := handleRE.FindStringSubmatch(out)
+	if h == nil {
+		l.t.Fatalf("lab: no rule handle in nft output %q", out)
+	}
+	return &Counter{lab: l, handle: h[1]}
+}
+
+// Packets returns how many packets have matched so far.
+func (c *Counter) Packets() int {
+	c.lab.t.Helper()
+	out := c.lab.run(c.lab.wan, "nft", "--handle", "list", "chain", "inet", "lab", "forward")
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasSuffix(strings.TrimSpace(line), "# handle "+c.handle) {
+			if m := packetsRE.FindStringSubmatch(line); m != nil {
+				n := 0
+				fmt.Sscan(m[1], &n)
+				return n
+			}
+		}
+	}
+	c.lab.t.Fatalf("lab: counter %s not found in\n%s", c.handle, out)
+	return 0
+}
+
 // Name returns the Node's name as given to Start.
 func (n *Node) Name() string { return n.name }
 

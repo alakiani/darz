@@ -24,9 +24,113 @@ type Snapshot struct {
 }
 
 // State is a Node's complete desired state. A Node sees only what its Roles
-// need. Later sessions add Links, Devices, Rules and the rest.
+// need. Later sessions add Devices, Rules and the rest.
 type State struct {
 	Node NodeInfo `json:"node"`
+	// Links are this Node's Links, each with its candidate instances in
+	// preference order (ADR 0007).
+	Links      []Link     `json:"links"`
+	LinkTiming LinkTiming `json:"link_timing"`
+	// EgressCheck is set for Exits: what the Agent checks every 5 s to set
+	// the egress OK flag in its probe replies (ADR 0008).
+	EgressCheck *EgressCheck `json:"egress_check,omitempty"`
+}
+
+// Transport is a way of carrying a Link's traffic.
+type Transport string
+
+const (
+	TransportWireGuard Transport = "wireguard"
+	TransportAmneziaWG Transport = "amneziawg"
+)
+
+// Link is one tunnel to a peer Node, carried by one of its instances.
+type Link struct {
+	ID   uint64 `json:"id"`
+	Peer Peer   `json:"peer"`
+	// Initiator is set on the end that has the peer's endpoint configured:
+	// the IR end of a Link that crosses the filter, otherwise the Node with
+	// the lower id. The other end listens.
+	Initiator bool `json:"initiator"`
+	// Instances are the Link's candidates, most preferred first. An instance
+	// appears only once both ends' Link keys are known, and, on the
+	// initiating end, once the listening end has chosen its port.
+	Instances []Instance `json:"instances"`
+}
+
+// Peer is the Node at the far end of a Link.
+type Peer struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Roles     []Role   `json:"roles"`
+	Tags      []string `json:"tags"`
+	PublicKey string   `json:"public_key"` // the peer's Link key, base64
+}
+
+// Instance is one candidate Transport instance of a Link. Its port and, for
+// AmneziaWG, its parameters are chosen by the listening end and never
+// change; an instance is replaced instead.
+type Instance struct {
+	ID        uint64    `json:"id"`
+	Transport Transport `json:"transport"`
+	Iface     string    `json:"iface"`
+	Addr      string    `json:"addr"`      // this end's inner address, with its /31
+	PeerAddr  string    `json:"peer_addr"` // the far end's inner address
+	// ListenPort is the listening end's UDP port. On the listening end, 0
+	// means the Agent must choose one and report it.
+	ListenPort uint16 `json:"listen_port,omitempty"`
+	// Endpoint is the listening end's address and port, set on the
+	// initiating end only.
+	Endpoint string `json:"endpoint,omitempty"`
+	// AWG holds AmneziaWG parameters. On the listening end, nil means the
+	// Agent must choose them and report them.
+	AWG *AWGParams `json:"awg,omitempty"`
+}
+
+// AWGParams are an AmneziaWG instance's obfuscation parameters (protocol
+// 2.0), in the form amneziawg-go's UAPI takes them.
+type AWGParams struct {
+	Jc   int    `json:"jc"`
+	Jmin int    `json:"jmin"`
+	Jmax int    `json:"jmax"`
+	S1   int    `json:"s1"`
+	S2   int    `json:"s2"`
+	S3   int    `json:"s3"`
+	S4   int    `json:"s4"`
+	H1   string `json:"h1"`
+	H2   string `json:"h2"`
+	H3   string `json:"h3"`
+	H4   string `json:"h4"`
+	I1   string `json:"i1,omitempty"`
+	I2   string `json:"i2,omitempty"`
+	I3   string `json:"i3,omitempty"`
+	I4   string `json:"i4,omitempty"`
+	I5   string `json:"i5,omitempty"`
+}
+
+// LinkTiming holds ADR 0007's timings, pushed so tests can shorten them.
+type LinkTiming struct {
+	SwitchBackSeconds   int `json:"switch_back_seconds"`
+	RetryMinSeconds     int `json:"retry_min_seconds"`
+	RetryMaxSeconds     int `json:"retry_max_seconds"`
+	ReplaceAfterSeconds int `json:"replace_after_seconds"`
+}
+
+// DefaultLinkTiming is ADR 0007's: switch back after 5 minutes Up, retry
+// from 30 s to 15 min, replace after 24 h down.
+var DefaultLinkTiming = LinkTiming{
+	SwitchBackSeconds:   300,
+	RetryMinSeconds:     30,
+	RetryMaxSeconds:     900,
+	ReplaceAfterSeconds: 24 * 3600,
+}
+
+// EgressCheck is what an Exit resolves and fetches to decide that its own
+// internet works.
+type EgressCheck struct {
+	Resolvers []string `json:"resolvers"` // IP addresses
+	Hostname  string   `json:"hostname"`
+	URL       string   `json:"url"`
 }
 
 // NodeInfo is what a Node is told about itself.
@@ -47,6 +151,47 @@ type Health struct {
 	// ApplyFailed lists snapshot versions the Agent applied and then reverted
 	// because it lost the Coordinator within the confirm window.
 	ApplyFailed []uint64 `json:"apply_failed,omitempty"`
+
+	// LinkPublicKey is the Agent's Link key, generated on the Node.
+	LinkPublicKey string `json:"link_public_key,omitempty"`
+	// Listening reports the ports and parameters this Node chose for the
+	// instances it listens on.
+	Listening []ListenChoice `json:"listening,omitempty"`
+	Links     []LinkHealth   `json:"links,omitempty"`
+}
+
+// ListenChoice is a listening end's choice for one instance.
+type ListenChoice struct {
+	InstanceID uint64     `json:"instance_id"`
+	Port       uint16     `json:"port"`
+	AWG        *AWGParams `json:"awg,omitempty"`
+}
+
+// LinkHealth is one Link as this end measures it. The top-level figures are
+// the active instance's (ADR 0007).
+type LinkHealth struct {
+	LinkID         uint64    `json:"link_id"`
+	Up             bool      `json:"up"`
+	ActiveInstance uint64    `json:"active_instance,omitempty"`
+	Transport      Transport `json:"transport,omitempty"`
+	RTTMillis      float64   `json:"rtt_ms"`
+	Loss           float64   `json:"loss"` // 0 to 1, over the last 30 s
+	// LastSuccessSeconds is the age of the last answered probe; -1 if none.
+	LastSuccessSeconds float64 `json:"last_success_s"`
+	// PeerEgressOK and PeerTransitRules are the flags in the peer's latest
+	// probe reply on the active instance (ADR 0008).
+	PeerEgressOK     bool             `json:"peer_egress_ok"`
+	PeerTransitRules []uint32         `json:"peer_transit_rules,omitempty"`
+	Instances        []InstanceHealth `json:"instances"`
+}
+
+// InstanceHealth is one instance as this end measures it.
+type InstanceHealth struct {
+	ID        uint64     `json:"id"`
+	Up        bool       `json:"up"`
+	DownSince *time.Time `json:"down_since,omitempty"` // set while not Up
+	RTTMillis float64    `json:"rtt_ms"`
+	Loss      float64    `json:"loss"`
 }
 
 // EnrollRequest is POSTed to /v1/enroll by a new Agent.

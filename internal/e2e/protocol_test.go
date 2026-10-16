@@ -6,22 +6,14 @@ package e2e
 
 import (
 	"context"
-	"crypto/tls"
-	"log/slog"
 	"net"
-	"net/http"
-	"net/http/httptest"
-	"path/filepath"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/alakiani/darz/internal/agent"
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/coordinator"
 	"github.com/alakiani/darz/internal/lab"
 	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
 	"github.com/alakiani/darz/internal/testutil"
 )
 
@@ -47,44 +39,9 @@ func (c cutter) Apply(_ context.Context, s protocol.State) error {
 // contact with the Coordinator is reverted and marked bad for that Node.
 func TestAgentsEnrollAndBadSnapshotIsReverted(t *testing.T) {
 	l := lab.Start(t, "coord", "n1", "n2", "n3")
-	coordNode := l.Node("coord")
+	co := startCoordinator(t, l.Node("coord"))
+	coord, s, admin := co.c, co.store, co.admin
 	ctx := context.Background()
-
-	s, err := store.Open(filepath.Join(t.TempDir(), "darz.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	authority, err := ca.LoadOrCreate(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	coord := coordinator.New(s, authority, slog.New(slog.DiscardHandler))
-	coord.LongPoll = 2 * time.Second
-
-	// The Agent API listens inside the Coordinator's namespace.
-	agentAddr := net.JoinHostPort(coordNode.Addr().String(), "8443")
-	var ln net.Listener
-	if err := coordNode.Do(func() (err error) { ln, err = net.Listen("tcp", agentAddr); return err }); err != nil {
-		t.Fatal(err)
-	}
-	tlsConfig, err := coord.AgentTLSConfig([]string{coordNode.Addr().String()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv := &http.Server{Handler: coord.AgentHandler()}
-	go srv.Serve(tls.NewListener(ln, tlsConfig))
-	defer srv.Close()
-
-	// The Admin API is the operator's laptop talking to the Coordinator; it
-	// does not need to cross the lab.
-	adminSrv := httptest.NewServer(coord.AdminHandler())
-	defer adminSrv.Close()
-	secret, _, err := s.CreateAPIToken(ctx, store.ScopeNodesEnroll, "laptop", time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	admin := &testutil.AdminClient{URL: adminSrv.URL, Token: secret}
 
 	// Enroll an Agent on each of n1, n2, n3.
 	ids := map[string]string{}
@@ -95,8 +52,8 @@ func TestAgentsEnrollAndBadSnapshotIsReverted(t *testing.T) {
 		created := admin.CreateNode(t, protocol.CreateNodeRequest{Name: name, Roles: []protocol.Role{"bridge"}})
 		ids[name] = created.Node.ID
 		cfg := agent.Config{
-			Coordinators:    []string{"https://" + agentAddr},
-			CACertPEM:       authority.CertPEM(),
+			Coordinators:    []string{co.agentURL},
+			CACertPEM:       co.caPEM,
 			StateDir:        t.TempDir(),
 			EnrollmentToken: created.EnrollmentToken,
 			Applier:         cutter{l, node},

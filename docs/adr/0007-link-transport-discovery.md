@@ -46,7 +46,7 @@ A candidate is a Transport with its own UDP port and, for AmneziaWG, its own obf
   - AmneziaWG parameters are random within the ranges the AmneziaWG documentation states are valid: junk packets, S1 to S4 padding, H1 to H4 header types, and I1 to I5 decoy packets.
   - The listening end reports them, and the Coordinator puts them in the initiating Node's snapshot.
 - **Parameters change only by replacing an instance**, never in place. No instance is replaced while the Coordinator is unreachable, because the initiating end would never learn the new values.
-- **Inner addressing:** each instance has its own interface and its own /31, allocated by the Coordinator from a mesh range.
+- **Inner addressing:** each instance has its own interface and its own /31, allocated by the Coordinator from a mesh range *(The mesh range is `10.78.0.0/16`, next to the Device pool `10.77.0.0/16` of [ADR 0003](0003-identity-devices-metering.md). Decided in [MVP 03](https://github.com/alakiani/darz/issues/19).)*
 
 ## When an instance counts as Up
 

@@ -99,7 +99,7 @@ func TestAdminOverviewAndLinks(t *testing.T) {
 
 	var o protocol.Overview
 	admin.must(200, "GET", "/v1/admin/overview", nil, &o)
-	if len(o.Nodes) != 2 || o.Nodes[0].LastContact == nil || len(o.Sets) != 2 || o.Backup == "" {
+	if len(o.Nodes) != 2 || o.Nodes[0].LastContact == nil || len(o.Sets) != 2 || o.Backup.Configured || o.UndeliveredAlerts == nil {
 		t.Errorf("overview = %+v", o)
 	}
 	if len(o.Links) != 1 || !o.Links[0].UpA && !o.Links[0].UpB || o.Links[0].RTTMillis != 42 || !o.Links[0].Instances[0].Up {

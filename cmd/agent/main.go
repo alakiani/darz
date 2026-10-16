@@ -26,6 +26,7 @@ type options struct {
 	coordinators, caPath, stateDir, tokenFile string
 	awgBinary, awgRunner                      string
 	healthInterval                            time.Duration
+	telegramAPI, nodeExporter                 string
 }
 
 func main() {
@@ -38,6 +39,8 @@ func main() {
 	flag.StringVar(&o.awgRunner, "awg-runner", "systemd", "how to run amneziawg-go daemons: systemd (darz-awg@<iface>.service) or exec")
 	flag.StringVar(&o.awgBinary, "awg-binary", "/usr/local/lib/darz/amneziawg-go", "amneziawg-go binary, for -awg-runner=exec")
 	flag.DurationVar(&o.healthInterval, "health-interval", 30*time.Second, "how often to report health")
+	flag.StringVar(&o.telegramAPI, "telegram-api", agent.DefaultTelegramAPI, "Telegram's Bot API, where an Exit relays the Coordinator's alerts")
+	flag.StringVar(&o.nodeExporter, "node-exporter", "http://127.0.0.1:9100/metrics", "node_exporter on localhost, served through /metrics; empty for none")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(version)
@@ -111,6 +114,8 @@ func run(log *slog.Logger, o options) error {
 		Version:         version,
 		Log:             log,
 		HealthInterval:  o.healthInterval,
+		TelegramAPI:     o.telegramAPI,
+		NodeExporter:    o.nodeExporter,
 	})
 	stop()
 	if lerr := <-linkErr; err == nil {

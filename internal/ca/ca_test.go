@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -98,5 +99,53 @@ func TestServerCertCoversItsHosts(t *testing.T) {
 		if _, err := cert.Verify(x509.VerifyOptions{DNSName: host, Roots: c.Pool()}); err != nil {
 			t.Errorf("server cert for %s: %v", host, err)
 		}
+	}
+}
+
+// A Node's certificate also serves its metrics port (ADR 0006): Prometheus
+// checks it by the shared name, the Coordinator by the Node's id.
+func TestNodeCertificateServesTheMetricsPort(t *testing.T) {
+	authority, err := ca.LoadOrCreate(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	certPEM, _, err := authority.SignClient(csrPEM(t), "nd_1", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, _ := pem.Decode(certPEM)
+	cert, _ := x509.ParseCertificate(block.Bytes)
+	for _, name := range []string{"nd_1", ca.AgentServerName} {
+		if _, err := cert.Verify(x509.VerifyOptions{DNSName: name, Roots: authority.Pool(), KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}); err != nil {
+			t.Errorf("as a server for %s: %v", name, err)
+		}
+	}
+	if _, err := cert.Verify(x509.VerifyOptions{Roots: authority.Pool(), KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err != nil {
+		t.Errorf("as a client: %v", err)
+	}
+}
+
+func TestIssueClient(t *testing.T) {
+	authority, err := ca.LoadOrCreate(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	certPEM, keyPEM, err := authority.IssueClient(ca.PrometheusName, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pair, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert := pair.Leaf
+	if cert.Subject.CommonName != ca.PrometheusName {
+		t.Errorf("CN = %q", cert.Subject.CommonName)
+	}
+	if _, err := cert.Verify(x509.VerifyOptions{Roots: authority.Pool(), KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err != nil {
+		t.Error(err)
+	}
+	if _, err := cert.Verify(x509.VerifyOptions{Roots: authority.Pool(), KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}); err == nil {
+		t.Error("a monitoring client certificate can serve")
 	}
 }

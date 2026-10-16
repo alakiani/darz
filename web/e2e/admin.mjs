@@ -51,6 +51,10 @@ try {
     await page.locator("[data-testid=link-matrix] td.up").first().waitFor({ timeout: 90_000 });
   }
 
+  step("overview: the banner shows an alert no Exit could deliver, and the backup's state");
+  await page.locator("[data-testid=undelivered-alerts]", { hasText: "NodeUnreachable: Node ab9 is unreachable" }).waitFor();
+  await page.locator("[data-testid=backup]", { hasText: "off: no age recipient configured" }).waitFor();
+
   step("users: suspend, resume, cap, recovery Invite, delete");
   await screen("/admin/users", "Users");
   const user = page.locator("[data-testid=user-maryam]");

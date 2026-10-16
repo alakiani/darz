@@ -85,6 +85,32 @@
         ],
         "type": "object"
       },
+      "BackupStatus": {
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "last_attempt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "last_success": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "configured",
+          "size_bytes"
+        ],
+        "type": "object"
+      },
       "ChangePassword": {
         "properties": {
           "current": {
@@ -932,7 +958,7 @@
       "Overview": {
         "properties": {
           "backup": {
-            "type": "string"
+            "$ref": "#/components/schemas/BackupStatus"
           },
           "endpoint_slots": {
             "$ref": "#/components/schemas/SlotStatus"
@@ -954,6 +980,12 @@
               "$ref": "#/components/schemas/SetInfo"
             },
             "type": "array"
+          },
+          "undelivered_alerts": {
+            "items": {
+              "$ref": "#/components/schemas/UndeliveredAlert"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -961,7 +993,8 @@
           "endpoint_slots",
           "links",
           "nodes",
-          "sets"
+          "sets",
+          "undelivered_alerts"
         ],
         "type": "object"
       },
@@ -1323,6 +1356,34 @@
         "required": [
           "enabled",
           "known"
+        ],
+        "type": "object"
+      },
+      "UndeliveredAlert": {
+        "properties": {
+          "attempts": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempts",
+          "id",
+          "last_error",
+          "received_at",
+          "text"
         ],
         "type": "object"
       },

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { ago, type Overview } from "./api";
+import { ago, bytes, type Overview } from "./api";
 
 // The status board (variant A in the prototype): Node tiles, a Link
 // latency matrix, and the Coordinator card.
@@ -19,6 +19,23 @@ export function OverviewScreen() {
   return (
     <section>
       <h1>Overview</h1>
+      {o.undelivered_alerts.length > 0 && (
+        // Alerts no Exit could relay to Telegram (ADR 0006): seen here even
+        // during an international outage.
+        <div className="warning" role="alert" data-testid="undelivered-alerts">
+          <strong>
+            {o.undelivered_alerts.length} alert{o.undelivered_alerts.length > 1 && "s"} could not reach Telegram
+          </strong>
+          {o.undelivered_alerts.map((a) => (
+            <div key={a.id}>
+              <pre>{a.text}</pre>
+              <span className="muted">
+                received {ago(a.received_at)}, {a.attempts} attempt{a.attempts > 1 && "s"}: {a.last_error}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="tiles">
         {o.nodes.map((n) => (
           <a key={n.id} className="tile" href={`#/admin/nodes/${n.id}`} data-testid={`node-${n.name}`}>
@@ -108,7 +125,18 @@ export function OverviewScreen() {
               {s.last_error && <span className="error"> — last update rejected: {s.last_error}</span>}
             </p>
           ))}
-        <p>Nightly backup: {o.backup}</p>
+        <p data-testid="backup">
+          Nightly backup:{" "}
+          {!o.backup.configured ? (
+            <span className="error">off: no age recipient configured</span>
+          ) : (
+            <>
+              last good {ago(o.backup.last_success)}
+              {o.backup.last_success && `, ${bytes(o.backup.size_bytes)}`}
+              {o.backup.last_error && <span className="error"> — last attempt failed: {o.backup.last_error}</span>}
+            </>
+          )}
+        </p>
       </div>
     </section>
   );

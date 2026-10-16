@@ -32,6 +32,7 @@ type rig struct {
 	caPEM    []byte
 	agentURL string
 	admin    *testutil.AdminClient
+	ca       *ca.CA
 }
 
 func newRig(t *testing.T) *rig {
@@ -62,7 +63,7 @@ func newRig(t *testing.T) *rig {
 		t.Fatal(err)
 	}
 	return &rig{store: s, coord: c, caPEM: authority.CertPEM(), agentURL: agentSrv.URL,
-		admin: &testutil.AdminClient{URL: adminSrv.URL, Token: secret}}
+		admin: &testutil.AdminClient{URL: adminSrv.URL, Token: secret}, ca: authority}
 }
 
 // network is a fake link between an Agent and the Coordinator that a test
@@ -135,7 +136,7 @@ func (r *running) stop() error {
 	return <-r.done
 }
 
-func (rg *rig) startAgent(t *testing.T, dir, token string, app *applier, net *network) *running {
+func (rg *rig) startAgent(t *testing.T, dir, token string, app agent.Applier, net *network, opts ...func(*agent.Config)) *running {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg := agent.Config{
@@ -151,6 +152,9 @@ func (rg *rig) startAgent(t *testing.T, dir, token string, app *applier, net *ne
 		RetryInterval:   50 * time.Millisecond,
 		RequestTimeout:  300 * time.Millisecond,
 		LongPoll:        500 * time.Millisecond,
+	}
+	for _, o := range opts {
+		o(&cfg)
 	}
 	r := &running{cancel: cancel, done: make(chan error, 1)}
 	go func() { r.done <- agent.Run(ctx, cfg) }()

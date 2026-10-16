@@ -12,8 +12,30 @@ type Overview struct {
 	// EndpointSlots are the slots and the probe's view of each domestic
 	// Bridge (ADR 0005).
 	EndpointSlots SlotStatus `json:"endpoint_slots"`
-	// Backup describes the nightly backup; session 11 builds it.
-	Backup string `json:"backup"`
+	// Backup is the nightly backup's state (ADR 0001).
+	Backup BackupStatus `json:"backup"`
+	// UndeliveredAlerts are alerts no Exit could relay to Telegram yet,
+	// shown as a banner (ADR 0006).
+	UndeliveredAlerts []UndeliveredAlert `json:"undelivered_alerts"`
+}
+
+// BackupStatus is the nightly backup on the status board.
+type BackupStatus struct {
+	// Configured is false until the Coordinator has an age recipient.
+	Configured  bool       `json:"configured"`
+	LastSuccess *time.Time `json:"last_success,omitempty"`
+	LastAttempt *time.Time `json:"last_attempt,omitempty"`
+	LastError   string     `json:"last_error,omitempty"` // of the last attempt, if it failed
+	SizeBytes   int64      `json:"size_bytes"`           // of the last good backup, encrypted
+}
+
+// UndeliveredAlert is an alert waiting for a healthy Exit.
+type UndeliveredAlert struct {
+	ID         uint64    `json:"id"`
+	Text       string    `json:"text"`
+	ReceivedAt time.Time `json:"received_at"`
+	Attempts   int       `json:"attempts"`
+	LastError  string    `json:"last_error"`
 }
 
 // NodeTile is a Node on the status board.

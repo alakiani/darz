@@ -57,6 +57,8 @@ type slotState struct {
 	inelSince map[string]time.Time            // by Node id, while ineligible
 	reasons   map[string][]string             // by Node id, while ineligible
 	prober    *probe.Prober
+	// dnsFailures counts ArvanCloud API calls failed in a row.
+	dnsFailures int
 }
 
 // RunEndpointSlots probes every domestic Bridge, judges slot eligibility,
@@ -217,7 +219,15 @@ func (c *Coordinator) syncSlotRecords(ctx context.Context, health map[string]*pr
 		if err != nil || addr.String() == e.Addr {
 			continue
 		}
-		if err := c.DNS.SetA(ctx, e.Name, addr); err != nil {
+		err = c.DNS.SetA(ctx, e.Name, addr)
+		c.slots.mu.Lock()
+		if err != nil {
+			c.slots.dnsFailures++
+		} else {
+			c.slots.dnsFailures = 0
+		}
+		c.slots.mu.Unlock()
+		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", e.Name, err))
 			continue
 		}

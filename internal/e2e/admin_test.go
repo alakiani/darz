@@ -88,6 +88,10 @@ func TestAdminPanel(t *testing.T) {
 	m.startAgent("ir1", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ab1", []protocol.Role{protocol.RoleExit}, nil)
 
+	// An alert no Exit could relay waits on the banner (ADR 0006).
+	alert, _ := co.store.QueueAlert(ctx, "DARZ\nFIRING critical NodeUnreachable: Node ab9 is unreachable")
+	co.store.AlertFailed(ctx, alert, "no healthy Exit")
+
 	cmd := exec.Command(node, script)
 	cmd.Dir = filepath.Dir(script)
 	cmd.Env = append(os.Environ(), "PANEL_URL="+co.admin.URL, "ADMIN_HANDLE=admin", "ADMIN_PASSWORD="+adminPassword, "TOTP_SECRET="+secret)

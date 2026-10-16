@@ -157,10 +157,19 @@ func (c *Coordinator) adminOverview(w http.ResponseWriter, r *http.Request) {
 		c.internalError(w, err)
 		return
 	}
+	if err == nil {
+		o.Backup, err = c.BackupStatus(ctx)
+	}
+	if err == nil {
+		o.UndeliveredAlerts, err = c.UndeliveredAlerts(ctx)
+	}
+	if err != nil {
+		c.internalError(w, err)
+		return
+	}
 	if o.Nodes == nil {
 		o.Nodes = []protocol.NodeTile{}
 	}
-	o.Backup = "not set up yet"
 	writeJSON(w, http.StatusOK, o)
 }
 

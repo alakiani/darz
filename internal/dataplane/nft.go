@@ -63,6 +63,11 @@ type ruleset struct {
 	// leaves their uplink for others.
 	Exit   bool
 	Uplink string
+
+	// MonitorPort, if set, is the monitoring port, open to MonitorAllow
+	// only (ADR 0006).
+	MonitorPort  uint16
+	MonitorAllow []string
 }
 
 type nftRule struct {
@@ -160,6 +165,29 @@ func render(r ruleset) string {
 		w("\t\toifname %q update @usage_down { ip daddr . ct mark counter }", DeviceIface)
 	}
 	w("\t}")
+
+	if r.MonitorPort != 0 {
+		// The monitoring port: the Coordinator VM in, everyone else
+		// silently dropped, so scanners see nothing.
+		var v4, v6 []string
+		for _, a := range r.MonitorAllow {
+			if strings.Contains(a, ":") {
+				v6 = append(v6, a)
+			} else {
+				v4 = append(v4, a)
+			}
+		}
+		w("\tchain input {")
+		w("\t\ttype filter hook input priority filter; policy accept;")
+		if len(v4) > 0 {
+			w("\t\ttcp dport %d ip saddr { %s } accept", r.MonitorPort, strings.Join(v4, ", "))
+		}
+		if len(v6) > 0 {
+			w("\t\ttcp dport %d ip6 saddr { %s } accept", r.MonitorPort, strings.Join(v6, ", "))
+		}
+		w("\t\ttcp dport %d drop", r.MonitorPort)
+		w("\t}")
+	}
 
 	w("\tchain postrouting {")
 	w("\t\ttype nat hook postrouting priority srcnat; policy accept;")

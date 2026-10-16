@@ -78,6 +78,9 @@ type Plane struct {
 	applied map[string][buckets]string // nft map name -> buckets in force
 	paths   []protocol.RuleHealth
 	transit []uint32
+	// moves counts bucket moves of Device traffic by Rule name and kind:
+	// steps that moved any bucket, and buckets moved (ADR 0006).
+	moves, movedBuckets map[[2]string]uint64
 
 	meter *meter
 }
@@ -101,7 +104,8 @@ func New(cfg Config) (*Plane, error) {
 		return nil, err
 	}
 	return &Plane{cfg: cfg, log: cfg.Log, wg: c, dev: map[uint64]*bucketState{}, tr: map[uint64]*bucketState{},
-		avail: map[string]*availability{}, applied: map[string][buckets]string{}, meter: m}, nil
+		avail: map[string]*availability{}, applied: map[string][buckets]string{}, meter: m,
+		moves: map[[2]string]uint64{}, movedBuckets: map[[2]string]uint64{}}, nil
 }
 
 // UseFetch implements agent.FetchUser.
@@ -127,6 +131,14 @@ func (p *Plane) Apply(ctx context.Context, st protocol.State) error {
 	p.uplink = up
 
 	rs := ruleset{Uplink: up.dev, LinkIfaces: map[string]uint64{}, Exit: slices.Contains(st.Node.Roles, protocol.RoleExit)}
+	if m := st.Monitor; m != nil && m.Port != 0 {
+		rs.MonitorPort = m.Port
+		for _, a := range m.AllowFrom {
+			if addr, err := netip.ParseAddr(a); err == nil {
+				rs.MonitorAllow = append(rs.MonitorAllow, addr.String())
+			}
+		}
+	}
 	for _, l := range st.Links {
 		for _, in := range l.Instances {
 			rs.LinkIfaces[in.Iface] = l.ID
@@ -370,7 +382,11 @@ func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
 				st = &bucketState{}
 				view.states[r.ID] = st
 			}
-			logMoves(p.log, r.Name, view.name, st.step(now, cands, b.Scoring))
+			moves := st.step(now, cands, b.Scoring)
+			logMoves(p.log, r.Name, view.name, moves)
+			if !view.transit {
+				p.countMoves(r.Name, moves)
+			}
 			if !view.transit {
 				if ownEligible {
 					transit = append(transit, uint32(r.ID))

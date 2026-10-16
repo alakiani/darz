@@ -191,7 +191,17 @@ func TestLinks(t *testing.T) {
 		t.Errorf("same-side link carried by %q, want wireguard first", lh.Transport)
 	}
 
-	// Blocking the active instance's port moves the Link within seconds.
+	// Blocking the active instance's port moves the Link within seconds to
+	// its other instance, once that one is Up as a warm standby.
+	testutil.Eventually(t, 60*time.Second, "both crossing instances up at ir1", func() bool {
+		ups := 0
+		for _, ih := range m.link("ir1", cross).Instances {
+			if ih.Up {
+				ups++
+			}
+		}
+		return ups == 2
+	})
 	active := m.link("ir1", cross).ActiveInstance
 	blocked := m.instance(active)
 	block := l.Filter(lab.DropUDP(l.Node(m.name(blocked.Listener)), blocked.ListenPort))
@@ -200,7 +210,12 @@ func TestLinks(t *testing.T) {
 		lh := m.link("ir1", cross)
 		return lh.Up && lh.ActiveInstance != active && lh.ActiveInstance != 0
 	})
-	t.Logf("crossing link moved from instance %d to %d in %v", active, m.link("ir1", cross).ActiveInstance, time.Since(start).Round(100*time.Millisecond))
+	moved := time.Since(start)
+	t.Logf("crossing link moved from instance %d to %d in %v; instances %+v", active, m.link("ir1", cross).ActiveInstance,
+		moved.Round(100*time.Millisecond), m.link("ir1", cross).Instances)
+	if moved > 8*time.Second {
+		t.Errorf("moving off a blocked instance took %v, want a few seconds", moved)
+	}
 
 	// Same side: off WireGuard while it is blocked, and back to it only
 	// after it has been Up for the switch-back time.

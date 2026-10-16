@@ -86,7 +86,8 @@ try {
   if (LIVE) {
     await page.locator("[data-testid=node-row-ir1] a").click();
     await page.locator("[data-testid=paths]", { hasText: "Default" }).waitFor();
-    await page.locator("[data-testid=paths]", { hasText: "ab1" }).waitFor();
+    // ab1 is a candidate once its first egress checks have passed.
+    await page.locator("[data-testid=paths]", { hasText: "ab1" }).waitFor({ timeout: 90_000 });
     await page.goto(`${PANEL_URL}/#/admin/nodes`);
   }
   await page.locator("[data-testid=node-row-ab9] a").click();

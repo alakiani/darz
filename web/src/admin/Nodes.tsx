@@ -113,16 +113,19 @@ export function NodeScreen({ id }: { id: string }) {
   const [d, setD] = useState<NodeDetail | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [tags, setTags] = useState("");
-  const load = () =>
+  const load = (form: boolean) =>
     api.GET("/v1/admin/nodes/{id}", { params: { path: { id } } }).then(({ data }) => {
       setD(data ?? null);
-      if (data) {
+      if (data && form) {
         setRoles(data.node.roles as Role[]);
         setTags(data.node.tags.join(", "));
       }
     });
   useEffect(() => {
-    load();
+    load(true);
+    // Contact, Links and Paths change by the second; the edit form does not.
+    const t = setInterval(() => load(false), 5000);
+    return () => clearInterval(t);
   }, [id]);
   if (!d) return null;
   const n = d.node;
@@ -130,7 +133,7 @@ export function NodeScreen({ id }: { id: string }) {
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     await api.POST("/v1/admin/nodes/{id}", { params: { path: { id } }, body: { roles, tags: splitTags(tags) } });
-    load();
+    load(true);
   };
   const remove = async () => {
     if (!typedConfirm("delete this Node; its certificate stops working at once", n.name)) return;

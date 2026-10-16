@@ -249,24 +249,22 @@ func (p *Plane) set(ctx context.Context, hash string) ([]string, error) {
 	return out, nil
 }
 
-// syncRules keeps exactly this plane's ip rules: one per Rule mark, one
-// per Link mark, and a catch-all that drops Device traffic with no mark.
+// syncRules keeps exactly this plane's ip rules: one per Rule mark and one
+// per Link mark. Device traffic that matches no Rule is dropped by
+// nftables, not by an ip rule: an "iif darz0" rule would also catch the
+// kernel's reverse-path lookups for replies to Devices and drop them all.
 func (p *Plane) syncRules(ctx context.Context) error {
 	want := map[string]bool{}
 	if b := p.st.Bridge; b != nil {
 		for _, r := range b.Rules {
 			want[fmt.Sprintf("%d fwmark %#x lookup %d", prioRules, ruleMark(r.ID), ruleTable(r.ID))] = true
 		}
-		want[fmt.Sprintf("%d iif %s lookup %d", prioDrop, DeviceIface, dropTable)] = true
 	}
 	for _, l := range p.st.Links {
 		want[fmt.Sprintf("%d fwmark %#x lookup %s", prioLinks, linkMark(l.ID), link.LinkTable(l.ID))] = true
 	}
 	// Tables first, so no rule ever points at an empty table and falls
 	// through to the main table.
-	if err := ip(ctx, "route", "replace", "blackhole", "default", "table", fmt.Sprint(dropTable)); err != nil {
-		return err
-	}
 	if b := p.st.Bridge; b != nil {
 		for _, r := range b.Rules {
 			table := ruleTable(r.ID)
@@ -381,7 +379,7 @@ func ourRules(ctx context.Context) (map[string]bool, error) {
 	have := map[string]bool{}
 	for _, r := range rules {
 		switch {
-		case r.Priority < prioRules || r.Priority > prioDrop:
+		case r.Priority < prioRules || r.Priority > prioMax:
 		case r.Fwmark != "":
 			have[fmt.Sprintf("%d fwmark %s lookup %s", r.Priority, r.Fwmark, r.Table)] = true
 		case r.Iif != "":
@@ -391,47 +389,20 @@ func ourRules(ctx context.Context) (map[string]bool, error) {
 	return have, nil
 }
 
-// setSysctls turns on forwarding, and turns reverse-path filtering off on
-// the tunnel interfaces. Their far ends are Devices, held to their own /32
-// by WireGuard, or this mesh's own Nodes, which legitimately send replies
-// and transit traffic from any source; the filter there only drops
-// replies. Interfaces made later inherit the default. The uplink keeps
-// its own setting, and "all" is 0 so the per-interface value decides.
+// setSysctls turns on forwarding and loose reverse-path filtering: replies
+// and transit traffic arrive over Links, not the interface the main table
+// would use to reach their sources.
 func setSysctls() error {
-	write := func(k, v string) error {
+	for k, v := range map[string]string{
+		"ip_forward":             "1",
+		"conf/all/rp_filter":     "2",
+		"conf/default/rp_filter": "2",
+	} {
 		if err := os.WriteFile("/proc/sys/net/ipv4/"+k, []byte(v), 0o644); err != nil {
 			return fmt.Errorf("sysctl %s: %w", k, err)
 		}
-		return nil
 	}
-	if err := write("ip_forward", "1"); err != nil {
-		return err
-	}
-	ifaces, err := os.ReadDir("/proc/sys/net/ipv4/conf")
-	if err != nil {
-		return err
-	}
-	uplinkValue := "2"
-	for _, e := range ifaces {
-		name := e.Name()
-		if name == "all" || name == "default" || name == "lo" {
-			continue
-		}
-		if name == DeviceIface || strings.HasPrefix(name, "dz") {
-			if err := write("conf/"+name+"/rp_filter", "0"); err != nil {
-				return err
-			}
-		} else if b, err := os.ReadFile("/proc/sys/net/ipv4/conf/" + name + "/rp_filter"); err == nil && strings.TrimSpace(string(b)) == "0" {
-			// An uplink inheriting 0 from "all" would lose its filter.
-			if err := write("conf/"+name+"/rp_filter", uplinkValue); err != nil {
-				return err
-			}
-		}
-	}
-	if err := write("conf/default/rp_filter", "0"); err != nil {
-		return err
-	}
-	return write("conf/all/rp_filter", "0")
+	return nil
 }
 
 // findUplink is the interface and gateway of the main table's default

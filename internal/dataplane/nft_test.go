@@ -26,6 +26,7 @@ func TestBridgeRuleset(t *testing.T) {
 		`iifname "darz0" ip daddr @rule_2 counter meta mark set 0x10002 accept`,
 		`iifname "darz0" meta l4proto { tcp, udp } th dport 53 counter dnat ip to 10.77.0.1:53`,
 		"tcp option maxseg size set rt mtu",
+		`iifname "darz0" counter drop`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("ruleset lacks %q:\n%s", want, got)
@@ -36,6 +37,9 @@ func TestBridgeRuleset(t *testing.T) {
 	}
 	if strings.Contains(got, "masquerade") {
 		t.Error("a Bridge that is no Exit masquerades")
+	}
+	if strings.Index(got, `iifname "darz0" counter drop`) < strings.Index(got, "@rule_2") {
+		t.Error("the fail-closed drop comes before the Rules")
 	}
 }
 

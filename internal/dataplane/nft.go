@@ -20,14 +20,14 @@ const (
 	linkMarkBase = 0x20000
 	markKind     = 0xffff0000
 
-	// Routing tables: one per Rule, and one that drops.
+	// Routing tables: one per Rule.
 	ruleTableBase = 20000
-	dropTable     = 29999
 
-	// ip rule priorities, all ahead of the main table (32766).
+	// ip rule priorities, all ahead of the main table (32766). Rules in
+	// prioRules..prioMax belong to the data plane.
 	prioRules = 2000
 	prioLinks = 2100
-	prioDrop  = 2900 // Device traffic that somehow has no Rule mark
+	prioMax   = 2999
 )
 
 func ruleMark(id uint64) uint32 { return ruleMarkBase | uint32(id) }
@@ -83,6 +83,8 @@ func render(r ruleset) string {
 		for _, rule := range r.Rules {
 			w("\t\tiifname %q ip daddr @rule_%d counter meta mark set %#x accept", DeviceIface, rule.ID, ruleMark(rule.ID))
 		}
+		// Fail closed: Device traffic no Rule claimed goes nowhere.
+		w("\t\tiifname %q counter drop", DeviceIface)
 	}
 	if len(r.ExitIfaces) > 0 {
 		var entries []string

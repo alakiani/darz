@@ -1,0 +1,18 @@
+# Managed by coordinator.yml (ADR 0006).
+[Unit]
+Description=Prometheus for DARZ
+After=network-online.target darz-coordinator.service
+
+[Service]
+User=darz-monitor
+Group=darz-monitor
+ExecStart=/usr/local/lib/darz/prometheus-{{ darz_versions.PROMETHEUS }}/prometheus \
+  --config.file=/etc/darz/prometheus/prometheus.yml \
+  --storage.tsdb.path=/var/lib/darz-monitor/prometheus \
+  --storage.tsdb.retention.time=30d \
+  --web.listen-address=127.0.0.1:9090
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

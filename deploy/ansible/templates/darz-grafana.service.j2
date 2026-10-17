@@ -1,0 +1,26 @@
+# Managed by coordinator.yml (ADR 0006). Reach it through an SSH tunnel:
+# ssh -L 3000:127.0.0.1:3000 <coordinator>
+[Unit]
+Description=Grafana for DARZ
+After=network-online.target darz-prometheus.service
+
+[Service]
+User=darz-monitor
+Group=darz-monitor
+Environment=GF_SERVER_HTTP_ADDR=127.0.0.1
+Environment=GF_SERVER_HTTP_PORT=3000
+Environment=GF_PATHS_DATA=/var/lib/darz-monitor/grafana
+Environment=GF_PATHS_LOGS=/var/lib/darz-monitor/grafana/log
+Environment=GF_PATHS_PLUGINS=/var/lib/darz-monitor/grafana/plugins
+Environment=GF_PATHS_PROVISIONING=/etc/darz/grafana/provisioning
+Environment=GF_ANALYTICS_REPORTING_ENABLED=false
+Environment=GF_ANALYTICS_CHECK_FOR_UPDATES=false
+Environment=GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
+Environment=GF_NEWS_NEWS_FEED_ENABLED=false
+ExecStart=/usr/local/lib/darz/grafana-{{ darz_versions.GRAFANA }}/bin/grafana server \
+  --homepath /usr/local/lib/darz/grafana-{{ darz_versions.GRAFANA }}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

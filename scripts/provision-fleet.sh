@@ -547,7 +547,7 @@ if [[ ! -f "$INVENTORY" ]] || confirm "Overwrite $INVENTORY?"; then
   {
     printf '# Written by scripts/provision-fleet.sh. Secrets live in fleet.env beside it.\n'
     printf 'all:\n  vars:\n    ansible_ssh_private_key_file: %s\n  children:\n' "$SSH_KEY"
-    printf '    coordinator:\n      hosts:\n'; inv_host COORD
+    printf '    coordinators:\n      hosts:\n'; inv_host COORD
     printf '    domestic:\n      hosts:\n';    inv_host DOM1; inv_host DOM2
     printf '    abroad:\n      hosts:\n';      inv_host ABROAD1; inv_host ABROAD2
   } > "$INVENTORY"

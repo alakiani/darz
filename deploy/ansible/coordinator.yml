@@ -1,0 +1,294 @@
+# coordinator.yml installs or upgrades the Coordinator VM (ADR 0001, 0006):
+# the Coordinator, Prometheus, Alertmanager and Grafana, pushed from the
+# release on the laptop. On the first run it also brings back the pinned CA
+# certificate and the laptop's nodes:enroll token, and prints the first
+# Admin's Invite.
+#
+#   scripts/darz-ansible coordinator.yml
+- name: Coordinator VM
+  hosts: coordinators
+  become: true
+  vars:
+    darz_tls_cert: "{{ lookup('env', 'TLS_CERT_FILE') }}"
+    darz_tls_key: "{{ lookup('env', 'TLS_KEY_FILE') }}"
+    darz_monitor_from: "{{ lookup('env', 'COORD_EGRESS_IP') or ansible_host }}"
+    darz_arvan_api_key: "{{ lookup('env', 'ARVAN_API_KEY') }}"
+    darz_telegram_token: "{{ lookup('env', 'TELEGRAM_TOKEN') }}"
+    darz_telegram_chat: "{{ lookup('env', 'TELEGRAM_CHAT') }}"
+    darz_backup_s3_endpoint: "{{ lookup('env', 'BACKUP_S3_ENDPOINT') }}"
+    darz_backup_s3_region: "{{ lookup('env', 'BACKUP_S3_REGION') or 'us-east-1' }}"
+    darz_backup_s3_bucket: "{{ lookup('env', 'BACKUP_S3_BUCKET') }}"
+    darz_backup_s3_access_key: "{{ lookup('env', 'BACKUP_S3_ACCESS_KEY') }}"
+    darz_backup_s3_secret_key: "{{ lookup('env', 'BACKUP_S3_SECRET_KEY') }}"
+    darz_backup_age_recipient: "{{ lookup('env', 'BACKUP_AGE_RECIPIENT') }}"
+    darz_repo: "{{ playbook_dir }}/../.."
+  pre_tasks:
+    - name: Check the laptop has what the Coordinator needs
+      ansible.builtin.assert:
+        that:
+          - darz_release | length > 0
+          - darz_backup_age_recipient is match('^age1')
+          - (darz_tls_cert | length > 0) == (darz_tls_key | length > 0)
+          - (darz_telegram_token | length > 0) == (darz_telegram_chat | length > 0)
+        fail_msg: >-
+          Set DARZ_RELEASE and BACKUP_AGE_RECIPIENT, and TLS_CERT_FILE with
+          TLS_KEY_FILE, TELEGRAM_TOKEN with TELEGRAM_CHAT, in pairs
+          (scripts/provision-fleet.sh writes them to ~/.darz/fleet.env).
+
+    - name: Read the release's pinned versions
+      ansible.builtin.set_fact:
+        darz_versions: >-
+          {{ dict(lookup('file', darz_release_dir ~ '/versions.env').splitlines()
+             | map('regex_findall', '^([A-Z_0-9]+)=(.*)$') | select | map('first')) }}
+
+  tasks:
+    - name: Install Ubuntu's packages
+      ansible.builtin.apt:
+        name: "{{ ['prometheus-node-exporter'] + (['chrony'] if darz_chrony else []) }}"
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Keep node_exporter on loopback
+      ansible.builtin.template:
+        src: node-exporter.default.j2
+        dest: /etc/default/prometheus-node-exporter
+        mode: "0644"
+      notify: Restart node_exporter
+
+    - name: Create the darz group
+      ansible.builtin.group:
+        name: darz
+        system: true
+
+    - name: Create the darz user, which runs the Coordinator
+      ansible.builtin.user:
+        name: darz
+        group: darz
+        system: true
+        shell: /usr/sbin/nologin
+        home: /var/lib/darz
+        create_home: false
+
+    - name: Create the darz-monitor user, which runs Prometheus, Alertmanager and Grafana
+      ansible.builtin.user:
+        name: darz-monitor
+        groups: [darz] # to read Prometheus's client certificate
+        system: true
+        shell: /usr/sbin/nologin
+        home: /var/lib/darz-monitor
+        create_home: false
+
+    - name: Create the directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: /etc/darz, owner: root, group: darz, mode: "0750" }
+        - { path: /etc/darz/ca, owner: darz, group: darz, mode: "0700" }
+        - { path: /etc/darz/secrets, owner: darz, group: darz, mode: "0700" }
+        - { path: /etc/darz/prometheus, owner: darz, group: darz, mode: "0750" }
+        - { path: /etc/darz/alertmanager, owner: root, group: darz, mode: "0750" }
+        - { path: /etc/darz/grafana, owner: root, group: darz, mode: "0750" }
+        - { path: /etc/darz/grafana/provisioning, owner: root, group: darz, mode: "0750" }
+        - { path: /etc/darz/grafana/provisioning/dashboards, owner: root, group: darz, mode: "0750" }
+        - { path: /etc/darz/grafana/provisioning/datasources, owner: root, group: darz, mode: "0750" }
+        - { path: /etc/darz/grafana/dashboards, owner: root, group: darz, mode: "0750" }
+        - { path: /var/lib/darz, owner: darz, group: darz, mode: "0700" }
+        - { path: /var/lib/darz-monitor, owner: darz-monitor, group: darz-monitor, mode: "0750" }
+        - { path: /var/lib/darz-monitor/prometheus, owner: darz-monitor, group: darz-monitor, mode: "0750" }
+        - { path: /var/lib/darz-monitor/alertmanager, owner: darz-monitor, group: darz-monitor, mode: "0750" }
+        - { path: /var/lib/darz-monitor/grafana, owner: darz-monitor, group: darz-monitor, mode: "0750" }
+        - { path: /usr/local/lib/darz, owner: root, group: root, mode: "0755" }
+
+    - name: Install the Coordinator
+      ansible.builtin.copy:
+        src: "{{ darz_release_dir }}/darz-coordinator"
+        dest: /usr/local/bin/darz-coordinator
+        mode: "0755"
+      notify: Restart the Coordinator
+
+    - name: Install the secrets
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "/etc/darz/secrets/{{ item.name }}"
+        owner: darz
+        group: darz
+        mode: "0600"
+      loop:
+        - { name: tls.crt, content: "{{ lookup('file', darz_tls_cert) ~ '\n' if darz_tls_cert else '' }}", when: "{{ darz_tls_cert | length > 0 }}" }
+        - { name: tls.key, content: "{{ lookup('file', darz_tls_key) ~ '\n' if darz_tls_key else '' }}", when: "{{ darz_tls_key | length > 0 }}" }
+        - { name: arvan-api-key, content: "{{ darz_arvan_api_key }}\n", when: "{{ darz_arvan_api_key | length > 0 }}" }
+        - { name: telegram-token, content: "{{ darz_telegram_token }}\n", when: "{{ darz_telegram_token | length > 0 }}" }
+        - { name: backup-s3-key, content: "{{ darz_backup_s3_access_key }}\n{{ darz_backup_s3_secret_key }}\n", when: "{{ darz_backup_s3_endpoint | length > 0 }}" }
+      when: item.when | bool
+      loop_control:
+        label: "{{ item.name }}"
+      no_log: true
+      notify: Restart the Coordinator
+
+    - name: Install the Coordinator's unit
+      ansible.builtin.template:
+        src: darz-coordinator.service.j2
+        dest: /etc/systemd/system/darz-coordinator.service
+        mode: "0644"
+      notify: Restart the Coordinator
+
+    - name: Unpack Prometheus, Alertmanager and Grafana
+      ansible.builtin.unarchive:
+        src: "{{ darz_release_dir }}/{{ item.name }}-{{ item.version }}.linux-amd64.tar.gz"
+        dest: /usr/local/lib/darz
+        creates: "/usr/local/lib/darz/{{ item.dir }}-{{ item.version }}/{{ item.bin }}"
+        owner: root
+        group: root
+      loop:
+        - { name: prometheus, dir: prometheus, version: "{{ darz_versions.PROMETHEUS }}", bin: prometheus }
+        - { name: alertmanager, dir: alertmanager, version: "{{ darz_versions.ALERTMANAGER }}", bin: alertmanager }
+        - { name: grafana, dir: grafana, version: "{{ darz_versions.GRAFANA }}", bin: bin/grafana }
+      loop_control:
+        label: "{{ item.name }} {{ item.version }}"
+
+    # The tarballs unpack as <name>-<version>.linux-amd64; Grafana's as
+    # grafana-<version>. Give each one the plain <name>-<version> path the
+    # units use.
+    - name: Name the unpacked directories by version
+      ansible.builtin.command:
+        cmd: "mv /usr/local/lib/darz/{{ item }}-{{ darz_versions[item | upper] }}.linux-amd64 /usr/local/lib/darz/{{ item }}-{{ darz_versions[item | upper] }}"
+        creates: "/usr/local/lib/darz/{{ item }}-{{ darz_versions[item | upper] }}"
+        removes: "/usr/local/lib/darz/{{ item }}-{{ darz_versions[item | upper] }}.linux-amd64"
+      loop: [prometheus, alertmanager]
+
+    - name: Install the monitoring configuration
+      ansible.builtin.copy:
+        src: "{{ darz_repo }}/deploy/monitoring/{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: root
+        group: darz
+        mode: "0640"
+      loop:
+        - { src: prometheus.yml, dest: /etc/darz/prometheus/prometheus.yml, service: prometheus }
+        - { src: rules.yml, dest: /etc/darz/prometheus/rules.yml, service: prometheus }
+        - { src: alertmanager.yml, dest: /etc/darz/alertmanager/alertmanager.yml, service: alertmanager }
+        - { src: grafana/provisioning/darz.yml, dest: /etc/darz/grafana/provisioning/dashboards/darz.yml, service: grafana }
+        - { src: grafana/datasources/darz.yml, dest: /etc/darz/grafana/provisioning/datasources/darz.yml, service: grafana }
+        - { src: grafana/dashboards/mesh.json, dest: /etc/darz/grafana/dashboards/mesh.json, service: grafana }
+      loop_control:
+        label: "{{ item.dest }}"
+      register: monitoring_config
+
+    - name: Install the monitoring units
+      ansible.builtin.template:
+        src: "darz-{{ item }}.service.j2"
+        dest: "/etc/systemd/system/darz-{{ item }}.service"
+        mode: "0644"
+      loop: [prometheus, alertmanager, grafana]
+      register: monitoring_units
+
+    - name: Start the Coordinator
+      ansible.builtin.systemd_service:
+        name: darz-coordinator
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Start node_exporter
+      ansible.builtin.systemd_service:
+        name: prometheus-node-exporter
+        enabled: true
+        state: started
+
+    - name: Start Prometheus, Alertmanager and Grafana, restarting any whose files changed
+      ansible.builtin.systemd_service:
+        name: "darz-{{ item }}"
+        enabled: true
+        daemon_reload: true
+        state: >-
+          {{ 'restarted'
+             if (monitoring_config.results | selectattr('changed') | selectattr('item.service', 'eq', item) | list)
+             or (monitoring_units.results | selectattr('changed') | selectattr('item', 'eq', item) | list)
+             else 'started' }}
+      loop: [prometheus, alertmanager, grafana]
+
+    - name: Run the handlers now, so the Coordinator runs this release
+      ansible.builtin.meta: flush_handlers
+
+    - name: Wait for the Coordinator's CA
+      ansible.builtin.wait_for:
+        path: /etc/darz/ca/ca.crt
+        timeout: 60
+
+    - name: Wait for the Agent API
+      ansible.builtin.wait_for:
+        port: 8443
+        timeout: 60
+
+    - name: Bring the CA certificate back to the laptop, for enroll.yml to pin
+      ansible.builtin.fetch:
+        src: /etc/darz/ca/ca.crt
+        dest: "{{ darz_home }}/ca.crt"
+        flat: true
+
+    - name: Look for the laptop's nodes:enroll token
+      ansible.builtin.stat:
+        path: "{{ darz_home }}/enroll-token"
+      delegate_to: localhost
+      become: false
+      register: laptop_token
+
+    - name: Mint the laptop's nodes:enroll token (ADR 0002)
+      ansible.builtin.command:
+        cmd: /usr/local/bin/darz-coordinator token create -db /var/lib/darz/darz.db -name laptop
+      become_user: darz
+      register: minted
+      no_log: true
+      when: not laptop_token.stat.exists
+
+    - name: Keep the token on the laptop only
+      ansible.builtin.copy:
+        content: "{{ minted.stdout | trim }}\n"
+        dest: "{{ darz_home }}/enroll-token"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+      no_log: true
+      when: not laptop_token.stat.exists
+
+    - name: Check whether the first Admin was invited
+      ansible.builtin.stat:
+        path: /var/lib/darz/first-admin-invited
+      register: invited
+
+    - name: Make the first Admin's Invite
+      ansible.builtin.command:
+        cmd: /usr/local/bin/darz-coordinator invite create -db /var/lib/darz/darz.db -admin -panel-url {{ darz_api_url }}
+      become_user: darz
+      register: invite
+      when: not invited.stat.exists
+
+    - name: Remember the first Admin was invited
+      ansible.builtin.file:
+        path: /var/lib/darz/first-admin-invited
+        state: touch
+        owner: darz
+        group: darz
+        mode: "0600"
+      when: not invited.stat.exists
+
+    - name: Show the first Admin's Invite (single use; open it, then turn on TOTP)
+      ansible.builtin.debug:
+        msg: "{{ invite.stdout | trim }}"
+      when: not invited.stat.exists
+
+  handlers:
+    - name: Restart node_exporter
+      ansible.builtin.systemd_service:
+        name: prometheus-node-exporter
+        state: restarted
+
+    - name: Restart the Coordinator
+      ansible.builtin.systemd_service:
+        name: darz-coordinator
+        state: restarted
+        daemon_reload: true

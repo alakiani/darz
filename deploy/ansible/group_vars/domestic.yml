@@ -1,0 +1,4 @@
+# Domestic Nodes are Bridges, and Exits for traffic to Iran through their own
+# NIC (ADR 0004).
+darz_roles: [bridge, exit]
+darz_tags: [IR]

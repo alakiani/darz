@@ -1,0 +1,43 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 publishes a release the operator downloads with
+# scripts/fetch-release.sh and pushes with the playbooks.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build the panel
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build the release
+        run: scripts/build-release.sh "$GITHUB_REF_NAME" "$RUNNER_TEMP/release"
+
+      - name: Publish it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/release/* \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Download with scripts/fetch-release.sh $GITHUB_REF_NAME, then deploy with scripts/darz-ansible."

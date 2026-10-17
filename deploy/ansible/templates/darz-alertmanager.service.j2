@@ -1,0 +1,18 @@
+# Managed by coordinator.yml (ADR 0006).
+[Unit]
+Description=Alertmanager for DARZ
+After=network-online.target
+
+[Service]
+User=darz-monitor
+Group=darz-monitor
+ExecStart=/usr/local/lib/darz/alertmanager-{{ darz_versions.ALERTMANAGER }}/alertmanager \
+  --config.file=/etc/darz/alertmanager/alertmanager.yml \
+  --storage.path=/var/lib/darz-monitor/alertmanager \
+  --web.listen-address=127.0.0.1:9093 \
+  --cluster.listen-address=
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -117,6 +117,13 @@ func TestDeploy(t *testing.T) {
 				t.Errorf("rerunning %s changed %s tasks on %s", pb, changed, h)
 			}
 		}
+		// Every Link is up by now, so enroll.yml must not warn about one.
+		if pb == "enroll.yml" && strings.Contains(out, "Links on") {
+			t.Errorf("enroll.yml warned about Links that are up")
+		}
+	}
+	for _, n := range nodes {
+		f.mustExec(t, n, "command -v wg") // wireguard-tools, for debugging Links
 	}
 
 	// Upgrading keeps every Node's identity.

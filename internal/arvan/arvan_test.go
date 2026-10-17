@@ -87,3 +87,20 @@ func TestSetAReportsAPIErrors(t *testing.T) {
 		t.Error("want an error while the API fails")
 	}
 }
+
+// The panel shows a key as "apikey <key>"; operators paste it in any form.
+func TestNormalizeKey(t *testing.T) {
+	const key = "0a1b2c3d-4e5f-6789-abcd-ef0123456789"
+	for _, in := range []string{
+		key,
+		"apikey " + key,
+		"Apikey " + key,
+		"APIKEY " + key,
+		"apikey" + key, // the space lost on the way
+		"  apikey " + key + "\n",
+	} {
+		if got := NormalizeKey(in); got != key {
+			t.Errorf("NormalizeKey(%q) = %q, want the bare key", in, got)
+		}
+	}
+}

@@ -107,7 +107,7 @@ func serve(args []string, log *slog.Logger) error {
 		if err != nil {
 			return err
 		}
-		c.DNS = &arvan.Client{BaseURL: *arvanURL, APIKey: strings.TrimSpace(string(key)), Zone: *arvanZone, TTL: *arvanTTL,
+		c.DNS = &arvan.Client{BaseURL: *arvanURL, APIKey: arvan.NormalizeKey(string(key)), Zone: *arvanZone, TTL: *arvanTTL,
 			HTTP: &http.Client{Timeout: 30 * time.Second}}
 	}
 	if err := configureMonitoring(c, *adminCert, uint16(*monitorPort), *monitorFrom, *promTLSDir, *tgTokenFile, *tgChat); err != nil {

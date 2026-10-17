@@ -30,7 +30,7 @@
   tasks:
     - name: Install Ubuntu's packages
       ansible.builtin.apt:
-        name: "{{ ['nftables', 'prometheus-node-exporter'] + (['chrony'] if darz_chrony else []) }}"
+        name: "{{ ['nftables', 'prometheus-node-exporter', 'wireguard-tools'] + (['chrony'] if darz_chrony else []) }}"
         update_cache: true
         cache_valid_time: 3600
 
@@ -159,6 +159,38 @@
         mode: "0600"
       when: token.changed
       no_log: true
+
+    # The wizard's small UDP probe can pass where the filter still drops tunnel
+    # traffic, so check the Links themselves. A Link to a Node not enrolled
+    # yet is down too, so this warns rather than fails.
+    - name: Wait for this Node's Links to come up
+      ansible.builtin.uri:
+        url: "{{ darz_api_url }}/v1/nodes/{{ node.json.node.id }}"
+        headers: "{{ darz_api_headers }}"
+        ca_path: "{{ darz_api_ca_path or omit }}"
+      delegate_to: localhost
+      become: false
+      register: link_status
+      until: >-
+        link_status.json is defined
+        and (link_status.json.last_health.links | default([]) | length) > 0
+        and (link_status.json.last_health.links | rejectattr('up') | list | length) == 0
+      retries: 24
+      delay: 5
+      failed_when: false
+      no_log: true
+
+    - name: Warn about Links still down
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: {{ down | length }} of {{ links | length }} Links on {{ inventory_hostname }}
+          are down (Link {{ down | map(attribute='link_id') | join(', ') }}).
+          If they stay down, the filter is probably dropping tunnel traffic to the
+          other end; the admin panel's Links page names it.
+      vars:
+        links: "{{ ((link_status.json | default({})).last_health | default({})).links | default([]) }}"
+        down: "{{ links | rejectattr('up') | list }}"
+      when: links | length == 0 or down | length > 0
 
     - name: Report
       ansible.builtin.debug:

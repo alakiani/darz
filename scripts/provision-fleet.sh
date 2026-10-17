@@ -436,7 +436,9 @@ step "menu path in the current panel; ArvanCloud's docs search for 'API key' fin
 step "Create a key with DNS rights limited to 4miz.ir if the panel allows that, and copy it."
 check_arvan() {
   ask_secret ARVAN_API_KEY "Paste the API key:"
-  ARVAN_API_KEY="${ARVAN_API_KEY#Apikey }"; ARVAN_API_KEY="${ARVAN_API_KEY//[[:space:]]/}"
+  # The panel shows "apikey <key>"; keep only the key, whatever its case.
+  ARVAN_API_KEY="${ARVAN_API_KEY//[[:space:]]/}"
+  if [[ "$(lower "${ARVAN_API_KEY:0:6}")" == apikey ]]; then ARVAN_API_KEY="${ARVAN_API_KEY:6}"; fi
   curl -fsS -m 15 -H "Authorization: Apikey $ARVAN_API_KEY" \
     "https://napi.arvancloud.ir/cdn/4.0/domains/4miz.ir/dns-records" >/dev/null 2>&1 \
     || fail "ArvanCloud rejected that key for 4miz.ir" || return 1

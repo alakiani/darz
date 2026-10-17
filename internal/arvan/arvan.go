@@ -17,6 +17,16 @@ import (
 // DefaultBaseURL is ArvanCloud's CDN API.
 const DefaultBaseURL = "https://napi.arvancloud.ir/cdn/4.0"
 
+// NormalizeKey returns the bare API key from one pasted as ArvanCloud's
+// panel shows it, "apikey <key>", in any case and with or without the space.
+func NormalizeKey(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) > len("apikey") && strings.EqualFold(s[:len("apikey")], "apikey") {
+		s = strings.TrimSpace(s[len("apikey"):])
+	}
+	return s
+}
+
 // Client edits A records in one zone.
 type Client struct {
 	BaseURL string // DefaultBaseURL if empty

@@ -203,14 +203,61 @@ func TestDeriveCandidates(t *testing.T) {
 }
 
 func TestWeight(t *testing.T) {
-	if w := weight(1, 100*time.Millisecond, sc); w != 1 {
+	if w := weight(1, 1, 100*time.Millisecond, sc); w != 1 {
 		t.Errorf("under the floor: %v", w)
 	}
-	if w := weight(1, 300*time.Millisecond, sc); w != 0.5 {
+	if w := weight(1, 1, 300*time.Millisecond, sc); w != 0.5 {
 		t.Errorf("300 ms: %v, want 150/300", w)
 	}
-	if w := weight(0.5, 0, sc); w != 0.25 {
+	if w := weight(1, 0.5, 0, sc); w != 0.25 {
 		t.Errorf("availability squared: %v", w)
+	}
+	if w := weight(40, 0.5, 300*time.Millisecond, sc); w != 5 {
+		t.Errorf("40 Mbps × 0.5² × 150/300: %v, want 5", w)
+	}
+}
+
+// ADR 0008's worked example: one Bridge, the default Rule, three Exits.
+func TestWorkedExampleFromADR0008(t *testing.T) {
+	frankfurt := weight(8, 0.97, 90*time.Millisecond, sc)
+	amsterdam := weight(25, 1, 110*time.Millisecond, sc)
+	virginia := weight(60, 1, 230*time.Millisecond, sc)
+	for _, c := range []struct {
+		name      string
+		got, want float64
+	}{{"Frankfurt", frankfurt, 7.5}, {"Amsterdam", amsterdam, 25}, {"Virginia", virginia, 39}} {
+		if c.got < c.want-0.5 || c.got > c.want+0.5 {
+			t.Errorf("%s weight = %.2f, want about %v", c.name, c.got, c.want)
+		}
+	}
+	b := &bucketState{}
+	b.step(t0, []candidate{direct("fra", frankfurt, true), direct("ams", amsterdam, true), direct("vir", virginia, true)}, sc)
+	// 39% and 61% of 64 buckets.
+	if c := counts(b); c["fra"] != 0 || c["ams"] != 25 || c["vir"] != 39 {
+		t.Errorf("shares = %v, want Frankfurt cut off, Amsterdam 25, Virginia 39", c)
+	}
+}
+
+func TestUnmeasuredCandidatesCountAtTheBestFigure(t *testing.T) {
+	cs := []candidate{{key: "a", mbps: 30}, {key: "b"}, {key: "c", mbps: 10}}
+	fillThroughput(cs)
+	if cs[0].mbps != 30 || cs[1].mbps != 30 || cs[2].mbps != 10 {
+		t.Errorf("figures = %v %v %v, want 30 30 10", cs[0].mbps, cs[1].mbps, cs[2].mbps)
+	}
+	// With nothing measured yet, throughput leaves the weights alone.
+	none := []candidate{{key: "a"}, {key: "b"}}
+	fillThroughput(none)
+	if none[0].mbps != 1 || none[1].mbps != 1 {
+		t.Errorf("figures = %v %v, want 1 1", none[0].mbps, none[1].mbps)
+	}
+}
+
+func TestDeriveCandidatesCarriesTheLinkFigure(t *testing.T) {
+	exit := protocol.Peer{Roles: []protocol.Role{protocol.RoleExit}}
+	links := []link.Status{{ID: 1, Up: true, Peer: exit, PeerEgressOK: true, ThroughputMbps: 42}}
+	cs := deriveCandidates(defRule, protocol.NodeInfo{Roles: []protocol.Role{protocol.RoleBridge}}, false, links, false)
+	if len(cs) != 1 || cs[0].mbps != 42 {
+		t.Errorf("candidates = %+v, want link:1 at 42 Mbps", cs)
 	}
 }
 

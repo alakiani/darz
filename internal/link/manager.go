@@ -65,6 +65,11 @@ type Manager struct {
 	links   map[uint64]*linkState
 	insts   map[uint64]*instance
 	choices map[uint64]protocol.ListenChoice // this Node's choices as a listener
+
+	// A Bridge measures what each Link's far end can still send it.
+	bridge  bool
+	scoring protocol.Scoring
+	tputs   map[uint64]*throughput
 }
 
 type linkState struct {
@@ -87,7 +92,8 @@ func New(cfg Config) (*Manager, error) {
 		cfg.CheckEgress = checkEgress
 	}
 	m := &Manager{cfg: cfg, log: cfg.Log, timing: protocol.DefaultLinkTiming,
-		links: map[uint64]*linkState{}, insts: map[uint64]*instance{}, choices: map[uint64]protocol.ListenChoice{}}
+		links: map[uint64]*linkState{}, insts: map[uint64]*instance{}, choices: map[uint64]protocol.ListenChoice{},
+		scoring: protocol.DefaultScoring, tputs: map[uint64]*throughput{}}
 	m.ctx, m.stop = context.WithCancel(context.Background())
 
 	keyPath := filepath.Join(cfg.StateDir, keyFile)
@@ -125,14 +131,22 @@ func New(cfg Config) (*Manager, error) {
 // PublicKey is the Node's Link public key.
 func (m *Manager) PublicKey() string { return m.key.PublicKey().String() }
 
-// Run answers probes, chooses each Link's active instance, and runs the
-// egress check, until ctx ends. Instances stay up after it returns.
+// Run answers probes and throughput tests, chooses each Link's active
+// instance, runs the egress check and, on a Bridge, the throughput tests,
+// until ctx ends. Instances stay up after it returns.
 func (m *Manager) Run(ctx context.Context) error {
 	defer m.stop()
 	conn, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", ProbePort))
 	if err != nil {
 		return fmt.Errorf("probe port: %w", err)
 	}
+	tln, err := net.Listen("tcp4", fmt.Sprintf(":%d", ThroughputPort))
+	if err != nil {
+		conn.Close()
+		return fmt.Errorf("throughput port: %w", err)
+	}
+	go serveThroughput(ctx, tln, m.isLinkAddr)
+	go m.throughputLoop(ctx)
 	go serveProbes(ctx, &wakingConn{conn, m}, func() Flags {
 		f := Flags{EgressOK: m.egressOK.Load()}
 		if t := m.transit.Load(); t != nil {
@@ -203,6 +217,10 @@ func (m *Manager) Apply(ctx context.Context, st protocol.State) error {
 	if slices.Contains(st.Node.Roles, protocol.RoleExit) {
 		m.egress = st.EgressCheck
 	}
+	m.bridge, m.scoring = slices.Contains(st.Node.Roles, protocol.RoleBridge), protocol.DefaultScoring
+	if st.Bridge != nil {
+		m.scoring = st.Bridge.Scoring
+	}
 
 	want := map[uint64]bool{}
 	wantIface := map[string]bool{}
@@ -259,6 +277,11 @@ func (m *Manager) Apply(ctx context.Context, st protocol.State) error {
 	for id := range m.links {
 		if links[id] == nil {
 			flushTable(ctx, id)
+		}
+	}
+	for id := range m.tputs {
+		if links[id] == nil {
+			delete(m.tputs, id)
 		}
 	}
 	m.links = links
@@ -395,6 +418,8 @@ type Status struct {
 	RTT              time.Duration
 	PeerEgressOK     bool
 	PeerTransitRules []uint32
+	// ThroughputMbps is the Link's throughput figure, 0 until measured.
+	ThroughputMbps float64
 }
 
 // LinkStatus returns every Link of this Node, by id.
@@ -405,6 +430,9 @@ func (m *Manager) LinkStatus() []Status {
 	for _, id := range slices.Sorted(maps.Keys(m.links)) {
 		ls := m.links[id]
 		st := Status{ID: id, Peer: ls.peer, Up: ls.active != 0 && ls.routed, Table: linkTable(id)}
+		if tp := m.tputs[id]; tp != nil {
+			st.ThroughputMbps = tp.mbps
+		}
 		if in := m.insts[ls.active]; st.Up && in != nil {
 			st.Iface = in.iface()
 			in.mu.Lock()
@@ -437,6 +465,9 @@ func (m *Manager) Report(h *protocol.Health) {
 	for _, id := range slices.Sorted(maps.Keys(m.links)) {
 		ls := m.links[id]
 		lh := protocol.LinkHealth{LinkID: id, Up: ls.active != 0, ActiveInstance: ls.active, LastSuccessSeconds: -1, Instances: []protocol.InstanceHealth{}}
+		if tp := m.tputs[id]; tp != nil {
+			lh.ThroughputMbps = tp.mbps
+		}
 		for _, iid := range ls.order {
 			in := m.insts[iid]
 			if in == nil {

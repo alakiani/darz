@@ -362,6 +362,7 @@ func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
 		}{{"dev", p.dev, false}, {"tr", p.tr, true}} {
 			cands := deriveCandidates(r, p.st.Node, selfEgress, links, view.transit)
 			eligible, ownEligible := 0, false
+			fillThroughput(cands)
 			for i := range cands {
 				c := &cands[i]
 				key := fmt.Sprintf("%d|%s|%s", r.ID, view.name, c.key)
@@ -371,7 +372,7 @@ func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
 					p.avail[key] = a
 				}
 				a.observe(now, c.eligible)
-				c.weight = weight(a.value(now, b.Scoring), c.rtt, b.Scoring)
+				c.weight = weight(c.mbps, a.value(now, b.Scoring), c.rtt, b.Scoring)
 				if c.eligible {
 					eligible++
 					ownEligible = ownEligible || c.kind != candTransit

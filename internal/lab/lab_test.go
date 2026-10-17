@@ -4,6 +4,7 @@ package lab_test
 
 import (
 	"errors"
+	"io"
 	"net"
 	"net/netip"
 	"os"
@@ -56,6 +57,18 @@ func TestLab(t *testing.T) {
 		mustNotEcho(t, n1, n2, 5000)
 		l.ClearNetem(n1)
 		mustEcho(t, n1, n2, 5000)
+	}
+
+	// Netem rate limits a node's uplink.
+	{
+		l.Netem(n1, lab.Impairment{Rate: 8_000_000})
+		if mbps := tcpMbps(t, n1, n2, 6000); mbps < 5 || mbps > 9 {
+			t.Errorf("TCP from a node limited to 8 Mbit/s ran at %.1f Mbit/s", mbps)
+		}
+		l.ClearNetem(n1)
+		if mbps := tcpMbps(t, n1, n2, 6001); mbps < 50 {
+			t.Errorf("TCP after clearing the limit ran at %.1f Mbit/s, want far more than 8", mbps)
+		}
 	}
 
 	// Counters count matching packets, including ones the filter drops.
@@ -164,4 +177,46 @@ func mustNotEcho(t *testing.T, from, to *lab.Node, port uint16) {
 	if _, err := echo(from, to, port, 500*time.Millisecond); err == nil {
 		t.Fatalf("echo %s -> %s:%d got a reply, want it dropped", from.Name(), to.Name(), port)
 	}
+}
+
+// tcpMbps sends as much as it can from `from` to `to` over TCP for about 2
+// seconds and returns the rate the receiver saw.
+func tcpMbps(t *testing.T, from, to *lab.Node, port uint16) float64 {
+	t.Helper()
+	var ln net.Listener
+	if err := to.Do(func() (err error) {
+		ln, err = net.Listen("tcp4", netip.AddrPortFrom(to.Addr(), port).String())
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	got := make(chan float64, 1)
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			got <- 0
+			return
+		}
+		defer c.Close()
+		start := time.Now()
+		n, _ := io.Copy(io.Discard, c)
+		got <- float64(n) * 8 / time.Since(start).Seconds() / 1e6
+	}()
+	var conn net.Conn
+	if err := from.Do(func() (err error) {
+		conn, err = net.Dial("tcp4", netip.AddrPortFrom(to.Addr(), port).String())
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 64<<10)
+	conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
+	for {
+		if _, err := conn.Write(buf); err != nil {
+			break
+		}
+	}
+	conn.Close()
+	return <-got
 }

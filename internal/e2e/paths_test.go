@@ -61,6 +61,11 @@ func TestPathSelection(t *testing.T) {
 	co.c.Scoring = sc
 	egressTargets(t, co, l.Node("egress-ab"), l.Node("egress-ir"))
 	dumpNetOnFailure(t, l, "ir1", "ir3", "ab1", "ab2")
+	// Equal capacities, so throughput tests that land during the test
+	// keep the shares equal; unlimited, they would measure CPU noise.
+	for _, ab := range []string{"ab1", "ab2"} {
+		l.Netem(l.Node(ab), lab.Impairment{Rate: 50_000_000})
+	}
 
 	co.c.FeedURL, co.c.RIPEstatURL = serveFeed(t, irFeed("2.144.0.0/14", "2.176.0.0/12", "5.0.0.0/8")), ""
 	if err := co.c.RefreshIRFeed(ctx); err != nil {

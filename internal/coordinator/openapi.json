@@ -606,6 +606,9 @@
           "rtt_ms": {
             "type": "number"
           },
+          "throughput_mbps": {
+            "type": "number"
+          },
           "transport": {
             "type": "string"
           },

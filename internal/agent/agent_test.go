@@ -257,6 +257,43 @@ func TestRestartReappliesPersistedSnapshotWithoutCoordinator(t *testing.T) {
 	})
 }
 
+// After an upgrade, the snapshot on disk may have been saved by an older
+// Agent that dropped fields it did not know. On restart the Agent must take
+// the Coordinator's copy, even when its version is the one on disk.
+func TestRestartRefetchesTheCurrentSnapshot(t *testing.T) {
+	rg := newRig(t)
+	created := rg.admin.CreateNode(t, protocol.CreateNodeRequest{Name: "x1", Roles: []protocol.Role{"exit"}})
+	dir := t.TempDir()
+	nw := &network{}
+	first := rg.startAgent(t, dir, created.EnrollmentToken, &applier{}, nw)
+	path := filepath.Join(dir, "state.json")
+	testutil.Eventually(t, 5*time.Second, "version 1 confirmed and persisted", func() bool {
+		b, err := os.ReadFile(path)
+		return err == nil && strings.Contains(string(b), `"version": 1`)
+	})
+	if err := first.stop(); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale := strings.ReplaceAll(string(b), `"name": "x1"`, `"name": "stale"`)
+	if stale == string(b) {
+		t.Fatal("found no Node name to make stale in state.json")
+	}
+	if err := os.WriteFile(path, []byte(stale), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	app := &applier{}
+	rg.startAgent(t, dir, "", app, nw)
+	testutil.Eventually(t, 10*time.Second, "the Coordinator's copy of version 1 applied", func() bool {
+		st, _ := app.last()
+		return st.Node.Name == "x1"
+	})
+}
+
 func TestEnrollmentTokenWorksOnce(t *testing.T) {
 	rg := newRig(t)
 	created := rg.admin.CreateNode(t, protocol.CreateNodeRequest{Name: "b1", Roles: []protocol.Role{"bridge"}})

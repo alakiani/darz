@@ -157,3 +157,25 @@ func TestBucketUpdatesTouchOnlyMovedBuckets(t *testing.T) {
 		t.Error("no change produced updates")
 	}
 }
+
+// A GRE instance whose peer address is missing, such as one from a snapshot
+// an older Agent saved, must not break the whole ruleset (nft rejects an
+// empty set).
+func TestGREPeerWithoutAddressIsLeftOut(t *testing.T) {
+	for _, peers := range [][]string{{""}, {"", "203.0.113.9"}, {"not-an-ip"}} {
+		r := ruleset{Exit: true, LinkIfaces: map[string]uint64{"dz3l": 7}, Uplink: "eth0",
+			GREIfaces: []string{"dz3l"}, GREPeers: peers}
+		got := render(r)
+		if strings.Contains(got, "{  }") || strings.Contains(got, "{ ,") || strings.Contains(got, "not-an-ip") {
+			t.Errorf("peers %q render an invalid set:\n%s", peers, got)
+		}
+		if !strings.Contains(got, "\t\tmeta l4proto gre drop\n") {
+			t.Errorf("peers %q: GRE is no longer dropped by default", peers)
+		}
+	}
+	got := render(ruleset{Exit: true, LinkIfaces: map[string]uint64{"dz3l": 7}, Uplink: "eth0",
+		GREIfaces: []string{"dz3l"}, GREPeers: []string{"", "203.0.113.9"}})
+	if !strings.Contains(got, "meta l4proto gre ip saddr { 203.0.113.9 } accept") {
+		t.Errorf("the valid peer was lost:\n%s", got)
+	}
+}

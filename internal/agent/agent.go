@@ -495,11 +495,18 @@ func (a *agent) healthLoop(ctx context.Context) {
 }
 
 func (a *agent) pollLoop(ctx context.Context) {
+	// The first poll asks for the current snapshot whatever the version on
+	// disk: an older Agent may have saved that version without fields it
+	// did not know, as happened when GRE arrived (ADR 0009).
+	fresh := false
 	for ctx.Err() == nil {
 		a.mu.Lock()
 		unreported := len(a.st.Unreported) > 0
 		after := a.current
 		a.mu.Unlock()
+		if !fresh {
+			after = 0
+		}
 
 		// Tell the Coordinator about a revert before asking for more, or it
 		// would hand back the same bad version.
@@ -521,10 +528,12 @@ func (a *agent) pollLoop(ctx context.Context) {
 				sleep(ctx, a.cfg.RetryInterval)
 			}
 		case status == http.StatusNoContent:
+			fresh = true
 		case a.isBad(snap.Version):
 			// The Coordinator has not taken in our report yet.
 			sleep(ctx, a.cfg.RetryInterval)
 		default:
+			fresh = true
 			a.applyAndConfirm(ctx, snap)
 		}
 	}

@@ -58,7 +58,7 @@ func (k *KernelWireGuard) Up(ctx context.Context, c InstanceConfig) error {
 	if err := k.client.ConfigureDevice(c.Iface, cfg); err != nil {
 		return err
 	}
-	return address(ctx, c)
+	return address(ctx, c, c.MTU())
 }
 
 func (k *KernelWireGuard) Down(ctx context.Context, iface string) error {

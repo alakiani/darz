@@ -8,8 +8,9 @@
 // Node's uplink; the filter (nftables) sits in the internet namespace, in the
 // path of every packet between two Nodes.
 //
-// The lab needs root, iproute2, tc with the sch_netem module, and nft. Tests
-// that use it skip themselves when not run as root.
+// The lab needs root, iproute2, tc with the sch_netem module, and nft; GRE
+// between Nodes needs the ip_gre module. Tests that use it skip themselves
+// when not run as root.
 package lab
 
 import (
@@ -231,7 +232,8 @@ func (l *Lab) ClearNetem(n *Node) {
 
 func tcTime(d time.Duration) string { return fmt.Sprintf("%dus", d.Microseconds()) }
 
-// FilterMatch describes packets the filter drops. Build one with DropUDP or DropAll.
+// FilterMatch describes packets the filter drops. Build one with DropUDP,
+// DropAll, DropBetween, DropUDPBetween or DropGREBetween.
 type FilterMatch struct{ expr string }
 
 // DropUDP matches UDP packets to n on the given port.
@@ -248,6 +250,21 @@ func DropAll(n *Node) FilterMatch {
 func DropBetween(a, b *Node) FilterMatch {
 	set := fmt.Sprintf("{ %s, %s }", a.addr, b.addr)
 	return FilterMatch{fmt.Sprintf("ip saddr %s ip daddr %s", set, set)}
+}
+
+// DropUDPBetween matches every UDP packet between two Nodes, in both
+// directions, and nothing else: GRE between them still passes.
+func DropUDPBetween(a, b *Node) FilterMatch {
+	set := fmt.Sprintf("{ %s, %s }", a.addr, b.addr)
+	return FilterMatch{fmt.Sprintf("ip saddr %s ip daddr %s meta l4proto udp", set, set)}
+}
+
+// DropGREBetween matches every GRE packet (IP protocol 47) between two
+// Nodes, in both directions, and nothing else: UDP between them still
+// passes.
+func DropGREBetween(a, b *Node) FilterMatch {
+	set := fmt.Sprintf("{ %s, %s }", a.addr, b.addr)
+	return FilterMatch{fmt.Sprintf("ip saddr %s ip daddr %s meta l4proto gre", set, set)}
 }
 
 // FilterRule is one rule installed in the filter.

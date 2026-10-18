@@ -109,10 +109,10 @@ func TestDownSinceAndLinkKey(t *testing.T) {
 	}
 }
 
-func TestTransportListDefaultsToBoth(t *testing.T) {
+func TestTransportListDefaultsToAll(t *testing.T) {
 	s := open(t, newClock())
 	ts, err := s.Transports(ctx)
-	if err != nil || len(ts) != 2 || ts[0] != protocol.TransportWireGuard {
+	if err != nil || len(ts) != 3 || ts[0] != protocol.TransportWireGuard || ts[2] != protocol.TransportGRE {
 		t.Fatalf("default transports = %v, %v", ts, err)
 	}
 	s.SetTransports(ctx, []protocol.Transport{protocol.TransportAmneziaWG})

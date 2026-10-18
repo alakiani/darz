@@ -2,6 +2,8 @@ package dataplane
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -10,36 +12,132 @@ import (
 	"time"
 )
 
-// resolver is the Bridge's DNS relay (ADR 0004, amended in MVP 04). It
-// passes Devices' queries, UDP and TCP, to public resolvers abroad and
-// their answers back, without parsing or logging anything. Its upstream
+// resolver is the Bridge's DNS relay (ADR 0004, amended in MVP 04 and by
+// ADR 0009). It passes Devices' queries, UDP and TCP, to public resolvers
+// abroad and their answers back, without parsing or logging anything. It
+// asks them over DNS over TLS on port 853: a Link may carry traffic on
+// plain GRE, and the filter rewrites DNS answers on port 53. Its upstream
 // sockets carry the default Rule's mark, so its queries leave through an
 // abroad Exit rather than the domestic uplink.
 type resolver struct {
 	listen       string // host:port
 	upstreams    []string
-	upstreamPort string        // "53"; tests point it elsewhere
-	mark         func() uint32 // the mark upstream sockets carry, read per query
+	upstreamPort string         // "853"; tests point it elsewhere
+	roots        *x509.CertPool // what upstream certificates verify against; nil for the system's
+	mark         func() uint32  // the mark upstream sockets carry, read per query
 
 	udpAddr, tcpAddr string // where it ended up listening
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+
+	sessions tls.ClientSessionCache
+	mu       sync.Mutex
+	idle     map[string][]*upstreamConn // by upstream, most recently used last
+}
+
+// upstreamConn is one DNS-over-TLS connection, kept between queries so a
+// query costs one round trip abroad rather than three.
+type upstreamConn struct {
+	*tls.Conn
+	mark     uint32 // the mark it was dialled with
+	lastUsed time.Time
 }
 
 const (
 	upstreamTimeout = 3 * time.Second
 	tcpIdle         = 10 * time.Second
+	// Idle upstream connections are kept this long, a few per upstream.
+	upstreamIdle       = 20 * time.Second
+	maxIdlePerUpstream = 4
 )
 
 func newResolver(listen string, upstreams []string, mark func() uint32) *resolver {
-	return &resolver{listen: listen, upstreams: upstreams, upstreamPort: "53", mark: mark}
+	return &resolver{listen: listen, upstreams: upstreams, upstreamPort: "853", mark: mark,
+		sessions: tls.NewLRUClientSessionCache(16), idle: map[string][]*upstreamConn{}}
 }
 
-// dialer carries the mark in force now, so the resolver's queries follow
-// the default Rule's buckets as they move.
-func (r *resolver) dialer() *net.Dialer {
-	return &net.Dialer{Timeout: upstreamTimeout, Control: markControl(r.mark())}
+// exchange asks one upstream one query over a pooled connection, or a new
+// one. A pooled connection the upstream has closed in the meantime fails
+// at once, and the query goes again over a fresh connection.
+func (r *resolver) exchange(ctx context.Context, upstream string, query []byte) ([]byte, error) {
+	mark := r.mark()
+	if c := r.takeIdle(upstream, mark); c != nil {
+		if answer, err := c.ask(query); err == nil {
+			r.putIdle(upstream, c)
+			return answer, nil
+		}
+		c.Close()
+	}
+	c, err := r.dial(ctx, upstream, mark)
+	if err != nil {
+		return nil, err
+	}
+	answer, err := c.ask(query)
+	if err != nil {
+		c.Close()
+		return nil, err
+	}
+	r.putIdle(upstream, c)
+	return answer, nil
+}
+
+// dial opens a DNS-over-TLS connection carrying mark, the one in force
+// now, so the resolver's queries follow the default Rule's buckets as they
+// move. Upstreams are named by IP address, which their certificates carry.
+func (r *resolver) dial(ctx context.Context, upstream string, mark uint32) (*upstreamConn, error) {
+	d := &tls.Dialer{
+		NetDialer: &net.Dialer{Timeout: upstreamTimeout, Control: markControl(mark)},
+		Config:    &tls.Config{ServerName: upstream, RootCAs: r.roots, MinVersion: tls.VersionTLS12, ClientSessionCache: r.sessions},
+	}
+	ctx, cancel := context.WithTimeout(ctx, upstreamTimeout)
+	defer cancel()
+	c, err := d.DialContext(ctx, "tcp4", net.JoinHostPort(upstream, r.upstreamPort))
+	if err != nil {
+		return nil, err
+	}
+	return &upstreamConn{Conn: c.(*tls.Conn), mark: mark}, nil
+}
+
+func (c *upstreamConn) ask(query []byte) ([]byte, error) {
+	c.SetDeadline(time.Now().Add(upstreamTimeout))
+	if err := writeMsg(c, query); err != nil {
+		return nil, err
+	}
+	return readMsg(c)
+}
+
+// takeIdle returns a pooled connection to upstream dialled with mark, if
+// one is fresh enough. Older or differently marked ones are closed.
+func (r *resolver) takeIdle(upstream string, mark uint32) *upstreamConn {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.idle == nil { // stopped
+		return nil
+	}
+	list := r.idle[upstream]
+	for len(list) > 0 {
+		c := list[len(list)-1]
+		list = list[:len(list)-1]
+		if c.mark == mark && time.Since(c.lastUsed) < upstreamIdle {
+			r.idle[upstream] = list
+			return c
+		}
+		c.Close()
+	}
+	r.idle[upstream] = list
+	return nil
+}
+
+func (r *resolver) putIdle(upstream string, c *upstreamConn) {
+	c.lastUsed = time.Now()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.idle == nil || len(r.idle[upstream]) >= maxIdlePerUpstream {
+		c.Close()
+		return
+	}
+	r.idle[upstream] = append(r.idle[upstream], c)
 }
 
 // start listens on both UDP and TCP.
@@ -88,6 +186,14 @@ func (r *resolver) stop() {
 		r.cancel()
 		r.wg.Wait()
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, list := range r.idle {
+		for _, c := range list {
+			c.Close()
+		}
+	}
+	r.idle = nil
 }
 
 func (r *resolver) serveUDP(ctx context.Context, conn net.PacketConn) {
@@ -99,30 +205,20 @@ func (r *resolver) serveUDP(ctx context.Context, conn net.PacketConn) {
 			return
 		}
 		go func() {
-			if answer, err := r.askUDP(ctx, buf[:n]); err == nil {
+			if answer, err := r.ask(ctx, buf[:n]); err == nil {
 				conn.WriteTo(answer, from)
 			}
 		}()
 	}
 }
 
-// askUDP tries each upstream in turn.
-func (r *resolver) askUDP(ctx context.Context, query []byte) ([]byte, error) {
+// ask tries each upstream in turn.
+func (r *resolver) ask(ctx context.Context, query []byte) ([]byte, error) {
 	err := errors.New("no upstream resolver")
 	for _, up := range r.upstreams {
-		var c net.Conn
-		if c, err = r.dialer().DialContext(ctx, "udp4", net.JoinHostPort(up, r.upstreamPort)); err != nil {
-			continue
-		}
-		c.SetDeadline(time.Now().Add(upstreamTimeout))
-		buf := make([]byte, 4096)
-		var n int
-		if _, err = c.Write(query); err == nil {
-			n, err = c.Read(buf)
-		}
-		c.Close()
-		if err == nil {
-			return buf[:n], nil
+		var answer []byte
+		if answer, err = r.exchange(ctx, up, query); err == nil {
+			return answer, nil
 		}
 	}
 	return nil, err
@@ -138,7 +234,7 @@ func (r *resolver) serveTCP(ctx context.Context, c net.Conn) {
 		if err != nil {
 			return
 		}
-		answer, err := r.askTCP(ctx, query)
+		answer, err := r.ask(ctx, query)
 		if err != nil {
 			return
 		}
@@ -146,26 +242,6 @@ func (r *resolver) serveTCP(ctx context.Context, c net.Conn) {
 			return
 		}
 	}
-}
-
-func (r *resolver) askTCP(ctx context.Context, query []byte) ([]byte, error) {
-	err := errors.New("no upstream resolver")
-	for _, up := range r.upstreams {
-		var c net.Conn
-		if c, err = r.dialer().DialContext(ctx, "tcp4", net.JoinHostPort(up, r.upstreamPort)); err != nil {
-			continue
-		}
-		c.SetDeadline(time.Now().Add(upstreamTimeout))
-		var answer []byte
-		if err = writeMsg(c, query); err == nil {
-			answer, err = readMsg(c)
-		}
-		c.Close()
-		if err == nil {
-			return answer, nil
-		}
-	}
-	return nil, err
 }
 
 func readMsg(r io.Reader) ([]byte, error) {

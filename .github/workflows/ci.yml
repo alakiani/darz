@@ -43,6 +43,8 @@ jobs:
           sudo apt-get install -y "linux-modules-extra-$(uname -r)" || true
           sudo modprobe sch_netem
           sudo modprobe wireguard
+          # GRE Transport instances (ADR 0009).
+          sudo modprobe ip_gre
 
       - name: Check formatting
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
@@ -115,6 +117,7 @@ jobs:
       - name: Prepare the host
         run: |
           sudo modprobe wireguard
+          sudo modprobe ip_gre
           echo "172.30.0.10 4miz.ir" | sudo tee -a /etc/hosts
 
       - name: Test the playbooks

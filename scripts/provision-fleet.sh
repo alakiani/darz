@@ -266,10 +266,23 @@ rent_node() {
   retry "$(val "${p}_NAME"): SSH, Ubuntu 26.04 or sudo check" check_host "$p"
 }
 
+# gre_tunnel IP USER REMOTE INNER: a throwaway GRE interface on the VM at IP,
+# from its own interface address to REMOTE, with INNER as its /30 address.
+# Passing no INNER deletes it.
+gre_tunnel() {
+  local cmd="sudo ip link del darzchk 2>/dev/null; true"
+  if [[ -n "${4:-}" ]]; then
+    cmd="$cmd; src=\$(ip -4 route get $3 | sed -n 's/.* src \([0-9.]*\).*/\1/p'); sudo modprobe ip_gre;"
+    cmd="$cmd sudo ip link add darzchk type gre local \$src remote $3 ttl 64 && sudo ip addr add $4/30 dev darzchk && sudo ip link set darzchk up"
+  fi
+  remote "$2" "$1" "$cmd" >/dev/null 2>&1
+}
+
 # check_crossing PREFIX: a domestic VM reaches both abroad Nodes over UDP on a
-# high port (what Links use) and reaches the web abroad over HTTPS.
+# high port and over GRE (IP protocol 47), what Links use (ADR 0009), and
+# reaches the web abroad over HTTPS.
 check_crossing() {
-  local dip duser a aip auser out pid code bad=0
+  local dip duser a aip auser out pid code bad=0 gre_bad=0
   dip=$(val "$1_IP"); duser=$(val "$1_USER")
   for a in ABROAD1 ABROAD2; do
     aip=$(val "${a}_IP"); auser=$(val "${a}_USER"); out=$(mktemp)
@@ -280,7 +293,20 @@ check_crossing() {
     if grep -q darz-probe "$out"; then ok "UDP $PROBE_PORT reaches $(val "${a}_NAME") ($aip)"
     else warn "UDP from $dip never reached $(val "${a}_NAME") ($aip) on port $PROBE_PORT"; bad=1; fi
     rm -f "$out"
+    # GRE both ways: a tunnel between the two public addresses, through
+    # any NAT in front of either, and a ping across it from the domestic end.
+    gre_tunnel "$aip" "$auser" "$dip" 10.255.255.2
+    gre_tunnel "$dip" "$duser" "$aip" 10.255.255.1
+    if remote "$duser" "$dip" "ping -c 3 -W 2 10.255.255.2" >/dev/null 2>&1; then ok "GRE reaches $(val "${a}_NAME") ($aip) and back"
+    else warn "GRE (IP protocol 47) between $dip and $(val "${a}_NAME") ($aip) doesn't get through"; gre_bad=1; fi
+    gre_tunnel "$dip" "$duser"
+    gre_tunnel "$aip" "$auser"
   done
+  if (( gre_bad )); then
+    note "GRE is the first Transport on Links that cross the filter; without it they fall back to UDP."
+    note "Check both providers' firewalls (security groups) allow IP protocol 47, or all traffic, between these VMs."
+    bad=1
+  fi
   code=$(remote "$duser" "$dip" "curl -sS -m 10 -o /dev/null -w '%{http_code}' https://www.cloudflare.com/" 2>/dev/null || true)
   if [[ "$code" =~ ^[23] ]]; then ok "HTTPS abroad works"; else warn "HTTPS abroad failed (got '${code:-nothing}')"; bad=1; fi
   if (( bad )); then
@@ -344,7 +370,7 @@ stage "Abroad Node 1"
 say "Rent the first abroad VM. It will be an Exit."
 step "Any provider outside Iran; 1–2 vCPU, 1–2 GB RAM, generous traffic, and a public IPv4."
 step "Image: Ubuntu 26.04. Add your SSH key when creating it."
-step "If the provider has a cloud firewall, allow inbound UDP (all ports) and TCP 22."
+step "If the provider has a cloud firewall, allow inbound UDP (all ports), IP protocol 47 (GRE) and TCP 22."
 pause "Press Enter once it's running."
 rent_node ABROAD1 "de-1"
 pause
@@ -369,7 +395,7 @@ step "Ubuntu 26.04, your SSH key, a public IPv4, inbound UDP allowed."
 pause "Press Enter once it's running."
 rent_node DOM1 "ir-1"
 say "Checking that this VM can reach your abroad Nodes…"
-retry "$(val DOM1_NAME): reaching abroad over UDP and HTTPS" check_crossing DOM1
+retry "$(val DOM1_NAME): reaching abroad over UDP, GRE and HTTPS" check_crossing DOM1
 pause
 
 # ── 5 ─────────────────────────────────────────────────────────────────────
@@ -383,7 +409,7 @@ if [[ "${DOM2_ASN%% *}" == "${DOM1_ASN%% *}" ]]; then
   confirm "Keep it anyway?" || SKIPPED+=("move the second domestic Node to another AS")
 fi
 say "Checking that this VM can reach your abroad Nodes…"
-retry "$(val DOM2_NAME): reaching abroad over UDP and HTTPS" check_crossing DOM2
+retry "$(val DOM2_NAME): reaching abroad over UDP, GRE and HTTPS" check_crossing DOM2
 pause
 
 # ── 6 ─────────────────────────────────────────────────────────────────────

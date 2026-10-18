@@ -4,13 +4,23 @@ package e2e
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -67,23 +77,34 @@ func whoami(t *testing.T, n *lab.Node, port int) {
 	}()
 }
 
-// dnsServer stands in for a public resolver: it answers each UDP query and
-// each length-prefixed TCP query with the source address it saw.
-func dnsServer(t *testing.T, n *lab.Node) {
+// dnsServer stands in for a public resolver: it answers each UDP query,
+// and each length-prefixed query over TCP or over TLS on port 853, with
+// the source address it saw. Its certificate is for its IP address, as
+// public resolvers' are; it returns the file of the root that signs it,
+// for the Agents' -upstream-ca.
+func dnsServer(t *testing.T, n *lab.Node) (caFile string) {
 	t.Helper()
+	cert, caPEM := ipCert(t, n.Addr())
+	caFile = filepath.Join(t.TempDir(), "upstream-ca.pem")
+	if err := os.WriteFile(caFile, caPEM, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	addr := net.JoinHostPort(n.Addr().String(), "53")
 	var udp net.PacketConn
-	var tcp net.Listener
+	var tcp, dot net.Listener
 	if err := n.Do(func() (err error) {
 		if udp, err = net.ListenPacket("udp4", addr); err != nil {
 			return err
 		}
-		tcp, err = net.Listen("tcp4", addr)
+		if tcp, err = net.Listen("tcp4", addr); err != nil {
+			return err
+		}
+		dot, err = tls.Listen("tcp4", net.JoinHostPort(n.Addr().String(), "853"), &tls.Config{Certificates: []tls.Certificate{cert}})
 		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { udp.Close(); tcp.Close() })
+	t.Cleanup(func() { udp.Close(); tcp.Close(); dot.Close() })
 	go func() {
 		buf := make([]byte, 1500)
 		for {
@@ -94,25 +115,56 @@ func dnsServer(t *testing.T, n *lab.Node) {
 			udp.WriteTo([]byte("dns:"+from.(*net.UDPAddr).IP.String()), from)
 		}
 	}()
-	go func() {
-		for {
-			c, err := tcp.Accept()
-			if err != nil {
-				return
-			}
-			go func() {
-				defer c.Close()
-				host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
-				var n [2]byte
-				if _, err := io.ReadFull(c, n[:]); err != nil {
+	for _, ln := range []net.Listener{tcp, dot} {
+		go func() {
+			for {
+				c, err := ln.Accept()
+				if err != nil {
 					return
 				}
-				io.CopyN(io.Discard, c, int64(n[0])<<8|int64(n[1]))
-				answer := "dns:" + host
-				c.Write(append([]byte{0, byte(len(answer))}, answer...))
-			}()
-		}
-	}()
+				go func() {
+					defer c.Close()
+					host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
+					for { // as many queries as the connection carries
+						var n [2]byte
+						if _, err := io.ReadFull(c, n[:]); err != nil {
+							return
+						}
+						io.CopyN(io.Discard, c, int64(n[0])<<8|int64(n[1]))
+						answer := "dns:" + host
+						c.Write(append([]byte{0, byte(len(answer))}, answer...))
+					}
+				}()
+			}
+		}()
+	}
+	return caFile
+}
+
+// ipCert is a certificate for addr, signed by a fresh root, and the root
+// in PEM.
+func ipCert(t *testing.T, addr netip.Addr) (tls.Certificate, []byte) {
+	t.Helper()
+	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caTmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "lab resolver root"},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour),
+		IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caCert, _ := x509.ParseCertificate(caDER)
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: addr.String()},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour),
+		IPAddresses: []net.IP{addr.AsSlice()}, KeyUsage: x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, caCert, &key.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key},
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})
 }
 
 // phone is a lab Node set up as a Device: stock WireGuard to a Bridge, with
@@ -233,8 +285,9 @@ func irFeed(prefixes ...string) string {
 
 // TestDataPlane is session 4's "proves in the lab" test: a lab Device
 // reaches an abroad address through an abroad Exit and a domestic address
-// through an IR Node; DNS goes abroad; a hostile feed update is rejected
-// and the last good set stays.
+// through an IR Node; DNS goes abroad, and leaves the Bridge only as DNS
+// over TLS (ADR 0009); a hostile feed update is rejected and the last good
+// set stays.
 func TestDataPlane(t *testing.T) {
 	binDir(t)
 	if out, err := execCommand("modprobe", "wireguard"); err != nil {
@@ -275,7 +328,10 @@ func TestDataPlane(t *testing.T) {
 	whoami(t, l.Node("web-ir"), 7)
 	whoami(t, l.Node("web-ir"), 853)
 	whoami(t, l.Node("web-ab"), 7)
-	dnsServer(t, l.Node("dns-ab"))
+	upstreamCA := dnsServer(t, l.Node("dns-ab"))
+	// What leaves for the upstream resolver, wherever it leaves from.
+	plainDNS := l.Count("ip daddr 9.9.9.9 meta l4proto { tcp, udp } th dport 53")
+	dotDNS := l.Count("ip daddr 9.9.9.9 tcp dport 853")
 
 	// Two Devices of one User.
 	user, err := co.store.CreateUser(ctx, "maryam")
@@ -293,7 +349,8 @@ func TestDataPlane(t *testing.T) {
 		addrs[i] = d.Address
 	}
 
-	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{}}
+	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{},
+		agentArgs: []string{"-upstream-ca", upstreamCA}}
 	m.startAgent("ir1", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ir2", []protocol.Role{protocol.RoleExit}, []string{"IR"})
 	m.startAgent("ir3", []protocol.Role{protocol.RoleBridge, protocol.RoleExit}, []string{"IR"})
@@ -332,6 +389,15 @@ func TestDataPlane(t *testing.T) {
 	// whose queries leave abroad.
 	p1.leavesFrom("DNS over UDP", udp(p1, "8.8.8.8:53"), "dns:"+ab1, 30*time.Second)
 	p1.leavesFrom("DNS over TCP", tcp(p1, "8.8.8.8:53", true), "dns:"+ab1, 30*time.Second)
+	p2.leavesFrom("DNS from the other Bridge", udp(p2, "10.77.0.1:53"), "dns:"+ab1, 30*time.Second)
+	// The Bridge resolvers reach the upstream over TLS on port 853 only:
+	// the Link may be plain GRE, and the filter rewrites port-53 answers.
+	if n := plainDNS.Packets(); n != 0 {
+		t.Errorf("%d plain port-53 packets left for the upstream resolver", n)
+	}
+	if dotDNS.Packets() == 0 {
+		t.Error("no DNS over TLS reached the upstream resolver")
+	}
 	// DNS over TLS goes abroad even to an address in the IR set.
 	p1.leavesFrom("DoT to an IR address", tcp(p1, "2.144.0.10:853", false), ab1, 30*time.Second)
 

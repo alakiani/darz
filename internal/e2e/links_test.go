@@ -4,11 +4,9 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -164,32 +162,20 @@ func (m *mesh) name(nodeID string) string {
 
 // TestLinks is session 3's "proves in the lab" test: blocking one
 // instance's UDP port moves the Link to its other instance within seconds;
-// plain WireGuard is never tried on a Link that crosses the filter; a dead
-// instance is replaced with new parameters.
+// a dead instance is replaced with new parameters. Since ADR 0009 a Link
+// that crosses the filter has GRE, two AmneziaWG instances and plain
+// WireGuard, in that order.
 func TestLinks(t *testing.T) {
 	binDir(t)
-	if out, err := exec.Command("modprobe", "wireguard").CombinedOutput(); err != nil {
-		t.Fatalf("modprobe wireguard: %v: %s", err, out)
+	for _, mod := range []string{"wireguard", "ip_gre"} {
+		if out, err := exec.Command("modprobe", mod).CombinedOutput(); err != nil {
+			t.Fatalf("modprobe %s: %v: %s", mod, err, out)
+		}
 	}
 	l := lab.Start(t, "coord", "ir1", "ir2", "ab1", "ab2")
 	co := startCoordinator(t, l.Node("coord"))
 	co.c.LinkTiming = protocol.LinkTiming{SwitchBackSeconds: 15, RetryMinSeconds: 2, RetryMaxSeconds: 4, ReplaceAfterSeconds: 25}
 	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{}}
-
-	// Plain WireGuard handshake initiations: a 148-byte UDP payload that
-	// starts with message type 1. Counted in both directions.
-	set := func(names ...string) string {
-		var addrs []string
-		for _, n := range names {
-			addrs = append(addrs, l.Node(n).Addr().String())
-		}
-		return "{ " + strings.Join(addrs, ", ") + " }"
-	}
-	wgInit := "udp length 156 @th,64,32 0x01000000"
-	ir, ab := set("ir1", "ir2"), set("ab1", "ab2")
-	crossOut := l.Count(fmt.Sprintf("ip saddr %s ip daddr %s %s", ir, ab, wgInit))
-	crossIn := l.Count(fmt.Sprintf("ip saddr %s ip daddr %s %s", ab, ir, wgInit))
-	sameSide := l.Count(fmt.Sprintf("ip saddr %s ip daddr %s %s", ir, ir, wgInit))
 
 	m.startAgent("ir1", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ir2", []protocol.Role{protocol.RoleBridge, protocol.RoleExit}, []string{"IR"})
@@ -210,15 +196,14 @@ func TestLinks(t *testing.T) {
 		return true
 	})
 
-	// Across the filter there are two AmneziaWG instances and no WireGuard.
+	// Across the filter: GRE, two AmneziaWG, one plain WireGuard.
 	cross := m.linkID("ir1", "ab1")
+	byTransport := map[protocol.Transport]int{}
 	for _, in := range m.instances(cross) {
-		if in.Transport != protocol.TransportAmneziaWG {
-			t.Errorf("crossing link has a %s instance", in.Transport)
-		}
+		byTransport[in.Transport]++
 	}
-	if n := len(m.instances(cross)); n != 2 {
-		t.Errorf("crossing link has %d instances, want 2", n)
+	if byTransport[protocol.TransportGRE] != 1 || byTransport[protocol.TransportAmneziaWG] != 2 || byTransport[protocol.TransportWireGuard] != 1 {
+		t.Errorf("crossing link instances by transport = %v, want 1 gre, 2 amneziawg, 1 wireguard", byTransport)
 	}
 	same := m.linkID("ir1", "ir2")
 	// WireGuard is preferred. If AmneziaWG came up a moment sooner, the
@@ -227,16 +212,19 @@ func TestLinks(t *testing.T) {
 		return m.link("ir1", same).Transport == protocol.TransportWireGuard
 	})
 
-	// Blocking the active instance's port moves the Link within seconds to
-	// its other instance, once that one is Up as a warm standby.
-	testutil.Eventually(t, 60*time.Second, "both crossing instances up at ir1", func() bool {
+	// With GRE blocked, the crossing Link runs on AmneziaWG. Blocking the
+	// active instance's port moves it within seconds to the other
+	// AmneziaWG instance, once that one is Up as a warm standby.
+	greBlock := l.Filter(lab.DropGREBetween(l.Node("ir1"), l.Node("ab1")))
+	testutil.Eventually(t, 60*time.Second, "both amneziawg instances up and carrying at ir1", func() bool {
 		ups := 0
-		for _, ih := range m.link("ir1", cross).Instances {
-			if ih.Up {
+		lh := m.link("ir1", cross)
+		for _, ih := range lh.Instances {
+			if ih.Up && m.instance(ih.ID).Transport == protocol.TransportAmneziaWG {
 				ups++
 			}
 		}
-		return ups == 2
+		return ups == 2 && lh.Transport == protocol.TransportAmneziaWG
 	})
 	active := m.link("ir1", cross).ActiveInstance
 	blocked := m.instance(active)
@@ -244,7 +232,7 @@ func TestLinks(t *testing.T) {
 	start := time.Now()
 	testutil.Eventually(t, 15*time.Second, "crossing link moves off the blocked instance", func() bool {
 		lh := m.link("ir1", cross)
-		return lh.Up && lh.ActiveInstance != active && lh.ActiveInstance != 0
+		return lh.Up && lh.ActiveInstance != active && lh.ActiveInstance != 0 && lh.Transport == protocol.TransportAmneziaWG
 	})
 	moved := time.Since(start)
 	t.Logf("crossing link moved from instance %d to %d in %v; instances %+v", active, m.link("ir1", cross).ActiveInstance,
@@ -300,11 +288,5 @@ func TestLinks(t *testing.T) {
 		}
 	}
 	block.Remove()
-
-	if n := crossOut.Packets() + crossIn.Packets(); n != 0 {
-		t.Errorf("%d plain WireGuard handshake initiations crossed the filter", n)
-	}
-	if sameSide.Packets() == 0 {
-		t.Error("the WireGuard counter saw no handshake on the same-side link; it is not counting")
-	}
+	greBlock.Remove()
 }

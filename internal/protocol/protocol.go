@@ -170,6 +170,9 @@ type Transport string
 const (
 	TransportWireGuard Transport = "wireguard"
 	TransportAmneziaWG Transport = "amneziawg"
+	// TransportGRE is plain GRE, IP protocol 47 (ADR 0009). It has no
+	// port, parameters or handshake.
+	TransportGRE Transport = "gre"
 )
 
 // Link is one tunnel to a peer Node, carried by one of its instances.
@@ -197,7 +200,7 @@ type Peer struct {
 
 // Instance is one candidate Transport instance of a Link. Its port and, for
 // AmneziaWG, its parameters are chosen by the listening end and never
-// change; an instance is replaced instead.
+// change; an instance is replaced instead. A GRE instance has neither.
 type Instance struct {
 	ID        uint64    `json:"id"`
 	Transport Transport `json:"transport"`
@@ -210,6 +213,9 @@ type Instance struct {
 	// Endpoint is the listening end's address and port, set on the
 	// initiating end only.
 	Endpoint string `json:"endpoint,omitempty"`
+	// Remote is the far end's public address, its seen address (ADR 0002),
+	// set on both ends of a GRE instance: GRE does not roam (ADR 0009).
+	Remote string `json:"remote,omitempty"`
 	// AWG holds AmneziaWG parameters. On the listening end, nil means the
 	// Agent must choose them and report them.
 	AWG *AWGParams `json:"awg,omitempty"`

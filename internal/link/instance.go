@@ -76,7 +76,7 @@ func sameConfig(a, b InstanceConfig) bool {
 		a.Endpoint != nil && b.Endpoint != nil && a.Endpoint.String() == b.Endpoint.String()
 	sameAWG := a.AWG == nil && b.AWG == nil || a.AWG != nil && b.AWG != nil && *a.AWG == *b.AWG
 	return a.Iface == b.Iface && a.PrivateKey == b.PrivateKey && a.ListenPort == b.ListenPort &&
-		a.PeerKey == b.PeerKey && a.Addr == b.Addr && sameEndpoint && sameAWG
+		a.PeerKey == b.PeerKey && a.Addr == b.Addr && a.Remote == b.Remote && sameEndpoint && sameAWG
 }
 
 func (in *instance) wake() {
@@ -158,7 +158,7 @@ func (in *instance) run() {
 		start := time.Now()
 		seq++
 		ok, rtt, flags := probe(conn, in.peerAddr, seq, start.Add(interval*9/10))
-		handshake, _ := in.transport.LastHandshake(cfg.Iface)
+		handshake, hsErr := in.transport.LastHandshake(cfg.Iface)
 		now := time.Now()
 
 		in.mu.Lock()
@@ -166,7 +166,7 @@ func (in *instance) run() {
 		if ok {
 			in.flags, in.lastSuccess = flags, now
 		}
-		up := in.meter.up(now, handshake)
+		up := in.meter.up(now, handshakeOf(handshake, hsErr, in.lastSuccess))
 		if up != in.up {
 			if up {
 				in.upSince, in.downSince = now, time.Time{}

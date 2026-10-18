@@ -91,8 +91,8 @@ func TestDualRoleMasqueradesItsDevices(t *testing.T) {
 // over IPv4 or IPv6, is dropped without a reply (ADR 0006).
 func TestMonitoringPortIsAllowlisted(t *testing.T) {
 	r := bridgeRuleset()
-	if strings.Contains(render(r), "hook input") {
-		t.Error("an input chain with no monitoring port")
+	if strings.Contains(render(r), "tcp dport 9443") {
+		t.Error("monitoring rules with no monitoring port")
 	}
 	r.MonitorPort, r.MonitorAllow = 9443, []string{"192.0.2.100", "2001:db8::1"}
 	got := render(r)
@@ -108,6 +108,38 @@ func TestMonitoringPortIsAllowlisted(t *testing.T) {
 	}
 	if strings.Index(got, "tcp dport 9443 drop") < strings.Index(got, "accept\n\t\ttcp dport 9443 ip6") {
 		t.Error("the drop comes before the allowlist")
+	}
+}
+
+// GRE has no authentication, so an Exit takes it only from current peers,
+// and on a GRE interface forwards only new traffic from Devices or the mesh
+// (ADR 0009). Replies to this Node's own connections still come back.
+func TestGREIsLimitedToPeersAndOurRanges(t *testing.T) {
+	r := ruleset{Exit: true, LinkIfaces: map[string]uint64{"dz3l": 7, "dz4l": 7}, Uplink: "eth0",
+		GREIfaces: []string{"dz3l"}, GREPeers: []string{"203.0.113.9", "198.51.100.4"}}
+	got := render(r)
+	for _, want := range []string{
+		"\tchain input {\n\t\ttype filter hook input priority filter; policy accept;\n",
+		"\t\tmeta l4proto gre ip saddr { 198.51.100.4, 203.0.113.9 } accept\n",
+		"\t\tmeta l4proto gre drop\n",
+		`iifname { "dz3l" } ct direction original ip saddr != { 10.77.0.0/16, 10.78.0.0/16 } counter drop`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ruleset lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Index(got, "meta l4proto gre drop") < strings.Index(got, "meta l4proto gre ip saddr") {
+		t.Error("GRE is dropped before the peers are accepted")
+	}
+	forward := got[strings.Index(got, "chain forward"):]
+	if !strings.Contains(forward[:strings.Index(forward, "\n\t}")], "ct direction original ip saddr !=") {
+		t.Error("the source check is not in the forward chain")
+	}
+
+	// No GRE peer: no GRE at all.
+	got = render(ruleset{Exit: true, Uplink: "eth0"})
+	if !strings.Contains(got, "\t\tmeta l4proto gre drop\n") || strings.Contains(got, "gre ip saddr") || strings.Contains(got, "10.78.0.0/16") {
+		t.Errorf("ruleset without GRE peers:\n%s", got)
 	}
 }
 

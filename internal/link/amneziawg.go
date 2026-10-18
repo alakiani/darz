@@ -169,7 +169,7 @@ func (a *AmneziaWG) Up(ctx context.Context, c InstanceConfig) error {
 	if _, err := a.uapi(c.Iface, b.String()); err != nil {
 		return err
 	}
-	return address(ctx, c)
+	return address(ctx, c, c.MTU())
 }
 
 func (a *AmneziaWG) waitSocket(ctx context.Context, iface string) error {

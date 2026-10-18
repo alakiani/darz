@@ -315,6 +315,14 @@ func (m *Manager) configFor(l protocol.Link, spec protocol.Instance, peerKey wgt
 		return InstanceConfig{}, err
 	}
 	c := InstanceConfig{Iface: spec.Iface, PrivateKey: m.key, PeerKey: peerKey, Addr: addr, AWG: spec.AWG}
+	if spec.Transport == protocol.TransportGRE {
+		// Both ends have the other's address; nothing is chosen.
+		if c.Remote, err = netip.ParseAddr(spec.Remote); err != nil || !c.Remote.Is4() {
+			return InstanceConfig{}, fmt.Errorf("gre remote %q: not an IPv4 address", spec.Remote)
+		}
+		c.AWG = nil
+		return c, nil
+	}
 	isAWG := spec.Transport == protocol.TransportAmneziaWG
 	if l.Initiator {
 		if c.Endpoint, err = net.ResolveUDPAddr("udp4", spec.Endpoint); err != nil {
@@ -457,7 +465,7 @@ func (m *Manager) Report(h *protocol.Health) {
 	h.LinkPublicKey = m.PublicKey()
 	for _, id := range slices.Sorted(maps.Keys(m.insts)) {
 		in := m.insts[id]
-		if in.listener {
+		if in.listener && in.spec.Transport != protocol.TransportGRE {
 			cfg := in.config()
 			h.Listening = append(h.Listening, protocol.ListenChoice{InstanceID: id, Port: cfg.ListenPort, AWG: cfg.AWG})
 		}

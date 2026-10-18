@@ -155,9 +155,10 @@ func TestPanelIssuesAWorkingDevice(t *testing.T) {
 		t.Fatal(err)
 	}
 	whoami(t, l.Node("web-ab"), 7)
-	dnsServer(t, l.Node("dns-ab"))
+	upstreamCA := dnsServer(t, l.Node("dns-ab"))
 
-	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{}}
+	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{},
+		agentArgs: []string{"-upstream-ca", upstreamCA}}
 	m.startAgent("ir1", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ab1", []protocol.Role{protocol.RoleExit}, nil)
 

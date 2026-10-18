@@ -2,6 +2,7 @@ package link
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -22,8 +23,23 @@ type Transport interface {
 	Up(ctx context.Context, c InstanceConfig) error
 	Down(ctx context.Context, iface string) error
 	// LastHandshake returns the time of the peer's last handshake, zero if
-	// none.
+	// none. A Transport that has no handshake, such as GRE, returns
+	// ErrNoHandshake.
 	LastHandshake(iface string) (time.Time, error)
+}
+
+// ErrNoHandshake is LastHandshake's answer for a Transport without a
+// handshake. Its last answered in-tunnel probe counts as one instead, so
+// the first answered probe completes ADR 0007's handshake condition.
+var ErrNoHandshake = errors.New("transport has no handshake")
+
+// handshakeOf is when an instance last completed a handshake, given what
+// LastHandshake returned and its last answered probe.
+func handshakeOf(handshake time.Time, err error, lastSuccess time.Time) time.Time {
+	if errors.Is(err, ErrNoHandshake) {
+		return lastSuccess
+	}
+	return handshake
 }
 
 // InstanceConfig is one end of an instance.
@@ -37,12 +53,15 @@ type InstanceConfig struct {
 	// Endpoint is set on the initiating end only; the listening end learns
 	// it from the peer's handshake.
 	Endpoint *net.UDPAddr
-	Addr     netip.Prefix
-	AWG      *protocol.AWGParams
+	// Remote is the peer's public address, for GRE, on both ends.
+	Remote netip.Addr
+	Addr   netip.Prefix
+	AWG    *protocol.AWGParams
 }
 
-// MTU is the inner MTU: WireGuard's 1420 for a 1500-byte path, less any
-// AmneziaWG transport padding.
+// MTU is a WireGuard-family instance's inner MTU: WireGuard's 1420 for a
+// 1500-byte path, less any AmneziaWG transport padding. A GRE instance's is
+// its outer MTU less 24 (ADR 0009).
 func (c InstanceConfig) MTU() int {
 	if c.AWG != nil {
 		return 1420 - c.AWG.S4
@@ -65,11 +84,11 @@ func linkExists(ctx context.Context, iface string) bool {
 }
 
 // address gives iface its inner address and MTU, and brings it up.
-func address(ctx context.Context, c InstanceConfig) error {
+func address(ctx context.Context, c InstanceConfig, mtu int) error {
 	if _, err := ip(ctx, "addr", "replace", c.Addr.String(), "dev", c.Iface); err != nil {
 		return err
 	}
-	_, err := ip(ctx, "link", "set", "dev", c.Iface, "mtu", fmt.Sprint(c.MTU()), "up")
+	_, err := ip(ctx, "link", "set", "dev", c.Iface, "mtu", fmt.Sprint(mtu), "up")
 	return err
 }
 

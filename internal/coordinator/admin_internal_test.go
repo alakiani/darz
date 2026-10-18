@@ -89,7 +89,7 @@ func TestAdminOverviewAndLinks(t *testing.T) {
 	a.c.Reconcile(ctx)
 	var links []protocol.LinkTile
 	admin.must(200, "GET", "/v1/admin/links", nil, &links)
-	if len(links) != 1 || !links[0].Crosses || len(links[0].Instances) != 2 || links[0].Instances[0].Transport != protocol.TransportAmneziaWG {
+	if len(links) != 1 || !links[0].Crosses || len(links[0].Instances) != 4 || links[0].Instances[0].Transport != protocol.TransportGRE {
 		t.Fatalf("links = %+v", links)
 	}
 	// The initiating end reports the Link up on its first instance.
@@ -112,11 +112,17 @@ func TestAdminTransports(t *testing.T) {
 	admin := a.admin()
 	var tl protocol.TransportList
 	admin.must(200, "GET", "/v1/admin/transports", nil, &tl)
-	if len(tl.Enabled) != 2 || len(tl.Known) != 2 {
+	if len(tl.Enabled) != 3 || len(tl.Known) != 3 || !slices.Contains(tl.Enabled, protocol.TransportGRE) {
 		t.Errorf("transports = %+v", tl)
 	}
-	admin.must(400, "POST", "/v1/admin/transports", protocol.TransportList{Enabled: []protocol.Transport{"wireguard"}}, nil)
+	admin.must(400, "POST", "/v1/admin/transports", protocol.TransportList{Enabled: []protocol.Transport{}}, nil)
 	admin.must(400, "POST", "/v1/admin/transports", protocol.TransportList{Enabled: []protocol.Transport{"amneziawg", "reality"}}, nil)
+	// GRE can be disabled, as when the filter is found decapsulating it
+	// (ADR 0009).
+	admin.must(200, "POST", "/v1/admin/transports", protocol.TransportList{Enabled: []protocol.Transport{"wireguard", "amneziawg"}}, &tl)
+	if len(tl.Enabled) != 2 || slices.Contains(tl.Enabled, protocol.TransportGRE) {
+		t.Errorf("after disabling gre: %+v", tl)
+	}
 	admin.must(200, "POST", "/v1/admin/transports", protocol.TransportList{Enabled: []protocol.Transport{"amneziawg"}}, &tl)
 	if len(tl.Enabled) != 1 {
 		t.Errorf("after disabling wireguard: %+v", tl)

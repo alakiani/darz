@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -103,6 +104,46 @@ func TestLab(t *testing.T) {
 		mustEcho(t, n1, n3, 5000)
 	}
 
+	// GRE and UDP are blocked separately (ADR 0009). n1 and n2 get a GRE
+	// tunnel between their public addresses, with an echo server inside it.
+	{
+		if out, err := exec.Command("modprobe", "ip_gre").CombinedOutput(); err != nil {
+			t.Fatalf("modprobe ip_gre: %v: %s", err, out)
+		}
+		for _, end := range []struct {
+			n, peer *lab.Node
+			inner   string
+		}{{n1, n2, "192.168.77.1/30"}, {n2, n1, "192.168.77.2/30"}} {
+			for _, args := range [][]string{
+				{"ip", "link", "add", "gre-t", "type", "gre", "local", end.n.Addr().String(), "remote", end.peer.Addr().String(), "ttl", "64"},
+				{"ip", "addr", "add", end.inner, "dev", "gre-t"},
+				{"ip", "link", "set", "gre-t", "up"},
+			} {
+				if out, err := end.n.Command(args[0], args[1:]...).CombinedOutput(); err != nil {
+					t.Fatalf("%v on %s: %v: %s", args, end.n.Name(), err, out)
+				}
+			}
+		}
+		inner := netip.MustParseAddrPort("192.168.77.2:5002")
+		echoAt(t, n2, inner)
+		mustEchoAt(t, n1, inner)
+
+		gre := l.Filter(lab.DropGREBetween(n1, n2))
+		if _, err := echoTo(n1, inner, 500*time.Millisecond); err == nil {
+			t.Error("the GRE tunnel still carries packets with GRE blocked")
+		}
+		mustEcho(t, n1, n2, 5000) // UDP still passes
+		gre.Remove()
+		mustEchoAt(t, n1, inner)
+
+		udp := l.Filter(lab.DropUDPBetween(n1, n2))
+		mustNotEcho(t, n1, n2, 5000)
+		mustEchoAt(t, n1, inner) // UDP inside GRE is GRE to the filter
+		mustEcho(t, n1, n3, 5000)
+		udp.Remove()
+		mustEcho(t, n1, n2, 5000)
+	}
+
 	// Teardown removes every namespace.
 	{
 		namespaces := l.Namespaces()
@@ -139,12 +180,43 @@ func echoServer(t *testing.T, n *lab.Node, port uint16) {
 	}()
 }
 
+// echoAt runs a UDP echo server on addr, inside n's namespace.
+func echoAt(t *testing.T, n *lab.Node, addr netip.AddrPort) {
+	t.Helper()
+	var conn net.PacketConn
+	if err := n.Do(func() (err error) { conn, err = net.ListenPacket("udp4", addr.String()); return err }); err != nil {
+		t.Fatalf("listen on %s %s: %v", n.Name(), addr, err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			k, from, err := conn.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			conn.WriteTo(buf[:k], from)
+		}
+	}()
+}
+
+func mustEchoAt(t *testing.T, from *lab.Node, to netip.AddrPort) {
+	t.Helper()
+	if _, err := echoTo(from, to, 2*time.Second); err != nil {
+		t.Fatalf("echo %s -> %s: %v", from.Name(), to, err)
+	}
+}
+
 // echo sends one datagram from `from` to `to` and waits for the reply,
 // returning the round-trip time.
 func echo(from, to *lab.Node, port uint16, timeout time.Duration) (time.Duration, error) {
+	return echoTo(from, netip.AddrPortFrom(to.Addr(), port), timeout)
+}
+
+func echoTo(from *lab.Node, to netip.AddrPort, timeout time.Duration) (time.Duration, error) {
 	var conn net.Conn
 	err := from.Do(func() (err error) {
-		conn, err = net.Dial("udp4", netip.AddrPortFrom(to.Addr(), port).String())
+		conn, err = net.Dial("udp4", to.String())
 		return err
 	})
 	if err != nil {

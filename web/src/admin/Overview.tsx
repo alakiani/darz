@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import { api } from "../api/client";
-import { ago, bytes, type Overview } from "./api";
+import { api, errorOf } from "../api/client";
+import { ago, bytes, type Overview, type SlotRebalance } from "./api";
 
 // The status board (variant A in the prototype): Node tiles, a Link
 // latency matrix, and the Coordinator card.
 export function OverviewScreen() {
   const [o, setO] = useState<Overview | null>(null);
+  const load = () => api.GET("/v1/admin/overview").then(({ data }) => setO(data ?? null));
   useEffect(() => {
-    const load = () => api.GET("/v1/admin/overview").then(({ data }) => setO(data ?? null));
     load();
     const t = setInterval(load, 5000);
     return () => clearInterval(t);
@@ -114,6 +114,7 @@ export function OverviewScreen() {
           ))}
         </tbody>
       </table>
+      <RebalanceSlots onApplied={load} />
 
       <h2>Coordinator</h2>
       <div className="card">
@@ -139,5 +140,66 @@ export function OverviewScreen() {
         </p>
       </div>
     </section>
+  );
+}
+
+// RebalanceSlots spreads the Endpoint Slots over the eligible Bridges on
+// an Admin's demand (ADR 0005): it previews the moves, then applies them on
+// confirm. Slots never move back on their own.
+function RebalanceSlots({ onApplied }: { onApplied: () => void }) {
+  const [plan, setPlan] = useState<SlotRebalance | null>(null);
+  const [moved, setMoved] = useState<SlotRebalance | null>(null);
+  const [error, setError] = useState("");
+  const preview = async () => {
+    const { data, error } = await api.GET("/v1/admin/slots/rebalance");
+    setPlan(data ?? null);
+    setMoved(null);
+    setError(data ? "" : (errorOf(error) ?? "failed"));
+  };
+  const apply = async () => {
+    const { data, error } = await api.POST("/v1/admin/slots/rebalance");
+    setPlan(null);
+    setMoved(data ?? null);
+    setError(data ? "" : (errorOf(error) ?? "failed"));
+    onApplied();
+  };
+  const moves = (r: SlotRebalance) => (
+    <ul>
+      {r.moves.map((m) => (
+        <li key={m.slot}>
+          {m.slot}: {m.from ?? "unassigned"} → {m.to}
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <div className="card" data-testid="slot-rebalance">
+      <button type="button" onClick={preview}>
+        Rebalance slots
+      </button>
+      {error && <p className="error">{error}</p>}
+      {plan && plan.moves.length === 0 && <p data-testid="rebalance-balanced">Already balanced.</p>}
+      {plan && plan.moves.length > 0 && (
+        <div data-testid="rebalance-plan">
+          {moves(plan)}
+          <p className="warning">{plan.note}</p>
+          <div className="actions">
+            <button type="button" onClick={apply}>
+              Apply
+            </button>
+            <button type="button" className="link" onClick={() => setPlan(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {moved && (
+        <div data-testid="rebalance-moved">
+          <p>{moved.moves.length === 0 ? "Already balanced: nothing moved." : `Moved ${moved.moves.length} slot${moved.moves.length > 1 ? "s" : ""}:`}</p>
+          {moves(moved)}
+        </div>
+      )}
+    </div>
   );
 }

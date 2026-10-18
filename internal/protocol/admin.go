@@ -230,6 +230,21 @@ type SlotBridge struct {
 	IneligibleSince *time.Time `json:"ineligible_since,omitempty"`
 }
 
+// SlotRebalance is a plan that spreads the Endpoint Slots over the
+// eligible Bridges with the fewest moves, or what applying one moved.
+type SlotRebalance struct {
+	Moves []SlotMove `json:"moves"`
+	// Note says what the moves mean for Users.
+	Note string `json:"note"`
+}
+
+// SlotMove is one Endpoint Slot moving to another Bridge.
+type SlotMove struct {
+	Slot string `json:"slot"`           // such as a.4miz.ir
+	From string `json:"from,omitempty"` // the Bridge's name; absent for an unassigned slot
+	To   string `json:"to"`
+}
+
 // ProbeResult is the probe Device's latest check of a Bridge.
 type ProbeResult struct {
 	OK    bool      `json:"ok"`

@@ -3,24 +3,12 @@
 // checks the effects in the Coordinator's store.
 //
 // Env: PANEL_URL, ADMIN_HANDLE, ADMIN_PASSWORD, TOTP_SECRET.
-import { createHmac } from "node:crypto";
 import { chromium } from "@playwright/test";
+import { totp } from "./totp.mjs";
 
 const { PANEL_URL, ADMIN_HANDLE, ADMIN_PASSWORD, TOTP_SECRET } = process.env;
 // LIVE=0 skips what needs running Agents: for a quick run without the lab.
 const LIVE = process.env.LIVE !== "0";
-
-function totp(secret) {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  let bits = "";
-  for (const c of secret.toUpperCase()) bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
-  const key = Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)));
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
-  const mac = createHmac("sha1", key).update(counter).digest();
-  const off = mac[mac.length - 1] & 15;
-  return String((mac.readUInt32BE(off) & 0x7fffffff) % 1_000_000).padStart(6, "0");
-}
 
 const step = (name) => console.log(`- ${name}`);
 const browser = await chromium.launch();

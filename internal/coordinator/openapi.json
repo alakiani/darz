@@ -1241,6 +1241,42 @@
         ],
         "type": "object"
       },
+      "SlotMove": {
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slot",
+          "to"
+        ],
+        "type": "object"
+      },
+      "SlotRebalance": {
+        "properties": {
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/SlotMove"
+            },
+            "type": "array"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "moves",
+          "note"
+        ],
+        "type": "object"
+      },
       "SlotStatus": {
         "properties": {
           "bridges": {
@@ -2219,6 +2255,72 @@
           }
         ],
         "summary": "Roll a set's feed back to its previous good update"
+      }
+    },
+    "/v1/admin/slots/rebalance": {
+      "get": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "getAdminSlotsRebalance",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotRebalance"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Plan a rebalance of the Endpoint Slots over the eligible Bridges"
+      },
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminSlotsRebalance",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotRebalance"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Rebalance the Endpoint Slots now; returns what moved"
       }
     },
     "/v1/admin/tokens": {

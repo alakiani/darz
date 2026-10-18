@@ -27,6 +27,7 @@ Failures of a Bridge's Links or Exits that the mesh can route around (ADR 0004) 
 - **Re-pointing:**
   - A slot moves after its Bridge has been ineligible for 60 s.
   - It does not move back automatically when that Bridge recovers.
+  - *(An Admin can rebalance the slots on demand from the panel: the fewest moves that spread them over the eligible Bridges. They still never move back automatically. Decided in [#49](https://github.com/alakiani/darz/issues/49).)*
   - The Coordinator updates the record through the ArvanCloud DNS API, with the lowest TTL ArvanCloud allows (target 60 s).
   - Self-hosting DNS on the Coordinator was rejected, because a dead Coordinator would then stop every Device from resolving.
 - **Floating IPs are an optional optimisation.** Where a provider offers one, a slot may use it and have the Agent move it, giving zero-touch recovery for that slot. It is never required (inventory constraint 2).

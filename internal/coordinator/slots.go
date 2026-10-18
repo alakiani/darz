@@ -52,6 +52,9 @@ var DefaultSlotSettings = SlotSettings{
 // slotState is what the slot loop remembers between rounds. It is not
 // stored: after a restart every Bridge starts a fresh 60 s.
 type slotState struct {
+	// moves serialises the rounds' slot moves with an Admin's rebalance,
+	// so the two never race. Taken before mu, never while holding it.
+	moves     sync.Mutex
 	mu        sync.Mutex
 	probes    map[string]protocol.ProbeResult // by Node id
 	inelSince map[string]time.Time            // by Node id, while ineligible
@@ -172,6 +175,8 @@ func (c *Coordinator) slotRound(ctx context.Context) error {
 	inelSince := maps.Clone(s.inelSince)
 	s.mu.Unlock()
 
+	s.moves.Lock()
+	defer s.moves.Unlock()
 	stored, err := c.store.EndpointSlots(ctx)
 	if err != nil {
 		return err
@@ -295,6 +300,116 @@ func planSlots(slots []string, held map[string]string, bridges []string, eligibl
 		}
 	}
 	return out
+}
+
+// slotMove is one slot moving from one Bridge to another, by Node id.
+type slotMove struct{ Slot, From, To string }
+
+// rebalanceSlots plans the fewest moves that spread the slots evenly over
+// the eligible Bridges, for an Admin who asks (ADR 0005). Each eligible
+// Bridge's share is the slots divided by the eligible Bridges, with the
+// remainder going one each to the Bridges already holding the most, the
+// first in bridges on a tie; an ineligible Bridge's share is none. A slot
+// stays while its Bridge is within its share. Every other slot moves to
+// the eligible Bridge holding the fewest, the first in bridges on a tie.
+// With fewer than 2 eligible Bridges, nothing moves. bridges are the
+// domestic Bridges in order.
+func rebalanceSlots(slots []string, held map[string]string, bridges []string, eligible map[string]bool) []slotMove {
+	var el []string
+	for _, b := range bridges {
+		if eligible[b] {
+			el = append(el, b)
+		}
+	}
+	if len(el) < 2 {
+		return nil
+	}
+	load := map[string]int{}
+	for _, s := range slots {
+		load[held[s]]++
+	}
+	byLoad := slices.Clone(el)
+	slices.SortStableFunc(byLoad, func(a, b string) int { return load[b] - load[a] })
+	share := map[string]int{}
+	for i, b := range byLoad {
+		share[b] = len(slots) / len(el)
+		if i < len(slots)%len(el) {
+			share[b]++
+		}
+	}
+	kept := map[string]int{}
+	var moving []string
+	for _, s := range slots {
+		if h := held[s]; kept[h] < share[h] {
+			kept[h]++
+		} else {
+			moving = append(moving, s)
+		}
+	}
+	var out []slotMove
+	for _, s := range moving {
+		best := el[0]
+		for _, b := range el[1:] {
+			if kept[b] < kept[best] {
+				best = b
+			}
+		}
+		kept[best]++
+		out = append(out, slotMove{s, held[s], best})
+	}
+	return out
+}
+
+// RebalanceSlots plans an Admin's rebalance of the Endpoint Slots and, with
+// apply, carries it out the way a round moves slots: the store, then the
+// ArvanCloud records. Eligibility is the latest round's judgement; a Bridge
+// no round has probed yet is not eligible. Slots still never move back on
+// their own (ADR 0005).
+func (c *Coordinator) RebalanceSlots(ctx context.Context, apply bool) (protocol.SlotRebalance, error) {
+	out := protocol.SlotRebalance{Moves: []protocol.SlotMove{}}
+	s := &c.slots
+	s.moves.Lock()
+	defer s.moves.Unlock()
+	bridges, health, err := c.domesticBridges(ctx)
+	if err != nil {
+		return out, err
+	}
+	ids := make([]string, len(bridges))
+	names := map[string]string{}
+	eligible := map[string]bool{}
+	s.mu.Lock()
+	for i, b := range bridges {
+		ids[i], names[b.ID] = b.ID, b.Name
+		_, probed := s.probes[b.ID]
+		eligible[b.ID] = probed && len(s.reasons[b.ID]) == 0
+	}
+	s.mu.Unlock()
+	stored, err := c.store.EndpointSlots(ctx)
+	if err != nil {
+		return out, err
+	}
+	held := map[string]string{}
+	for _, e := range stored {
+		held[e.Name] = e.NodeID
+	}
+	moves := rebalanceSlots(c.EndpointSlots, held, ids, eligible)
+	for _, m := range moves {
+		out.Moves = append(out.Moves, protocol.SlotMove{Slot: m.Slot, From: names[m.From], To: names[m.To]})
+	}
+	out.Note = "Users on a moved slot must toggle their tunnel off and on to follow it."
+	if len(moves) == 0 {
+		out.Note = "The slots are already balanced."
+	}
+	if !apply || len(moves) == 0 {
+		return out, nil
+	}
+	for _, m := range moves {
+		c.log.Info("Endpoint Slot rebalanced", "slot", m.Slot, "from", names[m.From], "to", names[m.To])
+		if err := c.store.AssignSlot(ctx, m.Slot, m.To); err != nil {
+			return out, err
+		}
+	}
+	return out, c.syncSlotRecords(ctx, health)
 }
 
 // EndpointSlotStatus reports where the slots point and the probe's view of

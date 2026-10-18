@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,11 +15,13 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/alakiani/darz/internal/ca"
 	"github.com/alakiani/darz/internal/lab"
 	"github.com/alakiani/darz/internal/monitoring"
 	"github.com/alakiani/darz/internal/protocol"
@@ -214,6 +217,24 @@ func TestMonitoring(t *testing.T) {
 	// Block the Link between ir1 and ab2: Link down.
 	l.Filter(lab.DropBetween(l.Node("ir1"), l.Node("ab2")))
 	tg.await(t, 90*time.Second, "LinkDown", "ab2/ir1", ab2)
+	// Every instance of it is down, as both ends see it: a blackout of the
+	// whole path, not one transport failing (issue #51).
+	var transports []string
+	for _, in := range m.instances(m.linkID("ir1", "ab2")) {
+		transports = append(transports, string(in.Transport))
+	}
+	slices.Sort(transports)
+	transports = slices.Compact(transports)
+	testutil.Eventually(t, 30*time.Second, "every instance of ab2/ir1 is down on both ends", func() bool {
+		down := slices.Compact(prom.series(`darz_link_instance_up{link="ab2/ir1",node="ir1"} == 0`, "transport"))
+		ends := slices.Compact(prom.series(`darz_link_instance_up{link="ab2/ir1"} == 0`, "node"))
+		up := prom.series(`darz_link_instance_up{link="ab2/ir1"} == 1`, "instance_id")
+		return len(transports) > 1 && slices.Equal(down, transports) && slices.Equal(ends, []string{"ab2", "ir1"}) && len(up) == 0
+	})
+	// A Link left alone still has an instance Up.
+	if up := prom.series(`darz_link_instance_up{link="ab2/ir3"} == 1`, "node"); len(up) == 0 {
+		t.Errorf("no instance of ab2/ir3 is Up")
+	}
 
 	// Kill ir3, a Bridge: it loses slot eligibility.
 	l.Filter(lab.DropAll(l.Node("ir3")))
@@ -370,6 +391,56 @@ func (p *promAPI) series(q, label string) []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// scraper reads Agents' /metrics as Prometheus does, from the Coordinator's
+// Node with Prometheus's client certificate, for tests that run no
+// Prometheus.
+type scraper struct {
+	client *http.Client
+	port   uint16
+}
+
+func newScraper(t *testing.T, co *coord, from *lab.Node, port uint16) *scraper {
+	t.Helper()
+	dir := t.TempDir()
+	if err := co.c.WritePrometheusTLS(dir); err != nil {
+		t.Fatal(err)
+	}
+	pair, err := tls.LoadX509KeyPair(filepath.Join(dir, "prometheus.crt"), filepath.Join(dir, "prometheus.key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots := x509.NewCertPool()
+	roots.AppendCertsFromPEM(co.caPEM)
+	tc := &tls.Config{RootCAs: roots, Certificates: []tls.Certificate{pair}, ServerName: ca.AgentServerName}
+	return &scraper{port: port, client: &http.Client{Timeout: 5 * time.Second,
+		Transport: &http.Transport{DialContext: nsDial(from), TLSClientConfig: tc}}}
+}
+
+// samples scrapes n and returns each series' value, keyed by the series as
+// the Agent writes it: name{labels}.
+func (s *scraper) samples(n *lab.Node) (map[string]float64, error) {
+	resp, err := s.client.Get("https://" + net.JoinHostPort(n.Addr().String(), fmt.Sprint(s.port)) + "/metrics")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("scrape %s: %s %v", n.Name(), resp.Status, err)
+	}
+	out := map[string]float64{}
+	for _, line := range strings.Split(string(b), "\n") {
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		i := strings.LastIndexByte(line, ' ')
+		if v, err := strconv.ParseFloat(line[i+1:], 64); err == nil {
+			out[line[:i]] = v
+		}
+	}
+	return out, nil
 }
 
 // mustParse fails the test unless Prometheus accepts q.

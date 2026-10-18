@@ -21,6 +21,12 @@ groups:
           severity: warning
         annotations:
           summary: "Link {{ $labels.link }} has no working transport"
+      - alert: LinkBlackout
+        expr: "changes((max by (link) (darz_link_instance_up) == bool 0)[1h:]) >= 5"
+        labels:
+          severity: warning
+        annotations:
+          summary: "Every instance of Link {{ $labels.link }} went down at once at least 3 times in an hour"
       - alert: BridgeHasNoDefaultPath
         expr: "darz_path_ok{default=\"true\"} == 0"
         for: 1m

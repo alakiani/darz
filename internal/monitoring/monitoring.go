@@ -80,6 +80,12 @@ func rules(t Timing) []rule {
 			0, "warning", "Node {{ $labels.node }} has not reached the Coordinator for {{ $value | humanizeDuration }}"},
 		{"LinkDown", `max by (link) (darz_link_up) == 0`,
 			t.LinkDown, "warning", "Link {{ $labels.link }} has no working transport"},
+		// Every instance down at once, on both ends, is a whole-path blackout
+		// rather than one transport failing (issue #51). Three blackouts make
+		// at least 5 changes into or out of one within the hour; two make 4
+		// at most.
+		{"LinkBlackout", `changes((max by (link) (darz_link_instance_up) == bool 0)[1h:]) >= 5`,
+			0, "warning", "Every instance of Link {{ $labels.link }} went down at once at least 3 times in an hour"},
 		{"BridgeHasNoDefaultPath", `darz_path_ok{default="true"} == 0`,
 			t.NoPath, "critical", "Bridge {{ $labels.node }} has no Path for the default Rule"},
 		// Rebalancing moves do not count (ADR 0008).

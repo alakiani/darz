@@ -1,6 +1,7 @@
 package dataplane
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -290,5 +291,59 @@ func TestResolveFallsThroughThenDrops(t *testing.T) {
 	out = resolve(rules, map[uint64]*bucketState{1: ir, 2: def})
 	if out[1][5] != keyDrop || out[2][5] != keyDrop {
 		t.Errorf("nothing anywhere: %v / %v, want drop", out[1][5], out[2][5])
+	}
+}
+
+// The Path metrics' view of a Rule (issue #51): each candidate's share
+// before the cutoff, and whether the cutoff took it away, as step spreads
+// the buckets.
+func TestTargetSharesMirrorTheBuckets(t *testing.T) {
+	byKey := func(vs []candidateView) map[string]candidateView {
+		m := map[string]candidateView{}
+		for _, v := range vs {
+			m[v.key] = v
+		}
+		return m
+	}
+	// ADR 0008's worked example: Frankfurt is cut off.
+	cands := []candidate{direct("fra", 7.5, true), direct("ams", 25, true), direct("vir", 39, true),
+		direct("down", 50, false), {key: "link:9", kind: candTransit, weight: 80, eligible: true}}
+	v := byKey(targetShares(cands, sc.Cutoff))
+	for key, want := range map[string]struct {
+		share float64
+		cut   bool
+	}{"fra": {7.5 / 71.5, true}, "ams": {25 / 71.5, false}, "vir": {39 / 71.5, false}, "down": {0, false}, "link:9": {0, false}} {
+		if got := v[key]; got.target != want.share || got.cut != want.cut || got.weight != cands[slices.IndexFunc(cands, func(c candidate) bool { return c.key == key })].weight {
+			t.Errorf("%s = %+v, want share %v cut %v", key, got, want.share, want.cut)
+		}
+	}
+	b := &bucketState{}
+	b.step(t0, cands, sc)
+	c := counts(b)
+	for key, view := range v {
+		if view.cut && c[key] != 0 {
+			t.Errorf("%s is cut off with %d buckets", key, c[key])
+		}
+	}
+	// What the cutoff leaves shares the buckets in proportion.
+	if c["ams"] != 25 || c["vir"] != 39 {
+		t.Errorf("buckets = %v", c)
+	}
+
+	// No direct candidate left: the best transit candidate takes it all.
+	v = byKey(targetShares([]candidate{direct("link:1", 9, false), {key: "link:5", kind: candTransit, weight: 1, eligible: true},
+		{key: "link:6", kind: candTransit, weight: 2, eligible: true}}, sc.Cutoff))
+	if v["link:6"].target != 1 || v["link:5"].target != 0 || v["link:1"].target != 0 {
+		t.Errorf("transit only: %+v", v)
+	}
+	// A local candidate takes it all.
+	v = byKey(targetShares([]candidate{{key: keyLocal, kind: candLocal, weight: 1, eligible: true}, direct("link:1", 9, true)}, sc.Cutoff))
+	if v[keyLocal].target != 1 || v["link:1"].target != 0 || v["link:1"].cut {
+		t.Errorf("local: %+v", v)
+	}
+	// Unweighted direct candidates share equally, as the buckets do.
+	v = byKey(targetShares([]candidate{direct("link:1", 0, true), direct("link:2", 0, true)}, sc.Cutoff))
+	if v["link:1"].target != 0.5 || v["link:2"].target != 0.5 || v["link:1"].cut {
+		t.Errorf("unweighted: %+v", v)
 	}
 }

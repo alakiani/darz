@@ -40,6 +40,7 @@ type candidate struct {
 	eligible bool
 	rtt      time.Duration
 	mbps     float64 // the Link's throughput figure; 0 until measured
+	avail    float64 // availability, as the weight uses it
 	weight   float64
 }
 
@@ -280,6 +281,59 @@ func cutoff(cs []candidate, frac float64) []candidate {
 		if best == 0 || c.weight >= frac*best {
 			out = append(out, c)
 		}
+	}
+	return out
+}
+
+// candidateView is one candidate as the Path metrics show it: its weight
+// and availability, the share of the Rule's buckets it is due before the
+// cutoff, and whether the cutoff takes that share away.
+type candidateView struct {
+	key                   string
+	weight, avail, target float64
+	cut                   bool
+}
+
+// targetShares works out each candidate's target share the way step
+// chooses who shares the buckets: a local candidate takes them all;
+// otherwise the eligible direct candidates share by weight, equally if
+// none has any, and those under frac of the best are cut off; with no
+// direct candidate, the best transit candidate takes them all. An
+// ineligible candidate's share is 0. It only reports: step decides.
+func targetShares(cs []candidate, frac float64) []candidateView {
+	out := make([]candidateView, len(cs))
+	local, best := -1, -1
+	var directs []int
+	for i, c := range cs {
+		out[i] = candidateView{key: c.key, weight: c.weight, avail: c.avail}
+		switch {
+		case !c.eligible:
+		case c.kind == candLocal:
+			local = i
+		case c.kind == candDirect:
+			directs = append(directs, i)
+		case best < 0 || c.weight > cs[best].weight:
+			best = i
+		}
+	}
+	switch {
+	case local >= 0:
+		out[local].target = 1
+	case len(directs) > 0:
+		total, top := 0.0, 0.0
+		for _, i := range directs {
+			total += cs[i].weight
+			top = math.Max(top, cs[i].weight)
+		}
+		for _, i := range directs {
+			out[i].target = 1 / float64(len(directs))
+			if total > 0 {
+				out[i].target = cs[i].weight / total
+			}
+			out[i].cut = top > 0 && cs[i].weight < frac*top
+		}
+	case best >= 0:
+		out[best].target = 1
 	}
 	return out
 }

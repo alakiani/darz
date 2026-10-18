@@ -31,7 +31,7 @@ One tunnel between two Nodes, carried at any moment by one Transport chosen from
 _Avoid_: Tunnel, connection, peering
 
 **Transport**:
-A way of carrying a Link's traffic between two Nodes, such as plain WireGuard or AmneziaWG. Which Transports work on a Link is discovered by trying them, never configured.
+A way of carrying a Link's traffic between two Nodes, such as GRE, plain WireGuard or AmneziaWG. Which Transports work on a Link is discovered by trying them, never configured.
 _Avoid_: Protocol, carrier, tunnel type
 
 **Path**:

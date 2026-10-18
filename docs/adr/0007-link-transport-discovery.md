@@ -23,18 +23,18 @@ Nobody records which Transport works from which datacenter, because the filter c
 
 | Transport | Runs as | Used on |
 | --- | --- | --- |
-| Plain WireGuard | Kernel module, configured over netlink | Same-side Links only |
+| Plain WireGuard | Kernel module, configured over netlink | Same-side Links only *(every Link since [ADR 0009](0009-gre-transport.md))* |
 | AmneziaWG (protocol 2.0 parameters) | The `amneziawg-go` userspace daemon, one per instance, under its own systemd unit, configured over its UAPI socket. No DKMS kernel module. | Every Link |
 
 - **Tunnels outlive the Agent.** The Agent configures, measures, and switches, and never carries packets itself. An Agent crash or upgrade changes no tunnel.
-- **No plain WireGuard across the filter.** Its handshake has a fixed fingerprint and is reported blackholed right after the handshake. Probing it every second would mark the abroad IP as a WireGuard server and risk getting that IP blocked, taking the AmneziaWG instances down with it.
+- **No plain WireGuard across the filter.** Its handshake has a fixed fingerprint and is reported blackholed right after the handshake. Probing it every second would mark the abroad IP as a WireGuard server and risk getting that IP blocked, taking the AmneziaWG instances down with it. *(Amended by [ADR 0009](0009-gre-transport.md): plain WireGuard now runs on Links that cross the filter too, last in order, as an accepted risk for redundancy.)*
 - **The Agent's Transport layer is an interface** (bring up, take down, report health), so adding a Transport later does not change the Link model.
 
 ## Candidates are Transport instances
 
 A candidate is a Transport with its own UDP port and, for AmneziaWG, its own obfuscation parameters. Different instances present different fingerprints to the filter.
 
-- **A Link that crosses the filter:** 2 AmneziaWG instances.
+- **A Link that crosses the filter:** 2 AmneziaWG instances. *(Since [ADR 0009](0009-gre-transport.md): 1 GRE instance, then 2 AmneziaWG instances, then 1 plain WireGuard instance.)*
 - **A same-side Link:** 1 plain WireGuard instance and 1 AmneziaWG instance.
 - **Preference order:** plain WireGuard before AmneziaWG; otherwise the order the instances were created.
 
@@ -83,7 +83,7 @@ A TCP Transport for Links that cross the filter, such as VLESS+REALITY, is the p
 
 - **VLESS+REALITY over TCP/443 (Xray-core)**: the research's first choice for crossing the filter. Deferred: it brings a second process model, a JSON-config generator, SNI selection, and IP rotation every few days.
 - **XHTTP or WS+TLS through a CDN**: needs a CDN account and domains that are blocked within about a day to a week. Out of scope for this phase.
-- **GRE and GRE over 6to4**: no benefit over plain WireGuard at the Link speeds Iran allows, no encryption, and they fail every protocol allowlist.
+- **GRE and GRE over 6to4**: no benefit over plain WireGuard at the Link speeds Iran allows, no encryption, and they fail every protocol allowlist. *(Reversed by [ADR 0009](0009-gre-transport.md): production found AmneziaWG over UDP dropped to most hosting networks, and plain GRE is now the first Transport on Links that cross the filter.)*
 - **QUIC carriers (Hysteria2, MASQUE)**: QUIC has been fully blocked since June 2025 (measured).
 - **One Link per (Node pair, Transport)**: multiplies Paths, and makes "must not share a first Link" in ADR 0004 ambiguous.
 - **Admin-drawn Links, or recording per-datacenter transport facts**: contradicts discovery over configuration.

@@ -67,9 +67,11 @@ func whoami(t *testing.T, n *lab.Node, port int) {
 	}()
 }
 
-// dnsServer stands in for a public resolver: it answers each UDP query and
-// each length-prefixed TCP query with the source address it saw.
-func dnsServer(t *testing.T, n *lab.Node) {
+// dnsServer stands in for a public resolver: it answers each UDP query,
+// and each length-prefixed query over TCP or over TLS on port 853, with
+// the source address it saw. It returns the file of the root its TLS
+// certificate verifies against, for the Agents' -upstream-ca.
+func dnsServer(t *testing.T, n *lab.Node) (caFile string) {
 	t.Helper()
 	addr := net.JoinHostPort(n.Addr().String(), "53")
 	var udp net.PacketConn
@@ -94,25 +96,9 @@ func dnsServer(t *testing.T, n *lab.Node) {
 			udp.WriteTo([]byte("dns:"+from.(*net.UDPAddr).IP.String()), from)
 		}
 	}()
-	go func() {
-		for {
-			c, err := tcp.Accept()
-			if err != nil {
-				return
-			}
-			go func() {
-				defer c.Close()
-				host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
-				var n [2]byte
-				if _, err := io.ReadFull(c, n[:]); err != nil {
-					return
-				}
-				io.CopyN(io.Discard, c, int64(n[0])<<8|int64(n[1]))
-				answer := "dns:" + host
-				c.Write(append([]byte{0, byte(len(answer))}, answer...))
-			}()
-		}
-	}()
+	answer := func(_ []byte, from string) []byte { return []byte("dns:" + from) }
+	go serveStreamDNS(tcp, answer)
+	return serveDoT(t, n, answer)
 }
 
 // phone is a lab Node set up as a Device: stock WireGuard to a Bridge, with
@@ -233,8 +219,9 @@ func irFeed(prefixes ...string) string {
 
 // TestDataPlane is session 4's "proves in the lab" test: a lab Device
 // reaches an abroad address through an abroad Exit and a domestic address
-// through an IR Node; DNS goes abroad; a hostile feed update is rejected
-// and the last good set stays.
+// through an IR Node; DNS goes abroad, and leaves the Bridge only as DNS
+// over TLS (ADR 0009); a hostile feed update is rejected and the last good
+// set stays.
 func TestDataPlane(t *testing.T) {
 	binDir(t)
 	if out, err := execCommand("modprobe", "wireguard"); err != nil {
@@ -275,7 +262,10 @@ func TestDataPlane(t *testing.T) {
 	whoami(t, l.Node("web-ir"), 7)
 	whoami(t, l.Node("web-ir"), 853)
 	whoami(t, l.Node("web-ab"), 7)
-	dnsServer(t, l.Node("dns-ab"))
+	upstreamCA := dnsServer(t, l.Node("dns-ab"))
+	// What leaves for the upstream resolver, wherever it leaves from.
+	plainDNS := l.Count("ip daddr 9.9.9.9 meta l4proto { tcp, udp } th dport 53")
+	dotDNS := l.Count("ip daddr 9.9.9.9 tcp dport 853")
 
 	// Two Devices of one User.
 	user, err := co.store.CreateUser(ctx, "maryam")
@@ -293,7 +283,8 @@ func TestDataPlane(t *testing.T) {
 		addrs[i] = d.Address
 	}
 
-	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{}}
+	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{},
+		agentArgs: []string{"-upstream-ca", upstreamCA}}
 	m.startAgent("ir1", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ir2", []protocol.Role{protocol.RoleExit}, []string{"IR"})
 	m.startAgent("ir3", []protocol.Role{protocol.RoleBridge, protocol.RoleExit}, []string{"IR"})
@@ -332,6 +323,15 @@ func TestDataPlane(t *testing.T) {
 	// whose queries leave abroad.
 	p1.leavesFrom("DNS over UDP", udp(p1, "8.8.8.8:53"), "dns:"+ab1, 30*time.Second)
 	p1.leavesFrom("DNS over TCP", tcp(p1, "8.8.8.8:53", true), "dns:"+ab1, 30*time.Second)
+	p2.leavesFrom("DNS from the other Bridge", udp(p2, "10.77.0.1:53"), "dns:"+ab1, 30*time.Second)
+	// The Bridge resolvers reach the upstream over TLS on port 853 only:
+	// the Link may be plain GRE, and the filter rewrites port-53 answers.
+	if n := plainDNS.Packets(); n != 0 {
+		t.Errorf("%d plain port-53 packets left for the upstream resolver", n)
+	}
+	if dotDNS.Packets() == 0 {
+		t.Error("no DNS over TLS reached the upstream resolver")
+	}
 	// DNS over TLS goes abroad even to an address in the IR set.
 	p1.leavesFrom("DoT to an IR address", tcp(p1, "2.144.0.10:853", false), ab1, 30*time.Second)
 

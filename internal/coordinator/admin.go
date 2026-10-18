@@ -90,7 +90,7 @@ func (c *Coordinator) linkTiles(ctx context.Context, v adminView, only string) (
 		if ri != nil {
 			t.Transport, t.RTTMillis = ri.Transport, ri.RTTMillis
 		}
-		for _, in := range preferenceOrder(insts) {
+		for _, in := range preferenceOrder(insts, t.Crosses) {
 			if in.LinkID != l.ID {
 				continue
 			}
@@ -372,7 +372,7 @@ func (c *Coordinator) adminLinks(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tiles)
 }
 
-var knownTransports = []protocol.Transport{protocol.TransportWireGuard, protocol.TransportAmneziaWG}
+var knownTransports = []protocol.Transport{protocol.TransportWireGuard, protocol.TransportAmneziaWG, protocol.TransportGRE}
 
 func (c *Coordinator) adminTransports(w http.ResponseWriter, r *http.Request) {
 	ts, err := c.store.Transports(r.Context())
@@ -394,9 +394,10 @@ func (c *Coordinator) adminSetTransports(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
-	if !slices.Contains(req.Enabled, protocol.TransportAmneziaWG) {
-		// Without it, no Link could cross the filter (ADR 0007).
-		writeError(w, http.StatusBadRequest, "amneziawg must stay enabled: it is the only Transport across the filter")
+	if len(req.Enabled) == 0 {
+		// Every Transport crosses the filter since ADR 0009, but with none
+		// no Link could come up at all.
+		writeError(w, http.StatusBadRequest, "at least one transport must stay enabled")
 		return
 	}
 	err := c.store.SetTransports(r.Context(), slices.Compact(req.Enabled))

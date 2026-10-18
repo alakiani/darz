@@ -125,8 +125,8 @@ func TestAdminPanel(t *testing.T) {
 	if _, err := co.store.NodeByName(ctx, "ab9"); err == nil {
 		t.Error("ab9 was not deleted")
 	}
-	if ts, _ := co.store.Transports(ctx); len(ts) != 2 {
-		t.Errorf("transports = %v, want both back on", ts)
+	if ts, _ := co.store.Transports(ctx); len(ts) != 3 {
+		t.Errorf("transports = %v, want all three back on", ts)
 	}
 	rules, _ := co.store.Rules(ctx)
 	if rules[0].Fallback != protocol.FallbackNext {

@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -27,6 +29,7 @@ type options struct {
 	awgBinary, awgRunner                      string
 	healthInterval                            time.Duration
 	telegramAPI, nodeExporter                 string
+	upstreamCA                                string
 }
 
 func main() {
@@ -41,6 +44,7 @@ func main() {
 	flag.DurationVar(&o.healthInterval, "health-interval", 30*time.Second, "how often to report health")
 	flag.StringVar(&o.telegramAPI, "telegram-api", agent.DefaultTelegramAPI, "Telegram's Bot API, where an Exit relays the Coordinator's alerts")
 	flag.StringVar(&o.nodeExporter, "node-exporter", "http://127.0.0.1:9100/metrics", "node_exporter on localhost, served through /metrics; empty for none")
+	flag.StringVar(&o.upstreamCA, "upstream-ca", "", "PEM roots for the Bridge resolver's DNS-over-TLS upstreams; empty for the system's")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(version)
@@ -88,12 +92,24 @@ func run(log *slog.Logger, o options) error {
 		Transports: map[protocol.Transport]link.Transport{
 			protocol.TransportWireGuard: wg,
 			protocol.TransportAmneziaWG: link.NewAmneziaWG(runner),
+			protocol.TransportGRE:       link.GRE{},
 		},
 	})
 	if err != nil {
 		return err
 	}
-	plane, err := dataplane.New(dataplane.Config{StateDir: o.stateDir, Links: links, Log: log})
+	var upstreamRoots *x509.CertPool
+	if o.upstreamCA != "" {
+		pem, err := os.ReadFile(o.upstreamCA)
+		if err != nil {
+			return err
+		}
+		upstreamRoots = x509.NewCertPool()
+		if !upstreamRoots.AppendCertsFromPEM(pem) {
+			return errors.New("-upstream-ca: no certificates")
+		}
+	}
+	plane, err := dataplane.New(dataplane.Config{StateDir: o.stateDir, Links: links, Log: log, UpstreamRoots: upstreamRoots})
 	if err != nil {
 		return err
 	}

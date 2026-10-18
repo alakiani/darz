@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -48,6 +49,9 @@ type Config struct {
 	StateDir string
 	Links    LinkSource
 	Log      *slog.Logger
+	// UpstreamRoots verify the resolver's upstreams' DNS-over-TLS
+	// certificates; nil means the system's roots.
+	UpstreamRoots *x509.CertPool
 }
 
 const (
@@ -142,6 +146,9 @@ func (p *Plane) Apply(ctx context.Context, st protocol.State) error {
 	for _, l := range st.Links {
 		for _, in := range l.Instances {
 			rs.LinkIfaces[in.Iface] = l.ID
+			if in.Transport == protocol.TransportGRE {
+				rs.GREIfaces, rs.GREPeers = append(rs.GREIfaces, in.Iface), append(rs.GREPeers, in.Remote)
+			}
 			if slices.Contains(l.Peer.Roles, protocol.RoleBridge) {
 				rs.TransitIfaces = append(rs.TransitIfaces, in.Iface)
 			}
@@ -580,6 +587,7 @@ func (p *Plane) syncResolver() error {
 		defer p.mu.Unlock()
 		return p.resolverMark()
 	})
+	r.roots = p.cfg.UpstreamRoots
 	if err := r.start(); err != nil {
 		return fmt.Errorf("resolver: %w", err)
 	}

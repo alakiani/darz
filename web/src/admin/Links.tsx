@@ -43,7 +43,7 @@ export function LinksScreen() {
               </td>
               <td>{l.crosses ? "yes" : "no"}</td>
               <td className="status">{l.up_a || l.up_b ? `up, ${l.transport}, ${l.rtt_ms.toFixed(0)} ms` : "down"}</td>
-              <td>{l.instances.map((i) => `${i.transport}:${i.listen_port || "?"}${i.up ? " ✓" : ""}`).join(", ")}</td>
+              <td>{l.instances.map((i) => `${i.transport}${i.transport === "gre" ? "" : `:${i.listen_port || "?"}`}${i.up ? " ✓" : ""}`).join(", ")}</td>
             </tr>
           ))}
         </tbody>

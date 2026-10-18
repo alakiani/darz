@@ -13,6 +13,7 @@ const (
 	// must not match "dz*", the Link instances' pattern.
 	DeviceIface = "darz0"
 	devicePool  = "10.77.0.0/16"
+	meshRange   = "10.78.0.0/16" // every instance's /31 (ADR 0007)
 
 	// A packet's candidate mark picks its routing table. Over a Link it is
 	// the Link's mark, which a connection arriving over a Link also keeps
@@ -59,6 +60,10 @@ type ruleset struct {
 
 	// LinkIfaces maps every Link instance's interface to its Link.
 	LinkIfaces map[string]uint64
+	// GREIfaces are the GRE instances' interfaces, and GREPeers their
+	// remote ends: the only addresses GRE is taken from (ADR 0009).
+	GREIfaces []string
+	GREPeers  []string
 	// Exit is set on Nodes that hold the Exit Role: they masquerade what
 	// leaves their uplink for others.
 	Exit   bool
@@ -155,6 +160,13 @@ func render(r ruleset) string {
 	// Links carry less than 1500 bytes; clamp TCP to the path.
 	w("\tchain forward {")
 	w("\t\ttype filter hook forward priority mangle; policy accept;")
+	if len(r.GREIfaces) > 0 {
+		// GRE carries no authentication: new traffic that comes in on it
+		// is forwarded only from a Device or the mesh, so an Exit is no
+		// open relay. Replies to this Node's own connections pass.
+		w("\t\tiifname { %s } ct direction original ip saddr != { %s, %s } counter drop",
+			quoteAll(slices.Sorted(slices.Values(r.GREIfaces))), devicePool, meshRange)
+	}
 	w("\t\ttcp flags syn / syn,rst tcp option maxseg size set rt mtu")
 	if r.Bridge {
 		// A Device's connection remembers its candidate, tagged so the
@@ -166,6 +178,8 @@ func render(r ruleset) string {
 	}
 	w("\t}")
 
+	w("\tchain input {")
+	w("\t\ttype filter hook input priority filter; policy accept;")
 	if r.MonitorPort != 0 {
 		// The monitoring port: the Coordinator VM in, everyone else
 		// silently dropped, so scanners see nothing.
@@ -177,8 +191,6 @@ func render(r ruleset) string {
 				v4 = append(v4, a)
 			}
 		}
-		w("\tchain input {")
-		w("\t\ttype filter hook input priority filter; policy accept;")
 		if len(v4) > 0 {
 			w("\t\ttcp dport %d ip saddr { %s } accept", r.MonitorPort, strings.Join(v4, ", "))
 		}
@@ -186,8 +198,13 @@ func render(r ruleset) string {
 			w("\t\ttcp dport %d ip6 saddr { %s } accept", r.MonitorPort, strings.Join(v6, ", "))
 		}
 		w("\t\ttcp dport %d drop", r.MonitorPort)
-		w("\t}")
 	}
+	// GRE only from the current GRE peers (ADR 0009).
+	if peers := slices.Compact(slices.Sorted(slices.Values(r.GREPeers))); len(peers) > 0 {
+		w("\t\tmeta l4proto gre ip saddr { %s } accept", strings.Join(peers, ", "))
+	}
+	w("\t\tmeta l4proto gre drop")
+	w("\t}")
 
 	w("\tchain postrouting {")
 	w("\t\ttype nat hook postrouting priority srcnat; policy accept;")

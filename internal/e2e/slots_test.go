@@ -46,7 +46,7 @@ func TestEndpointSlots(t *testing.T) {
 	co := startCoordinator(t, l.Node("coord"))
 	co.c.Upstreams = []string{"9.9.9.9"}
 	egressTargets(t, co, l.Node("egress-ab"), l.Node("egress-ir"))
-	serveEgress(t, l.Node("dns-ab")) // a resolver abroad that answers the probe's query
+	upstreamCA := serveEgress(t, l.Node("dns-ab")) // a resolver abroad that answers the probe's query
 	whoami(t, l.Node("web-ab"), 7)
 	dumpNetOnFailure(t, l, "ir1", "ir3")
 
@@ -65,7 +65,8 @@ func TestEndpointSlots(t *testing.T) {
 	if err := co.c.InitProbe(ctx); err != nil {
 		t.Fatal(err)
 	}
-	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{}}
+	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{},
+		agentArgs: []string{"-upstream-ca", upstreamCA}}
 	m.startAgent("ir1", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ir3", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ab1", []protocol.Role{protocol.RoleExit}, nil)

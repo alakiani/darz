@@ -59,13 +59,15 @@ func ends(a, b store.Node) (initiator, listener store.Node) {
 	return b, a
 }
 
-// wantedTransports is a Link's candidate instances by Transport: two
-// AmneziaWG instances across the filter, never plain WireGuard; one of each
-// on the same side. Transports off the global list are left out.
+// wantedTransports is a Link's candidate instances by Transport, in
+// preference order: across the filter one GRE instance, two AmneziaWG
+// instances and one plain WireGuard instance (ADR 0009); on the same side
+// one plain WireGuard and one AmneziaWG instance (ADR 0007). Transports off
+// the global list are left out.
 func wantedTransports(a, b store.Node, enabled []protocol.Transport) []protocol.Transport {
 	want := []protocol.Transport{protocol.TransportWireGuard, protocol.TransportAmneziaWG}
 	if crosses(a, b) {
-		want = []protocol.Transport{protocol.TransportAmneziaWG, protocol.TransportAmneziaWG}
+		want = []protocol.Transport{protocol.TransportGRE, protocol.TransportAmneziaWG, protocol.TransportAmneziaWG, protocol.TransportWireGuard}
 	}
 	return slices.DeleteFunc(want, func(t protocol.Transport) bool { return !slices.Contains(enabled, t) })
 }
@@ -181,9 +183,27 @@ func linksFor(n store.Node, v meshView) []protocol.Link {
 			out = append(out, link) // no instance can come up without both keys
 			continue
 		}
-		for _, in := range preferenceOrder(v.instances[l.ID]) {
+		for _, in := range preferenceOrder(v.instances[l.ID], crosses(n, peer)) {
 			listenAddr, initAddr := slotAddrs(in.Slot)
 			pi := protocol.Instance{ID: in.ID, Transport: in.Transport}
+			if in.Transport == protocol.TransportGRE {
+				// Both ends point their tunnel at the other's seen address,
+				// and nobody chooses anything (ADR 0009).
+				remote, err := netip.ParseAddr(v.seenAddr[peer.ID])
+				if err != nil || !remote.Is4() {
+					continue
+				}
+				pi.Remote = remote.String()
+				if link.Initiator {
+					pi.Iface = fmt.Sprintf("dz%di", in.ID)
+					pi.Addr, pi.PeerAddr = netip.PrefixFrom(initAddr, 31).String(), listenAddr.String()
+				} else {
+					pi.Iface = fmt.Sprintf("dz%dl", in.ID)
+					pi.Addr, pi.PeerAddr = netip.PrefixFrom(listenAddr, 31).String(), initAddr.String()
+				}
+				link.Instances = append(link.Instances, pi)
+				continue
+			}
 			if link.Initiator {
 				addr := v.seenAddr[peer.ID]
 				if in.ListenPort == 0 || addr == "" || in.Transport == protocol.TransportAmneziaWG && in.AWG == nil {
@@ -204,17 +224,18 @@ func linksFor(n store.Node, v meshView) []protocol.Link {
 	return out
 }
 
-// preferenceOrder puts plain WireGuard first, then the rest in the order
-// they were created (ADR 0007).
-func preferenceOrder(insts []store.Instance) []store.Instance {
+// preferenceOrder sorts a Link's instances by Transport, then in the order
+// they were created: across the filter GRE, AmneziaWG, then plain WireGuard
+// (ADR 0009); on the same side plain WireGuard first (ADR 0007).
+func preferenceOrder(insts []store.Instance, crossing bool) []store.Instance {
+	order := []protocol.Transport{protocol.TransportWireGuard, protocol.TransportAmneziaWG, protocol.TransportGRE}
+	if crossing {
+		order = []protocol.Transport{protocol.TransportGRE, protocol.TransportAmneziaWG, protocol.TransportWireGuard}
+	}
 	out := slices.Clone(insts)
 	slices.SortStableFunc(out, func(a, b store.Instance) int {
-		aw, bw := a.Transport == protocol.TransportWireGuard, b.Transport == protocol.TransportWireGuard
-		switch {
-		case aw && !bw:
-			return -1
-		case bw && !aw:
-			return 1
+		if ra, rb := slices.Index(order, a.Transport), slices.Index(order, b.Transport); ra != rb {
+			return ra - rb
 		}
 		return int(int64(a.ID) - int64(b.ID))
 	})
@@ -284,6 +305,11 @@ func (c *Coordinator) takeLinkHealth(ctx context.Context, n store.Node, h protoc
 			if err := c.store.SetInstanceDownSince(ctx, in.ID, ih.DownSince); err != nil {
 				return false, err
 			}
+			// Replacing changes an instance's port and fingerprint. A GRE
+			// instance has neither, so it just keeps retrying (ADR 0009).
+			if in.Transport == protocol.TransportGRE {
+				continue
+			}
 			if ih.DownSince != nil && c.store.Now().Sub(*ih.DownSince) >= replaceAfter {
 				c.log.Warn("replacing instance down too long", "link", in.LinkID, "instance", in.ID, "down_since", ih.DownSince)
 				if err := c.store.RetireInstance(ctx, in.ID); err != nil {
@@ -301,6 +327,8 @@ func validChoice(in store.Instance, ch protocol.ListenChoice) error {
 		return fmt.Errorf("port %d outside 10000-60000", ch.Port)
 	}
 	switch in.Transport {
+	case protocol.TransportGRE:
+		return fmt.Errorf("a GRE instance has no port")
 	case protocol.TransportAmneziaWG:
 		if ch.AWG == nil {
 			return fmt.Errorf("no AmneziaWG parameters")

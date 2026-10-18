@@ -4,11 +4,20 @@ package e2e
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"io"
 	"log/slog"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,7 +125,9 @@ func egressTargets(t *testing.T, co *coord, abroad, domestic *lab.Node) {
 	}
 }
 
-func serveEgress(t *testing.T, n *lab.Node) {
+// serveEgress also answers DNS over TLS, as the resolvers Bridges forward
+// to do; it returns the root to trust for that, for -upstream-ca.
+func serveEgress(t *testing.T, n *lab.Node) (caFile string) {
 	t.Helper()
 	var udp net.PacketConn
 	var tcp net.Listener
@@ -146,6 +157,86 @@ func serveEgress(t *testing.T, n *lab.Node) {
 		w.WriteHeader(http.StatusNoContent)
 	})}
 	go srv.Serve(tcp)
+	return serveDoT(t, n, func(q []byte, _ string) []byte { return answerA(q, n.Addr().As4()) })
+}
+
+// serveDoT answers DNS over TLS on n's port 853 with answer, given each
+// query and the address it came from (ADR 0009). Its certificate is for
+// n's IP address, as public resolvers' are; it returns the file of the
+// root that signs it.
+func serveDoT(t *testing.T, n *lab.Node, answer func(q []byte, from string) []byte) (caFile string) {
+	t.Helper()
+	cert, caPEM := ipCert(t, n.Addr())
+	caFile = filepath.Join(t.TempDir(), "upstream-ca.pem")
+	if err := os.WriteFile(caFile, caPEM, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var ln net.Listener
+	if err := n.Do(func() (err error) {
+		ln, err = tls.Listen("tcp4", net.JoinHostPort(n.Addr().String(), "853"), &tls.Config{Certificates: []tls.Certificate{cert}})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go serveStreamDNS(ln, answer)
+	return caFile
+}
+
+// serveStreamDNS answers length-prefixed DNS queries, as many as each
+// connection carries, until ln closes.
+func serveStreamDNS(ln net.Listener, answer func(q []byte, from string) []byte) {
+	for {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		go func() {
+			defer c.Close()
+			host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
+			for {
+				var n [2]byte
+				if _, err := io.ReadFull(c, n[:]); err != nil {
+					return
+				}
+				q := make([]byte, int(n[0])<<8|int(n[1]))
+				if _, err := io.ReadFull(c, q); err != nil {
+					return
+				}
+				a := answer(q, host)
+				if a == nil {
+					return
+				}
+				c.Write(append([]byte{byte(len(a) >> 8), byte(len(a))}, a...))
+			}
+		}()
+	}
+}
+
+// ipCert is a certificate for addr, signed by a fresh root, and the root
+// in PEM.
+func ipCert(t *testing.T, addr netip.Addr) (tls.Certificate, []byte) {
+	t.Helper()
+	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caTmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "lab resolver root"},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour),
+		IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caKey.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caCert, _ := x509.ParseCertificate(caDER)
+	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: addr.String()},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour),
+		IPAddresses: []net.IP{addr.AsSlice()}, KeyUsage: x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, caCert, &key.PublicKey, caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key},
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})
 }
 
 // answerA answers a DNS query: an A query gets addr, any other type an

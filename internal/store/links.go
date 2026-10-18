@@ -176,12 +176,13 @@ func (s *Store) SetInstanceDownSince(ctx context.Context, id uint64, since *time
 	return err
 }
 
-// Transports returns the global ordered candidate Transport list.
+// Transports returns the global ordered candidate Transport list. Until an
+// Admin changes it, every Transport is on, GRE included (ADR 0009).
 func (s *Store) Transports(ctx context.Context) ([]protocol.Transport, error) {
 	var v string
 	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = 'transports'`).Scan(&v)
 	if errors.Is(err, sql.ErrNoRows) {
-		return []protocol.Transport{protocol.TransportWireGuard, protocol.TransportAmneziaWG}, nil
+		return []protocol.Transport{protocol.TransportWireGuard, protocol.TransportAmneziaWG, protocol.TransportGRE}, nil
 	}
 	if err != nil {
 		return nil, err

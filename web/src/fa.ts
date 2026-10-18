@@ -42,6 +42,7 @@ export const fa = {
     "این پیکربندی‌ها فقط همین یک بار نشان داده می‌شوند و کلید خصوصی جایی جز همین مرورگر ذخیره نمی‌شود. همین حالا هر سه را در برنامهٔ WireGuard وارد کنید یا فایل را نگه دارید.",
   downloadZip: "دریافت هر سه در یک فایل",
   download: "دریافت فایل",
+  openInWireGuard: "باز کردن در WireGuard",
   saved: "ذخیره کردم",
   labels: { Main: "اصلی", "Backup 1": "پشتیبان ۱", "Backup 2": "پشتیبان ۲" } as Record<string, string>,
 

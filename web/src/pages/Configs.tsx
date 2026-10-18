@@ -9,8 +9,10 @@ import { fa } from "../fa";
 /** The configs of a freshly issued Device, shown once: one QR code each,
  * and the files. The private key exists only in this page's memory. */
 export function Configs({ issued, privateKey, onSaved }: { issued: IssuedDevice; privateKey: string; onSaved: () => void }) {
+  // No MIME type: iOS then types the file by its .conf extension, which the
+  // WireGuard app claims; as text/plain the share sheet doesn't offer it.
   const files = useMemo(
-    () => configFiles(issued.config, privateKey).map((f) => ({ ...f, file: new File([f.text], f.name, { type: "text/plain" }) })),
+    () => configFiles(issued.config, privateKey).map((f) => ({ ...f, file: new File([f.text], f.name) })),
     [issued, privateKey],
   );
   const [qrs, setQrs] = useState<string[]>([]);

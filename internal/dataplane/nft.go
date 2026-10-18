@@ -3,6 +3,7 @@ package dataplane
 import (
 	"fmt"
 	"maps"
+	"net/netip"
 	"slices"
 	"strings"
 )
@@ -200,7 +201,16 @@ func render(r ruleset) string {
 		w("\t\ttcp dport %d drop", r.MonitorPort)
 	}
 	// GRE only from the current GRE peers (ADR 0009).
-	if peers := slices.Compact(slices.Sorted(slices.Values(r.GREPeers))); len(peers) > 0 {
+	// A peer without a valid address (such as from a snapshot an older Agent
+	// saved) is left out: nft rejects an empty or malformed set, and that
+	// would fail the whole ruleset.
+	var valid []string
+	for _, p := range r.GREPeers {
+		if addr, err := netip.ParseAddr(p); err == nil && addr.Is4() {
+			valid = append(valid, addr.String())
+		}
+	}
+	if peers := slices.Compact(slices.Sorted(slices.Values(valid))); len(peers) > 0 {
 		w("\t\tmeta l4proto gre ip saddr { %s } accept", strings.Join(peers, ", "))
 	}
 	w("\t\tmeta l4proto gre drop")

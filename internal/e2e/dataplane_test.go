@@ -4,23 +4,13 @@ package e2e
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -79,32 +69,23 @@ func whoami(t *testing.T, n *lab.Node, port int) {
 
 // dnsServer stands in for a public resolver: it answers each UDP query,
 // and each length-prefixed query over TCP or over TLS on port 853, with
-// the source address it saw. Its certificate is for its IP address, as
-// public resolvers' are; it returns the file of the root that signs it,
-// for the Agents' -upstream-ca.
+// the source address it saw. It returns the file of the root its TLS
+// certificate verifies against, for the Agents' -upstream-ca.
 func dnsServer(t *testing.T, n *lab.Node) (caFile string) {
 	t.Helper()
-	cert, caPEM := ipCert(t, n.Addr())
-	caFile = filepath.Join(t.TempDir(), "upstream-ca.pem")
-	if err := os.WriteFile(caFile, caPEM, 0o644); err != nil {
-		t.Fatal(err)
-	}
 	addr := net.JoinHostPort(n.Addr().String(), "53")
 	var udp net.PacketConn
-	var tcp, dot net.Listener
+	var tcp net.Listener
 	if err := n.Do(func() (err error) {
 		if udp, err = net.ListenPacket("udp4", addr); err != nil {
 			return err
 		}
-		if tcp, err = net.Listen("tcp4", addr); err != nil {
-			return err
-		}
-		dot, err = tls.Listen("tcp4", net.JoinHostPort(n.Addr().String(), "853"), &tls.Config{Certificates: []tls.Certificate{cert}})
+		tcp, err = net.Listen("tcp4", addr)
 		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { udp.Close(); tcp.Close(); dot.Close() })
+	t.Cleanup(func() { udp.Close(); tcp.Close() })
 	go func() {
 		buf := make([]byte, 1500)
 		for {
@@ -115,56 +96,9 @@ func dnsServer(t *testing.T, n *lab.Node) (caFile string) {
 			udp.WriteTo([]byte("dns:"+from.(*net.UDPAddr).IP.String()), from)
 		}
 	}()
-	for _, ln := range []net.Listener{tcp, dot} {
-		go func() {
-			for {
-				c, err := ln.Accept()
-				if err != nil {
-					return
-				}
-				go func() {
-					defer c.Close()
-					host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
-					for { // as many queries as the connection carries
-						var n [2]byte
-						if _, err := io.ReadFull(c, n[:]); err != nil {
-							return
-						}
-						io.CopyN(io.Discard, c, int64(n[0])<<8|int64(n[1]))
-						answer := "dns:" + host
-						c.Write(append([]byte{0, byte(len(answer))}, answer...))
-					}
-				}()
-			}
-		}()
-	}
-	return caFile
-}
-
-// ipCert is a certificate for addr, signed by a fresh root, and the root
-// in PEM.
-func ipCert(t *testing.T, addr netip.Addr) (tls.Certificate, []byte) {
-	t.Helper()
-	caKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	caTmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "lab resolver root"},
-		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour),
-		IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
-	caDER, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caKey.PublicKey, caKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	caCert, _ := x509.ParseCertificate(caDER)
-	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	tmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: addr.String()},
-		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour),
-		IPAddresses: []net.IP{addr.AsSlice()}, KeyUsage: x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, caCert, &key.PublicKey, caKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key},
-		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})
+	answer := func(_ []byte, from string) []byte { return []byte("dns:" + from) }
+	go serveStreamDNS(tcp, answer)
+	return serveDoT(t, n, answer)
 }
 
 // phone is a lab Node set up as a Device: stock WireGuard to a Bridge, with

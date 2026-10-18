@@ -64,7 +64,7 @@ func TestMonitoring(t *testing.T) {
 	co := startCoordinator(t, coordNode)
 	co.c.Upstreams = []string{"9.9.9.9"}
 	egressTargets(t, co, l.Node("egress-ab"), l.Node("egress-ir"))
-	serveEgress(t, l.Node("dns-ab"))
+	upstreamCA := serveEgress(t, l.Node("dns-ab"))
 	dumpNetOnFailure(t, l, "ir1", "ab2")
 
 	// Telegram, faked, and blocked from the Coordinator.
@@ -124,7 +124,7 @@ func TestMonitoring(t *testing.T) {
 	prom := &promAPI{t: t, client: &http.Client{Transport: &http.Transport{DialContext: nsDial(coordNode)}, Timeout: 5 * time.Second}}
 
 	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{},
-		agentArgs: []string{"-telegram-api", "http://" + telegramAddr, "-node-exporter", ""}}
+		agentArgs: []string{"-telegram-api", "http://" + telegramAddr, "-node-exporter", "", "-upstream-ca", upstreamCA}}
 	m.startAgent("ir1", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ir3", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ab1", []protocol.Role{protocol.RoleExit}, nil)

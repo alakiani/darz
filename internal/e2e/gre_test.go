@@ -216,7 +216,7 @@ func sendGRE(t *testing.T, n *lab.Node, dst, src, target netip.Addr, port uint16
 	pkt := append([]byte{0, 0, 0x08, 0x00}, inner...) // GRE carrying IPv4
 
 	var conn net.PacketConn
-	if err := n.Do(func() (err error) { conn, err = net.ListenPacket("ip4:gre", "0.0.0.0"); return err }); err != nil {
+	if err := n.Do(func() (err error) { conn, err = net.ListenPacket("ip4:47", "0.0.0.0"); return err }); err != nil {
 		t.Fatalf("raw GRE socket on %s: %v", n.Name(), err)
 	}
 	defer conn.Close()

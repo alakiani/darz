@@ -178,9 +178,7 @@ func (a *agent) serveMetrics(w http.ResponseWriter, r *http.Request) {
 		return fmt.Sprintf("link %d", id)
 	}
 	for _, lh := range h.Links {
-		pair := []string{st.Node.Name, peerName(lh.LinkID)}
-		slices.Sort(pair)
-		labels := []string{"link_id", strconv.FormatUint(lh.LinkID, 10), "link", strings.Join(pair, "/"), "peer", peerName(lh.LinkID)}
+		labels := metrics.LinkLabels(lh.LinkID, st.Node.Name, peers[lh.LinkID])
 		m.Bool("darz_link_up", "1 while the Link has a working transport.", lh.Up, labels...)
 		m.Gauge("darz_link_rtt_seconds", "Round-trip time over the Link's active instance.", lh.RTTMillis/1000, labels...)
 		m.Gauge("darz_link_loss_ratio", "Probe loss over the last 30 s on the active instance.", lh.Loss, labels...)

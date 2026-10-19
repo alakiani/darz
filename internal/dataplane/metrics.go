@@ -30,8 +30,9 @@ func (p *Plane) countMoves(rule string, moves []move) {
 }
 
 // WriteMetrics implements agent.MetricsWriter: bucket moves, and on a
-// Bridge its active Devices, as a count only, and the bytes through its
-// Device interface beside the bytes metered.
+// Bridge how it weighs its candidates, its active Devices, as a count
+// only, and the bytes through its Device interface beside the bytes
+// metered.
 func (p *Plane) WriteMetrics(w *metrics.Writer) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -43,6 +44,7 @@ func (p *Plane) WriteMetrics(w *metrics.Writer) {
 		w.Counter("darz_path_bucket_moves_total", "Buckets of a Rule's Device traffic moved, by kind.",
 			float64(p.movedBuckets[k]), "rule", k[0], "kind", k[1])
 	}
+	p.writePaths(w)
 	if p.st == nil || p.st.Bridge == nil {
 		return
 	}
@@ -59,6 +61,37 @@ func (p *Plane) WriteMetrics(w *metrics.Writer) {
 		w.Counter("darz_bridge_interface_bytes_total", "Bytes through the Device interface, both ways.", float64(n))
 	}
 	w.Counter("darz_metered_bytes_total", "Bytes metered since the Agent started, both ways.", float64(p.meter.metered()))
+}
+
+// writePaths writes, on a Bridge, how the last step weighed each Rule's
+// candidates for its own Devices (ADR 0008). The labels are
+// darz_path_buckets', so the two join: a candidate is its Link's far end
+// by name, or "local". Call with mu held.
+func (p *Plane) writePaths(w *metrics.Writer) {
+	if p.st == nil || p.st.Bridge == nil {
+		return
+	}
+	peers := map[string]string{}
+	for _, l := range p.st.Links {
+		peers[linkKey(l.ID)] = l.Peer.Name
+	}
+	rules := p.st.Bridge.Rules
+	for i, r := range rules {
+		labels := []string{"rule_id", strconv.FormatUint(r.ID, 10), "rule", r.Name, "default", strconv.FormatBool(i == len(rules)-1)}
+		for _, v := range p.views[r.ID] {
+			cand := v.key
+			if name := peers[v.key]; name != "" {
+				cand = name
+			} else if id, ok := strings.CutPrefix(v.key, "link:"); ok {
+				cand = "link " + id
+			}
+			l := append(slices.Clip(labels), "candidate", cand)
+			w.Gauge("darz_path_weight", "The candidate's weight for the Rule: throughput in Mbit/s × availability² × RTT factor.", v.weight, l...)
+			w.Gauge("darz_path_target_share", "The share of the Rule's buckets the candidate's weight asks for, before the cutoff.", v.target, l...)
+			w.Bool("darz_path_cut_off", "1 while the candidate's weight is under the cutoff fraction of the best, so it gets no buckets.", v.cut, l...)
+			w.Gauge("darz_path_availability", "The candidate's availability over the window, less the flap penalty, as its weight uses it.", v.avail, l...)
+		}
+	}
 }
 
 // ifaceBytes is an interface's received plus sent bytes.

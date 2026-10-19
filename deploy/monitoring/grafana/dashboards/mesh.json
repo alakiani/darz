@@ -1,7 +1,7 @@
 {
   "uid": "darz-mesh",
   "title": "Mesh",
-  "description": "Nodes, every Link with its latency, loss and transport, active Paths, and the Bridge behind each Endpoint Slot (ADR 0006).",
+  "description": "Nodes, every Link with its latency, loss, transport, instances and throughput, active Paths and their weights, and the Bridge behind each Endpoint Slot (ADR 0006).",
   "tags": ["darz"],
   "timezone": "utc",
   "schemaVersion": 39,
@@ -108,6 +108,98 @@
         }
       },
       "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Path weights: $bridge",
+      "description": "Each candidate's weight per Rule: throughput × availability² × RTT factor (ADR 0008). A candidate under 25% of the best weight is cut off and gets no buckets; it is drawn dashed.",
+      "repeat": "bridge",
+      "repeatDirection": "h",
+      "maxPerRow": 2,
+      "gridPos": { "x": 0, "y": 34, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "darz_path_weight{node=~\"$bridge\"} unless on (node, rule_id, candidate) darz_path_cut_off == 1", "legendFormat": "{{rule}} → {{candidate}}" },
+        { "refId": "B", "expr": "darz_path_weight{node=~\"$bridge\"} and on (node, rule_id, candidate) darz_path_cut_off == 1", "legendFormat": "{{rule}} → {{candidate}} (cut off)" }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [{ "matcher": { "id": "byFrameRefID", "options": "B" }, "properties": [{ "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }] }]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Throughput by Link",
+      "description": "What each Link's far end can still send the Bridge measuring it: the last throughput test, raised by peaks of real traffic, with its age and the transport that carried it (ADR 0008).",
+      "gridPos": { "x": 0, "y": 42, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "max by (node, link) (darz_link_throughput_mbps)", "format": "table", "instant": true },
+        { "refId": "B", "expr": "max by (node, link) (time() - darz_link_throughput_measured_timestamp_seconds)", "format": "table", "instant": true },
+        { "refId": "C", "expr": "max by (node, link, transport) (darz_link_throughput_transport)", "format": "table", "instant": true }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "Value #C": true },
+          "renameByName": { "node": "measured by", "Value #A": "Mbit/s", "Value #B": "age" } } }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [{ "matcher": { "id": "byName", "options": "age" }, "properties": [{ "id": "unit", "value": "s" }] }]
+      }
+    },
+    {
+      "id": 11,
+      "type": "state-timeline",
+      "title": "Instances Up: $link",
+      "description": "Each Transport instance of the Link as either end sees it. Every instance down together is a blackout of the whole path, not one transport failing.",
+      "repeat": "link",
+      "repeatDirection": "h",
+      "maxPerRow": 2,
+      "gridPos": { "x": 0, "y": 50, "w": 12, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "targets": [{ "refId": "A", "expr": "darz_link_instance_up{link=~\"$link\"}", "legendFormat": "{{node}}: {{transport}} {{instance_id}}" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "type": "value", "options": { "0": { "text": "down", "color": "red" }, "1": { "text": "up", "color": "green" } } }],
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "options": { "showValue": "never", "mergeValues": true }
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "bridge",
+        "label": "Bridge",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+        "definition": "label_values(darz_path_weight, node)",
+        "query": { "query": "label_values(darz_path_weight, node)", "refId": "bridge" },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "link",
+        "label": "Link",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+        "definition": "label_values(darz_link_instance_up, link)",
+        "query": { "query": "label_values(darz_link_instance_up, link)", "refId": "link" },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  }
 }

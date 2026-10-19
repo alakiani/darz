@@ -197,6 +197,7 @@ func (m *Manager) measureLinks(ctx context.Context) {
 		peer        string
 		tp          *throughput
 		iface       string
+		transport   protocol.Transport
 		local, addr netip.Addr
 	}
 	m.mu.Lock()
@@ -217,7 +218,7 @@ func (m *Manager) measureLinks(ctx context.Context) {
 			tp = &throughput{}
 			m.tputs[id] = tp
 		}
-		jobs = append(jobs, job{id, ls.peer.Name, tp, in.iface(), in.config().Addr.Addr(), in.peerAddr})
+		jobs = append(jobs, job{id, ls.peer.Name, tp, in.iface(), in.spec.Transport, in.config().Addr.Addr(), in.peerAddr})
 	}
 	m.mu.Unlock()
 
@@ -233,6 +234,9 @@ func (m *Manager) measureLinks(ctx context.Context) {
 		before, wasDue := j.tp.mbps, !j.tp.next.IsZero() && !now.Before(j.tp.next)
 		run := j.tp.due(now, rate, ok, tm, rand.Float64)
 		after := j.tp.mbps
+		if after > before {
+			j.tp.observed(now, j.transport)
+		}
 		m.mu.Unlock()
 		switch {
 		case run:
@@ -251,7 +255,7 @@ func (m *Manager) measureLinks(ctx context.Context) {
 			continue
 		}
 		m.mu.Lock()
-		j.tp.measured(r.mbps)
+		j.tp.measured(r.mbps, time.Now(), j.transport)
 		m.mu.Unlock()
 		m.log.Info("throughput measured", "link", j.id, "peer", j.peer, "mbps", fmt.Sprintf("%.1f", r.mbps), "bytes", r.bytes)
 	}
@@ -296,10 +300,14 @@ func throughputTimingFrom(sc protocol.Scoring) throughputTiming {
 
 // throughput is one Link's figure and the schedule of its tests.
 type throughput struct {
-	mbps    float64   // 0 until the first test
-	next    time.Time // the next test; zero until the Link is first seen Up
-	iface   string    // whose counter samples holds
-	samples []rxSample
+	mbps float64 // 0 until the first test
+	// at and transport are when the figure was taken, by a test or a peak
+	// of real traffic, and the transport that carried it.
+	at        time.Time
+	transport protocol.Transport
+	next      time.Time // the next test; zero until the Link is first seen Up
+	iface     string    // whose counter samples holds
+	samples   []rxSample
 }
 
 type rxSample struct {
@@ -350,7 +358,13 @@ func (t *throughput) due(now time.Time, rate float64, haveRate bool, tm throughp
 // measured takes a test's figure, which replaces the last one even when it
 // is lower. The test's own bytes are not real traffic, so the samples
 // start again.
-func (t *throughput) measured(mbps float64) {
+func (t *throughput) measured(mbps float64, at time.Time, tr protocol.Transport) {
 	t.mbps = mbps
 	t.samples = nil
+	t.observed(at, tr)
+}
+
+// observed records when the figure was taken and over which transport.
+func (t *throughput) observed(at time.Time, tr protocol.Transport) {
+	t.at, t.transport = at, tr
 }

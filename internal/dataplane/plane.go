@@ -81,6 +81,9 @@ type Plane struct {
 	avail   map[string]*availability
 	applied map[string][buckets]string // nft map name -> buckets in force
 	paths   []protocol.RuleHealth
+	// views are each Rule's candidates for this Bridge's own Devices, as
+	// the last step weighed them, for /metrics.
+	views   map[uint64][]candidateView
 	transit []uint32
 	// moves counts bucket moves of Device traffic by Rule name and kind:
 	// steps that moved any bucket, and buckets moved (ADR 0006).
@@ -361,6 +364,7 @@ func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
 	selfEgress := p.cfg.Links.EgressOK()
 	var transit []uint32
 	var health []protocol.RuleHealth
+	views := map[uint64][]candidateView{}
 	for _, r := range b.Rules {
 		for _, view := range []struct {
 			name    string
@@ -379,7 +383,8 @@ func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
 					p.avail[key] = a
 				}
 				a.observe(now, c.eligible)
-				c.weight = weight(c.mbps, a.value(now, b.Scoring), c.rtt, b.Scoring)
+				c.avail = a.value(now, b.Scoring)
+				c.weight = weight(c.mbps, c.avail, c.rtt, b.Scoring)
 				if c.eligible {
 					eligible++
 					ownEligible = ownEligible || c.kind != candTransit
@@ -394,6 +399,7 @@ func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
 			logMoves(p.log, r.Name, view.name, moves)
 			if !view.transit {
 				p.countMoves(r.Name, moves)
+				views[r.ID] = targetShares(cands, b.Scoring.Cutoff)
 			}
 			if !view.transit {
 				if ownEligible {
@@ -411,7 +417,7 @@ func (p *Plane) computePaths() (dev, tr map[uint64][buckets]string) {
 		}
 		health[i].Shares = shares
 	}
-	p.paths = health
+	p.paths, p.views = health, views
 	if !slices.Equal(transit, p.transit) {
 		p.log.Info("transit offered", "rules", transit)
 		p.transit = transit

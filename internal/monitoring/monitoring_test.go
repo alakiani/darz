@@ -41,6 +41,7 @@ func TestRulesCoverTheAlertTable(t *testing.T) {
 		"for: 2m",
 		`darz_slot_bridge_eligible == 0`,
 		`increase(darz_path_moves_total{kind="failure"}[1h]) > 6`,
+		`changes((max by (link) (darz_link_instance_up) == bool 0)[1h:]) >= 5`,
 		`darz_client_cert_expiry_timestamp_seconds - time() < 2592000`,
 		`time() - darz_backup_last_success_timestamp_seconds > 129600`,
 	} {
@@ -98,9 +99,57 @@ func TestMeshDashboard(t *testing.T) {
 	joined := strings.Join(qs, "\n")
 	// ADR 0006's Mesh dashboard: Nodes, the Link grid, Paths, slots.
 	for _, want := range []string{`up{job="agents"}`, "darz_link_rtt_seconds", "darz_link_loss_ratio", "darz_link_transport",
-		"darz_path_buckets", "darz_slot_points_to"} {
+		"darz_path_buckets", "darz_slot_points_to",
+		// Issue #51: weights and cutoff, throughput with its age, instances.
+		"darz_path_weight", "darz_path_cut_off", "darz_link_throughput_mbps",
+		"darz_link_throughput_measured_timestamp_seconds", "darz_link_throughput_transport", "darz_link_instance_up"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("no panel queries %s", want)
+		}
+	}
+}
+
+// Issue #51's panels: Path weights per Bridge, Throughput by Link, and an
+// Instances Up state timeline per Link, each repeated over a variable the
+// dashboard defines.
+func TestMeshDashboardRepeatsPerBridgeAndLink(t *testing.T) {
+	var d struct {
+		Panels []struct {
+			Type, Title, Repeat string
+		} `json:"panels"`
+		Templating struct {
+			List []struct {
+				Name       string `json:"name"`
+				Definition string `json:"definition"`
+			} `json:"list"`
+		} `json:"templating"`
+	}
+	if err := json.Unmarshal(MeshDashboard(), &d); err != nil {
+		t.Fatal(err)
+	}
+	vars := map[string]string{}
+	for _, v := range d.Templating.List {
+		vars[v.Name] = v.Definition
+	}
+	for _, want := range []struct{ typ, title, repeat, varQuery string }{
+		{"timeseries", "Path weights: $bridge", "bridge", "label_values(darz_path_weight, node)"},
+		{"table", "Throughput by Link", "", ""},
+		{"state-timeline", "Instances Up: $link", "link", "label_values(darz_link_instance_up, link)"},
+	} {
+		found := false
+		for _, p := range d.Panels {
+			if p.Title == want.title {
+				found = true
+				if p.Type != want.typ || p.Repeat != want.repeat {
+					t.Errorf("%s: a %s repeated over %q, want a %s over %q", p.Title, p.Type, p.Repeat, want.typ, want.repeat)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("no %q panel", want.title)
+		}
+		if want.repeat != "" && vars[want.repeat] != want.varQuery {
+			t.Errorf("variable %s = %q, want %q", want.repeat, vars[want.repeat], want.varQuery)
 		}
 	}
 }
@@ -191,6 +240,7 @@ func TestConfigsPassPromtool(t *testing.T) {
 	}
 	run(promtool, "check", "rules", write("rules.yml", Rules(ADRTiming)))
 	run(promtool, "check", "rules", write("lab-rules.yml", Rules(LabTiming)))
+	run(promtool, "test", "rules", write("blackout-test.yml", blackoutTest))
 	for _, f := range []string{"ca.crt", "prometheus.crt", "prometheus.key"} {
 		write(f, "")
 	}
@@ -199,6 +249,42 @@ func TestConfigsPassPromtool(t *testing.T) {
 	run(promtool, "check", "config", "--syntax-only", write("prometheus.yml", Prometheus(cfg)))
 	run(amtool, "check-config", write("alertmanager.yml", Alertmanager(ProductionAlertmanager)))
 }
+
+// blackoutTest is a promtool rule test of LinkBlackout, every 15 s as in
+// production: three blackouts of ab1/ir1 on both ends fire it; one
+// transport failing three times, and two blackouts, do not.
+const blackoutTest = `rule_files: [rules.yml]
+evaluation_interval: 15s
+tests:
+  - interval: 15s
+    input_series:
+      - series: 'darz_link_instance_up{node="ir1",link="ab1/ir1",instance_id="1",transport="gre"}'
+        values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
+      - series: 'darz_link_instance_up{node="ir1",link="ab1/ir1",instance_id="2",transport="amneziawg"}'
+        values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
+      - series: 'darz_link_instance_up{node="ab1",link="ab1/ir1",instance_id="1",transport="gre"}'
+        values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
+      - series: 'darz_link_instance_up{node="ab1",link="ab1/ir1",instance_id="2",transport="amneziawg"}'
+        values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
+      - series: 'darz_link_instance_up{node="ir1",link="ab2/ir1",instance_id="3",transport="gre"}'
+        values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
+      - series: 'darz_link_instance_up{node="ir1",link="ab2/ir1",instance_id="4",transport="amneziawg"}'
+        values: '1x58'
+      - series: 'darz_link_instance_up{node="ir1",link="ab3/ir1",instance_id="5",transport="gre"}'
+        values: '1x10 0x4 1x10 0x4 1x26'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: LinkBlackout
+        exp_alerts: []
+      - eval_time: 14m
+        alertname: LinkBlackout
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              link: ab1/ir1
+            exp_annotations:
+              summary: "Every instance of Link ab1/ir1 went down at once at least 3 times in an hour"
+`
 
 func TestRuleExpressionsUseKnownMetrics(t *testing.T) {
 	// Metric names in the rules either come from the exporters this repo

@@ -60,6 +60,7 @@ type Manager struct {
 	transit  atomic.Pointer[[]uint32] // Rules this Node carries transit for
 
 	mu      sync.Mutex
+	self    string // this Node's name, for metric labels
 	timing  protocol.LinkTiming
 	egress  *protocol.EgressCheck
 	links   map[uint64]*linkState
@@ -209,7 +210,7 @@ func (m *Manager) Apply(ctx context.Context, st protocol.State) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.timing = st.LinkTiming
+	m.self, m.timing = st.Node.Name, st.LinkTiming
 	if m.timing.RetryMinSeconds == 0 {
 		m.timing = protocol.DefaultLinkTiming
 	}

@@ -38,6 +38,17 @@ func TestRawIsAppended(t *testing.T) {
 	}
 }
 
+// Both ends of a Link label it the same, so their series line up.
+func TestLinkLabels(t *testing.T) {
+	ir1, ab1 := strings.Join(LinkLabels(7, "ir1", "ab1"), " "), strings.Join(LinkLabels(7, "ab1", "ir1"), " ")
+	if ir1 != "link_id 7 link ab1/ir1 peer ab1" || ab1 != "link_id 7 link ab1/ir1 peer ir1" {
+		t.Errorf("labels = %q, %q", ir1, ab1)
+	}
+	if got := strings.Join(LinkLabels(7, "x1", ""), " "); got != "link_id 7 link link 7/x1 peer link 7" {
+		t.Errorf("unnamed peer: %q", got)
+	}
+}
+
 func TestServe(t *testing.T) {
 	rec := httptest.NewRecorder()
 	var w Writer

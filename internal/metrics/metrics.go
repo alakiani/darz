@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -93,6 +94,18 @@ func (w *Writer) sample(name, kind, help string, v float64, labels []string) {
 	b.WriteByte(' ')
 	b.WriteString(strconv.FormatFloat(v, 'g', -1, 64))
 	b.WriteByte('\n')
+}
+
+// LinkLabels are the labels of a Link's metrics: its id, its two Nodes'
+// names in order, which both ends agree on, and the far end's name, or
+// "link <id>" until it is known.
+func LinkLabels(id uint64, self, peer string) []string {
+	if peer == "" {
+		peer = fmt.Sprintf("link %d", id)
+	}
+	pair := []string{self, peer}
+	slices.Sort(pair)
+	return []string{"link_id", strconv.FormatUint(id, 10), "link", strings.Join(pair, "/"), "peer", peer}
 }
 
 var escaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`)

@@ -150,7 +150,7 @@ const mbit = 1_000_000 / 8 // bytes per second at 1 Mbps
 
 func TestPassivePeaksRaiseTheFigure(t *testing.T) {
 	var tp throughput
-	tp.measured(20)
+	tp.measured(20, t0, protocol.TransportAmneziaWG)
 	rx := uint64(0)
 	var rate float64
 	var ok bool
@@ -172,7 +172,7 @@ func TestPassivePeaksRaiseTheFigure(t *testing.T) {
 	if tp.mbps != rate {
 		t.Errorf("figure = %v, lowered by light traffic", tp.mbps)
 	}
-	tp.measured(12)
+	tp.measured(12, t0, protocol.TransportAmneziaWG)
 	if tp.mbps != 12 {
 		t.Errorf("a test gave 12 Mbps but the figure is %v", tp.mbps)
 	}
@@ -208,7 +208,7 @@ func TestPassiveRateNeedsAFullWindowAndResetsOnANewInterface(t *testing.T) {
 	}
 	// A test's own bytes are not a peak.
 	tp.sample(t0.Add(5*time.Second), "dz2", 100)
-	tp.measured(1)
+	tp.measured(1, t0, protocol.TransportAmneziaWG)
 	if _, ok := tp.sample(t0.Add(9*time.Second), "dz2", 100+100*mbit); ok {
 		t.Error("the bytes of the test counted as real traffic")
 	}

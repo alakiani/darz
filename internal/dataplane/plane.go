@@ -55,7 +55,10 @@ type Config struct {
 }
 
 const (
-	syncInterval  = 500 * time.Millisecond
+	syncInterval = 500 * time.Millisecond
+	// rulesInterval is how often the ip rules are checked between States:
+	// systemd-networkd deletes rules it did not make when it restarts.
+	rulesInterval = 5 * time.Second
 	usageInterval = 10 * time.Second
 	// maxUsagePerReport keeps a health report small after a long outage;
 	// the rest goes in the reports after it.
@@ -198,7 +201,7 @@ func (p *Plane) Apply(ctx context.Context, st protocol.State) error {
 		p.applied[fmt.Sprintf("dev_%d", r.ID)] = r.Device
 		p.applied[fmt.Sprintf("tr_%d", r.ID)] = r.Transit
 	}
-	if err := p.syncRules(ctx); err != nil {
+	if _, err := p.syncRules(ctx); err != nil {
 		return err
 	}
 	return p.syncResolver()
@@ -210,8 +213,20 @@ func (p *Plane) Run(ctx context.Context) {
 	defer t.Stop()
 	usage := time.NewTicker(usageInterval)
 	defer usage.Stop()
+	rules := time.NewTicker(rulesInterval)
+	defer rules.Stop()
 	for {
 		select {
+		case <-rules.C:
+			p.mu.Lock()
+			if p.st != nil {
+				if n, err := p.syncRules(ctx); err != nil {
+					p.log.Warn("ip rules", "err", err)
+				} else if n > 0 {
+					p.log.Warn("ip rules restored; something else deleted them", "count", n)
+				}
+			}
+			p.mu.Unlock()
 		case <-usage.C:
 			p.mu.Lock()
 			if p.st != nil && p.st.Bridge != nil {
@@ -319,28 +334,31 @@ func (p *Plane) set(ctx context.Context, hash string) ([]string, error) {
 // to a blackhole. Device traffic that matches no Rule is dropped by
 // nftables, not by an ip rule: an "iif darz0" rule would also catch the
 // kernel's reverse-path lookups for replies to Devices and drop them all.
-func (p *Plane) syncRules(ctx context.Context) error {
+// It returns how many rules it added.
+func (p *Plane) syncRules(ctx context.Context) (int, error) {
 	want := map[string]bool{}
 	for _, l := range p.st.Links {
 		want[fmt.Sprintf("%d fwmark %#x lookup %s", prioLinks, linkMark(l.ID), link.LinkTable(l.ID))] = true
 	}
 	if p.st.Bridge != nil {
 		if err := ip(ctx, "route", "replace", "blackhole", "default", "table", fmt.Sprint(dropTable)); err != nil {
-			return err
+			return 0, err
 		}
 		want[fmt.Sprintf("%d fwmark %#x lookup main", prioRules, localMark)] = true
 		want[fmt.Sprintf("%d fwmark %#x lookup %d", prioRules, dropMark, dropTable)] = true
 	}
 	have, err := ourRules(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
+	added := 0
 	for spec := range want {
 		if !have[spec] {
 			f := strings.Fields(spec)
 			if err := ip(ctx, append([]string{"rule", "add", "priority"}, f...)...); err != nil {
-				return err
+				return added, err
 			}
+			added++
 		}
 	}
 	for spec := range have {
@@ -349,7 +367,7 @@ func (p *Plane) syncRules(ctx context.Context) error {
 			ip(ctx, append([]string{"rule", "del", "priority"}, f...)...)
 		}
 	}
-	return nil
+	return added, nil
 }
 
 // computePaths steps every Rule's buckets and returns them resolved, for

@@ -110,6 +110,7 @@ func TestDeploy(t *testing.T) {
 		ids[n.name] = st.ID
 	}
 	f.linksUp(t, ids)
+	f.rulesSurviveNetworkd(t, nodes[0])
 	if out, err := f.exec(nodes[0], "ss -Hltn sport = :9100"); err != nil || !strings.Contains(out, "127.0.0.1:9100") {
 		t.Errorf("node_exporter on %s isn't on loopback only: %q", nodes[0].name, out)
 	}
@@ -470,5 +471,31 @@ func (f *fleet) grafanaThroughThePanel(t *testing.T, invite string) {
 	})
 	if out, _ := f.exec(coordinator, "journalctl -u darz-grafana -o cat --no-pager | grep 'logger=plugin.backgroundinstaller' | head -3"); out != "" {
 		t.Errorf("Grafana tried to install plugins; it must use the bundled ones as they are:\n%s", out)
+	}
+}
+
+// rulesSurviveNetworkd restarts systemd-networkd on n, as an unattended
+// systemd upgrade does, and checks the Agent's ip rules are still there.
+// networkd's default deletes routing-policy rules it did not make when it
+// configures an interface, so it is given one to manage, as netplan's eth0
+// is on a real VM. The Agent is paused meanwhile, so its own repair can't
+// hide a lost rule.
+func (f *fleet) rulesSurviveNetworkd(t *testing.T, n host) {
+	t.Helper()
+	f.mustExec(t, n, `ip link show darzt0 >/dev/null 2>&1 || ip link add darzt0 type dummy
+printf '[Match]\nName=darzt0\n\n[Network]\nAddress=192.0.2.1/32\n' > /etc/systemd/network/50-darzt0.network`)
+	count := "ip rule show | grep -c fwmark || true"
+	before := strings.TrimSpace(f.mustExec(t, n, count))
+	if before == "0" {
+		t.Fatalf("%s has no fwmark rules to keep", n.name)
+	}
+	f.mustExec(t, n, "systemctl kill -s STOP darz-agent")
+	out, err := f.exec(n, "systemctl restart systemd-networkd && sleep 3; "+count)
+	f.mustExec(t, n, "systemctl kill -s CONT darz-agent")
+	if err != nil {
+		t.Fatalf("restarting systemd-networkd on %s: %v: %s", n.name, err, out)
+	}
+	if after := strings.TrimSpace(out); after != before {
+		t.Errorf("restarting systemd-networkd on %s left %s of its %s fwmark rules", n.name, after, before)
 	}
 }

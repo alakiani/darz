@@ -50,6 +50,46 @@
         enabled: true
         state: "{{ 'restarted' if node_exporter_args.changed else 'started' }}"
 
+    # systemd-networkd's defaults delete routing-policy rules and routes it
+    # did not make whenever it restarts, as an unattended systemd upgrade
+    # does. That once left a Bridge without the Agent's ip rules, sending
+    # its traffic for abroad out of its own uplink.
+    - name: Make the networkd config directory
+      ansible.builtin.file:
+        path: /etc/systemd/networkd.conf.d
+        state: directory
+        mode: "0755"
+
+    - name: Keep systemd-networkd off the Agent's rules, routes and interfaces
+      ansible.builtin.copy:
+        dest: "{{ item.dest }}"
+        content: "{{ item.content }}"
+        mode: "0644"
+      loop:
+        - dest: /etc/systemd/networkd.conf.d/darz.conf
+          content: |
+            # Managed by enroll.yml: leave the Agent's ip rules and routes alone.
+            [Network]
+            ManageForeignRoutingPolicyRules=no
+            ManageForeignRoutes=no
+        - dest: /etc/systemd/network/00-darz-unmanaged.network
+          content: |
+            # Managed by enroll.yml: the Agent's Link and Device interfaces.
+            [Match]
+            Name=dz* darz0
+
+            [Link]
+            Unmanaged=yes
+      loop_control:
+        label: "{{ item.dest }}"
+      register: networkd_config
+
+    - name: Restart systemd-networkd with those settings, if it runs
+      ansible.builtin.shell: >-
+        if systemctl is-active --quiet systemd-networkd;
+        then systemctl restart systemd-networkd; fi
+      when: networkd_config.changed
+
     - name: Create the directories
       ansible.builtin.file:
         path: "{{ item.path }}"

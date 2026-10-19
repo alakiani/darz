@@ -55,7 +55,7 @@ type Config struct {
 }
 
 const (
-	syncInterval  = 500 * time.Millisecond
+	syncInterval = 500 * time.Millisecond
 	// rulesInterval is how often the ip rules are checked between States:
 	// systemd-networkd deletes rules it did not make when it restarts.
 	rulesInterval = 5 * time.Second

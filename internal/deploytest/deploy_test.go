@@ -476,10 +476,14 @@ func (f *fleet) grafanaThroughThePanel(t *testing.T, invite string) {
 
 // rulesSurviveNetworkd restarts systemd-networkd on n, as an unattended
 // systemd upgrade does, and checks the Agent's ip rules are still there.
-// networkd's default deletes routing-policy rules it did not make. The
-// Agent is paused meanwhile, so its own repair can't hide a lost rule.
+// networkd's default deletes routing-policy rules it did not make when it
+// configures an interface, so it is given one to manage, as netplan's eth0
+// is on a real VM. The Agent is paused meanwhile, so its own repair can't
+// hide a lost rule.
 func (f *fleet) rulesSurviveNetworkd(t *testing.T, n host) {
 	t.Helper()
+	f.mustExec(t, n, `ip link show darzt0 >/dev/null 2>&1 || ip link add darzt0 type dummy
+printf '[Match]\nName=darzt0\n\n[Network]\nAddress=192.0.2.1/32\n' > /etc/systemd/network/50-darzt0.network`)
 	count := "ip rule show | grep -c fwmark || true"
 	before := strings.TrimSpace(f.mustExec(t, n, count))
 	if before == "0" {

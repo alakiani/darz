@@ -335,6 +335,19 @@ func TestDataPlane(t *testing.T) {
 	// DNS over TLS goes abroad even to an address in the IR set.
 	p1.leavesFrom("DoT to an IR address", tcp(p1, "2.144.0.10:853", false), ab1, 30*time.Second)
 
+	// The Agent puts back ip rules something else removed, as
+	// systemd-networkd does when it restarts: without them, marked traffic
+	// would leave through the Bridge's own uplink.
+	if out, err := l.Node("ir1").Command("sh", "-c",
+		"ip rule show | grep fwmark | cut -d: -f1 | xargs -rn1 ip rule del priority").CombinedOutput(); err != nil {
+		t.Fatalf("deleting ir1's ip rules: %v: %s", err, out)
+	}
+	if out, _ := l.Node("ir1").Command("sh", "-c", "ip rule show | grep -c fwmark").Output(); strings.TrimSpace(string(out)) != "0" {
+		t.Fatalf("ir1 still has %s fwmark rules", out)
+	}
+	p1.leavesFrom("phone1 abroad after its Bridge lost its ip rules", udp(p1, webAb), ab1, 15*time.Second)
+	p1.leavesFrom("DNS after its Bridge lost its ip rules", udp(p1, "8.8.8.8:53"), "dns:"+ab1, 15*time.Second)
+
 	// A hostile feed update is rejected and the last good set stays: the
 	// abroad site, inside 0.0.0.0/1, still leaves abroad.
 	feed.Store(irFeed("2.144.0.0/14", "2.176.0.0/12", "5.0.0.0/8", "0.0.0.0/1"))

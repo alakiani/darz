@@ -27,6 +27,9 @@
       delegate_to: localhost
       become: false
 
+    - name: Check the release against its SHA256SUMS
+      ansible.builtin.include_tasks: tasks/verify-release.yml
+
   tasks:
     - name: Install Ubuntu's packages
       ansible.builtin.apt:

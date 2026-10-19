@@ -14,7 +14,8 @@ Binaries are pushed from the laptop, never pulled by a Node (docs/mvp-plan.md, D
    `-l ir-1` limits it to one Node; `-e reenroll=true` re-keys it.
 
 Rerunning either playbook with a newer release upgrades in place; with the same release it
-changes nothing. `DARZ_RELEASE=v0.1.0` picks a release; the default is the newest one fetched.
+changes nothing. Both first check every file of the release against its `SHA256SUMS` and stop,
+naming the bad files, if a download was cut off or damaged. `DARZ_RELEASE=v0.1.0` picks a release; the default is the newest one fetched.
 
 Grafana and Prometheus listen on the Coordinator's loopback only. Admins open Grafana through the
 panel at https://4miz.ir/grafana/ (the "Grafana" link in the admin nav), signed in with TOTP.

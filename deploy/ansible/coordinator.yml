@@ -35,6 +35,9 @@
           TLS_KEY_FILE, TELEGRAM_TOKEN with TELEGRAM_CHAT, in pairs
           (scripts/provision-fleet.sh writes them to ~/.darz/fleet.env).
 
+    - name: Check the release against its SHA256SUMS
+      ansible.builtin.include_tasks: tasks/verify-release.yml
+
     - name: Read the release's pinned versions
       ansible.builtin.set_fact:
         darz_versions: >-

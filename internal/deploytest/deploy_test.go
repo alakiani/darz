@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -92,8 +93,8 @@ func TestDeploy(t *testing.T) {
 	}
 	f.eventually(t, coordinator, "curl -fsS http://127.0.0.1:9090/-/ready", "Prometheus ready")
 	f.eventually(t, coordinator, "curl -fsS http://127.0.0.1:3000/grafana/api/health", "Grafana healthy")
-	f.grafanaThroughThePanel(t, invite[1])
 	f.eventually(t, coordinator, "curl -fsS http://127.0.0.1:9090/api/v1/targets | grep -q coordinator", "Prometheus scraping the Coordinator")
+	f.grafanaThroughThePanel(t, invite[1])
 	if out, err := f.exec(coordinator, "ss -Hltn sport = :9100"); err != nil || !strings.Contains(out, "127.0.0.1:9100") {
 		t.Errorf("node_exporter isn't on loopback only: %q", out)
 	}
@@ -389,5 +390,37 @@ func (f *fleet) grafanaThroughThePanel(t *testing.T, invite string) {
 	var dash struct{ Dashboard struct{ Title string } }
 	if code := admin.Do(t, "GET", "/grafana/api/dashboards/uid/darz-mesh", nil, &dash); code != 200 || dash.Dashboard.Title != "Mesh" {
 		t.Errorf("the Mesh dashboard through the panel: %d, %q", code, dash.Dashboard.Title)
+	}
+
+	// The panels have data: Grafana's Prometheus data source answers a query.
+	// Grafana 13 reinstalls its bundled plugins at start unless preinstall is
+	// off, and in a root-owned install that leaves Prometheus unregistered on
+	// about half the starts, so every panel says No Data.
+	testutil.Eventually(t, 90*time.Second, "Grafana's Prometheus data source answering through the panel", func() bool {
+		now := time.Now()
+		q := map[string]any{
+			"from": strconv.FormatInt(now.Add(-5*time.Minute).UnixMilli(), 10), "to": strconv.FormatInt(now.UnixMilli(), 10),
+			"queries": []map[string]any{{"refId": "A", "expr": `up{job="coordinator"}`, "range": true, "intervalMs": 15000,
+				"datasource": map[string]string{"type": "prometheus", "uid": "darz-prometheus"}}},
+		}
+		var res struct {
+			Results map[string]struct {
+				Frames []struct {
+					Data struct{ Values [][]any }
+				}
+			}
+		}
+		if admin.Do(t, "POST", "/grafana/api/ds/query", q, &res) != 200 {
+			return false
+		}
+		for _, fr := range res.Results["A"].Frames {
+			if len(fr.Data.Values) > 0 && len(fr.Data.Values[0]) > 0 {
+				return true
+			}
+		}
+		return false
+	})
+	if out, _ := f.exec(coordinator, "journalctl -u darz-grafana -o cat --no-pager | grep 'logger=plugin.backgroundinstaller' | head -3"); out != "" {
+		t.Errorf("Grafana tried to install plugins; it must use the bundled ones as they are:\n%s", out)
 	}
 }

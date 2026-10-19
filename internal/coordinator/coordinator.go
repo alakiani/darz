@@ -65,6 +65,9 @@ type Coordinator struct {
 	Monitor MonitorSettings
 	// Backup configures the nightly backup (ADR 0001).
 	Backup BackupSettings
+	// GrafanaURL is Grafana on the VM's loopback; Admins reach it through
+	// the panel at /grafana/ (ADR 0006). Empty leaves /grafana/ shut.
+	GrafanaURL string
 
 	limit limiter // failed sign-ins
 	// FeedURL and RIPEstatURL are where the IR feed and its cross-check

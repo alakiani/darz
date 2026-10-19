@@ -33,6 +33,8 @@ try {
 
   step("overview: Node tiles and the Link matrix are live");
   await page.getByRole("heading", { name: "Overview" }).waitFor();
+  if ((await page.getByRole("link", { name: "Grafana" }).getAttribute("href")) !== "/grafana/")
+    throw new Error("the admin nav has no Grafana link");
   await page.locator("[data-testid=node-ab1]").waitFor();
   if (LIVE) {
     await page.locator("[data-testid=node-ir1]").getByText(/contact \d+s ago/).waitFor();

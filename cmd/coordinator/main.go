@@ -83,6 +83,7 @@ func serve(args []string, log *slog.Logger) error {
 	s3Region := fs.String("backup-s3-region", "us-east-1", "the bucket's region")
 	s3Bucket := fs.String("backup-s3-bucket", "", "the bucket")
 	s3KeyFile := fs.String("backup-s3-key-file", "", "file holding the access key id and the secret key, one per line")
+	grafanaURL := fs.String("grafana-url", "http://127.0.0.1:3000", "Grafana on loopback, which Admins reach through the panel at /grafana/; empty shuts /grafana/")
 	fs.Parse(args)
 	if *showVersion {
 		fmt.Println(version)
@@ -100,6 +101,7 @@ func serve(args []string, log *slog.Logger) error {
 	}
 	c := coordinator.New(s, authority, log)
 	c.PanelURL = *panelURL
+	c.GrafanaURL = *grafanaURL
 	c.FeedURL, c.RIPEstatURL = *feedURL, *ripeURL
 	c.SecureCookies = *adminCert != "" // plain HTTP is for development only
 	if *arvanKeyFile != "" {

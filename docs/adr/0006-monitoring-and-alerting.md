@@ -85,6 +85,8 @@ No Exit is special, so throwing one away costs nothing. An alert that no Exit co
 ## Dashboards
 
 The admin panel's status board shows the present; Grafana shows history.
+
+Grafana listens on the Coordinator VM's loopback only. Admins open it through the panel at `/grafana/`: the Coordinator proxies it only for a signed-in Admin whose session proved TOTP, the same check as the Admin API, and names them to Grafana in its auth-proxy header, which Grafana trusts from loopback only. The browser's own copy of that header and the panel's session cookie are never passed on. *(Added 2026-10-19, [#56](https://github.com/alakiani/darz/issues/56); before, Grafana was reached through an SSH tunnel.)*
 1. **Mesh:** Nodes, a grid of every Link with latency, loss, and transport, active Paths, and the Bridge behind each Endpoint Slot.
 2. **User's-eye:** probe results and active Device counts per Bridge.
 3. **Node detail:** host metrics and the Node's Links.
@@ -93,6 +95,8 @@ The admin panel's status board shows the present; Grafana shows history.
 ## Considered options
 
 - **The Coordinator re-publishes the health Agents push to it, so nothing dials a Node.** Rejected by the operator in favour of a direct pull, which is simpler and sees host metrics the health report does not carry.
+- **Grafana on its own subdomain (`grafana.4miz.ir`) behind Grafana's own login.** Rejected: Grafana's login page and any Grafana flaw would face the internet from the one permanent host, and a `grafana` name in public DNS points at it.
+- **Grafana only through an SSH tunnel.** The first deployment's way; dropped because it needs a laptop with the fleet's SSH key.
 - **Prometheus and Grafana on a separate VM abroad.** Rejected: an extra permanent machine, and it goes blind exactly when the border link is cut.
 - **A domestic messenger (Bale, Eitaa) for alerts.** Not chosen; SMS was preferred as the domestic channel.
 - **An external dead-man's switch** (healthchecks.io, or a watcher on an abroad Node). Rejected for phase one.

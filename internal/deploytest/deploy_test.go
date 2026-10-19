@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,6 +33,7 @@ import (
 
 	"filippo.io/age"
 
+	"github.com/alakiani/darz/internal/auth"
 	"github.com/alakiani/darz/internal/protocol"
 	"github.com/alakiani/darz/internal/testutil"
 )
@@ -76,8 +78,9 @@ func TestDeploy(t *testing.T) {
 
 	// A fresh Coordinator VM.
 	out := f.ansible(t, "ci-1", "coordinator.yml")
-	if !strings.Contains(out, "https://4miz.ir/#/invite/") {
-		t.Errorf("coordinator.yml printed no first Admin Invite")
+	invite := regexp.MustCompile(`https://4miz\.ir/#/invite/([A-Za-z0-9_-]+)`).FindStringSubmatch(out)
+	if invite == nil {
+		t.Fatalf("coordinator.yml printed no first Admin Invite")
 	}
 	for _, file := range []string{"ca.crt", "enroll-token"} {
 		if !testutil.Exists(filepath.Join(f.home, file)) {
@@ -88,7 +91,8 @@ func TestDeploy(t *testing.T) {
 		f.eventually(t, coordinator, "systemctl is-active --quiet "+unit, unit+" active")
 	}
 	f.eventually(t, coordinator, "curl -fsS http://127.0.0.1:9090/-/ready", "Prometheus ready")
-	f.eventually(t, coordinator, "curl -fsS http://127.0.0.1:3000/api/health", "Grafana healthy")
+	f.eventually(t, coordinator, "curl -fsS http://127.0.0.1:3000/grafana/api/health", "Grafana healthy")
+	f.grafanaThroughThePanel(t, invite[1])
 	f.eventually(t, coordinator, "curl -fsS http://127.0.0.1:9090/api/v1/targets | grep -q coordinator", "Prometheus scraping the Coordinator")
 	if out, err := f.exec(coordinator, "ss -Hltn sport = :9100"); err != nil || !strings.Contains(out, "127.0.0.1:9100") {
 		t.Errorf("node_exporter isn't on loopback only: %q", out)
@@ -349,5 +353,41 @@ func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// grafanaThroughThePanel redeems the first Admin's Invite, turns TOTP on,
+// and opens the Mesh dashboard at https://4miz.ir/grafana/ as that Admin
+// (ADR 0006); signed out, /grafana/ sends the browser to the panel.
+func (f *fleet) grafanaThroughThePanel(t *testing.T, invite string) {
+	t.Helper()
+	jar, _ := cookiejar.New(nil)
+	hc := *f.admin.Client
+	hc.Jar = jar
+	hc.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	signedOut := &testutil.AdminClient{URL: f.admin.URL, Client: &hc}
+	if code := signedOut.Do(t, "GET", "/grafana/", nil, nil); code != http.StatusFound {
+		t.Errorf("signed out, /grafana/ answered %d, want 302 to the panel", code)
+	}
+
+	admin := &testutil.AdminClient{URL: f.admin.URL, Client: &hc}
+	if code := admin.Do(t, "POST", "/v1/invites/accept", protocol.AcceptInvite{Token: invite, Handle: "ops", Password: "a long enough password"}, nil); code != 200 {
+		t.Fatalf("accepting the first Admin's Invite: %d", code)
+	}
+	var offer protocol.TOTPOffer
+	if code := admin.Do(t, "POST", "/v1/me/totp", nil, &offer); code != 200 {
+		t.Fatalf("offering TOTP: %d", code)
+	}
+	if code := admin.Do(t, "POST", "/v1/me/totp/confirm", protocol.TOTPCode{Code: auth.TOTP(offer.Secret, time.Now())}, nil); code != 200 {
+		t.Fatalf("confirming TOTP: %d", code)
+	}
+
+	var user struct{ Login string }
+	if code := admin.Do(t, "GET", "/grafana/api/user", nil, &user); code != 200 || user.Login != "ops" {
+		t.Errorf("Grafana through the panel: %d, signed in as %q, want ops", code, user.Login)
+	}
+	var dash struct{ Dashboard struct{ Title string } }
+	if code := admin.Do(t, "GET", "/grafana/api/dashboards/uid/darz-mesh", nil, &dash); code != 200 || dash.Dashboard.Title != "Mesh" {
+		t.Errorf("the Mesh dashboard through the panel: %d, %q", code, dash.Dashboard.Title)
 	}
 }

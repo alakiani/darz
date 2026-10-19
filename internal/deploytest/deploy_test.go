@@ -131,6 +131,29 @@ func TestDeploy(t *testing.T) {
 		f.mustExec(t, n, "command -v wg") // wireguard-tools, for debugging Links
 	}
 
+	// A release with files that fail SHA256SUMS, like a download cut off
+	// half-way, is refused before any host is touched.
+	f.brokenRelease(t, "ci-2", "ci-2-broken", "darz-coordinator", "darz-agent")
+	for _, pb := range []string{"coordinator.yml", "enroll.yml"} {
+		out, err := f.runAnsible("ci-2-broken", pb)
+		if err == nil {
+			t.Errorf("%s ran with a broken release:\n%s", pb, out)
+		}
+		for _, file := range []string{"darz-coordinator", "darz-agent"} {
+			if !strings.Contains(out, file) {
+				t.Errorf("%s didn't name the broken %s:\n%s", pb, file, out)
+			}
+		}
+	}
+	if v := strings.TrimSpace(f.mustExec(t, coordinator, "/usr/local/bin/darz-coordinator -version")); v != "ci-1" {
+		t.Errorf("Coordinator runs %q after a refused upgrade, want ci-1", v)
+	}
+	for _, n := range nodes {
+		if st := f.node(t, n); st.LastHealth == nil || st.LastHealth.AgentVersion != "ci-1" {
+			t.Errorf("%s after a refused upgrade: %+v", n.name, st.LastHealth)
+		}
+	}
+
 	// Upgrading keeps every Node's identity.
 	certs := map[string]string{}
 	for _, n := range nodes {
@@ -235,16 +258,41 @@ func inventory(key string) string {
 // ansible runs a playbook through scripts/darz-ansible, as the operator does.
 func (f *fleet) ansible(t *testing.T, release, playbook string) string {
 	t.Helper()
+	out, err := f.runAnsible(release, playbook)
+	t.Logf("%s (%s):\n%s", playbook, release, out)
+	if err != nil {
+		t.Fatalf("%s (%s): %v", playbook, release, err)
+	}
+	return out
+}
+
+// runAnsible runs a playbook through scripts/darz-ansible, as the operator does.
+func (f *fleet) runAnsible(release, playbook string) (string, error) {
 	cmd := exec.Command("../../scripts/darz-ansible", playbook,
 		"-e", "darz_chrony=false", "-e", "darz_api_ca_path="+f.apiCA)
 	cmd.Env = append(os.Environ(), "DARZ_HOME="+f.home, "DARZ_RELEASE="+release,
 		"ANSIBLE_HOST_KEY_CHECKING=False", "ANSIBLE_FORCE_COLOR=0", "ANSIBLE_NOCOLOR=1")
 	out, err := cmd.CombinedOutput()
-	t.Logf("%s (%s):\n%s", playbook, release, out)
-	if err != nil {
-		t.Fatalf("%s (%s): %v", playbook, release, err)
+	return string(out), err
+}
+
+// brokenRelease makes release name, a copy of from whose listed files are
+// cut to half their size, as a cut-off download leaves them.
+func (f *fleet) brokenRelease(t *testing.T, from, name string, files ...string) {
+	t.Helper()
+	src, dst := filepath.Join(f.home, "releases", from), filepath.Join(f.home, "releases", name)
+	must(t, os.MkdirAll(dst, 0o700))
+	entries, err := os.ReadDir(src)
+	must(t, err)
+	for _, e := range entries {
+		must(t, os.Symlink(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name())))
 	}
-	return string(out)
+	for _, file := range files {
+		b, err := os.ReadFile(filepath.Join(src, file))
+		must(t, err)
+		must(t, os.Remove(filepath.Join(dst, file)))
+		must(t, os.WriteFile(filepath.Join(dst, file), b[:len(b)/2], 0o755))
+	}
 }
 
 var recapLine = regexp.MustCompile(`(?m)^(\S+)\s+:\s+ok=\d+\s+changed=(\d+)`)

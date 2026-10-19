@@ -116,6 +116,9 @@ func (c *Coordinator) AdminHandler() http.Handler {
 		}
 		mux.Handle(r.method+" "+r.path, h)
 	}
+	for _, m := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+		mux.HandleFunc(m+" /grafana/", c.grafana)
+	}
 	mux.Handle("GET /", panel.Handler())
 	return mux
 }
@@ -153,41 +156,48 @@ func callerFrom(r *http.Request) caller { return r.Context().Value(sessionKey{})
 // suspended; with admin set, only an Admin whose session proved TOTP.
 func (c *Coordinator) requireSession(admin bool, next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(sessionCookie)
-		if err != nil {
-			writeError(w, http.StatusUnauthorized, "not signed in")
-			return
-		}
-		sess, err := c.store.LookupSession(r.Context(), cookie.Value)
-		if errors.Is(err, store.ErrInvalidToken) {
-			writeError(w, http.StatusUnauthorized, "session expired")
-			return
-		}
+		cl, status, msg, err := c.authenticate(r, admin)
 		if err != nil {
 			c.internalError(w, err)
 			return
 		}
-		acct, err := c.store.Account(r.Context(), sess.UserID)
-		if err != nil || acct.Suspended {
-			writeError(w, http.StatusUnauthorized, "not signed in")
+		if status != 0 {
+			writeError(w, status, msg)
 			return
 		}
-		if admin {
-			switch {
-			case !acct.Admin:
-				writeError(w, http.StatusForbidden, "Admins only")
-				return
-			case acct.TOTPSecret == "":
-				writeError(w, http.StatusForbidden, "Admins must turn on TOTP first")
-				return
-			case !sess.MFA:
-				writeError(w, http.StatusForbidden, "sign in again with your TOTP code")
-				return
-			}
-		}
-		ctx := context.WithValue(r.Context(), sessionKey{}, caller{account: acct, session: sess, token: cookie.Value})
-		next(w, r.WithContext(ctx))
+		next(w, r.WithContext(context.WithValue(r.Context(), sessionKey{}, cl)))
 	})
+}
+
+// authenticate is requireSession's check. A refused request gets a status
+// and message; err is set only when the store failed.
+func (c *Coordinator) authenticate(r *http.Request, admin bool) (cl caller, status int, msg string, err error) {
+	cookie, err := r.Cookie(sessionCookie)
+	if err != nil {
+		return caller{}, http.StatusUnauthorized, "not signed in", nil
+	}
+	sess, err := c.store.LookupSession(r.Context(), cookie.Value)
+	if errors.Is(err, store.ErrInvalidToken) {
+		return caller{}, http.StatusUnauthorized, "session expired", nil
+	}
+	if err != nil {
+		return caller{}, 0, "", err
+	}
+	acct, err := c.store.Account(r.Context(), sess.UserID)
+	if err != nil || acct.Suspended {
+		return caller{}, http.StatusUnauthorized, "not signed in", nil
+	}
+	if admin {
+		switch {
+		case !acct.Admin:
+			return caller{}, http.StatusForbidden, "Admins only", nil
+		case acct.TOTPSecret == "":
+			return caller{}, http.StatusForbidden, "Admins must turn on TOTP first", nil
+		case !sess.MFA:
+			return caller{}, http.StatusForbidden, "sign in again with your TOTP code", nil
+		}
+	}
+	return caller{account: acct, session: sess, token: cookie.Value}, 0, "", nil
 }
 
 // setSession starts a session and hands its cookie to the browser.

@@ -1,5 +1,7 @@
-# Managed by coordinator.yml (ADR 0006). Reach it through an SSH tunnel:
-# ssh -L 3000:127.0.0.1:3000 <coordinator>
+# Managed by coordinator.yml (ADR 0006). Admins reach it through the panel
+# at {{ darz_api_url }}/grafana/: the Coordinator proxies it for a signed-in
+# Admin and names them in X-WEBAUTH-USER, which Grafana trusts from
+# loopback only.
 [Unit]
 Description=Grafana for DARZ
 After=network-online.target darz-prometheus.service
@@ -9,6 +11,15 @@ User=darz-monitor
 Group=darz-monitor
 Environment=GF_SERVER_HTTP_ADDR=127.0.0.1
 Environment=GF_SERVER_HTTP_PORT=3000
+Environment=GF_SERVER_ROOT_URL={{ darz_api_url }}/grafana/
+Environment=GF_SERVER_SERVE_FROM_SUB_PATH=true
+Environment=GF_AUTH_PROXY_ENABLED=true
+Environment=GF_AUTH_PROXY_HEADER_NAME=X-WEBAUTH-USER
+Environment=GF_AUTH_PROXY_HEADER_PROPERTY=username
+Environment=GF_AUTH_PROXY_AUTO_SIGN_UP=true
+Environment=GF_AUTH_PROXY_WHITELIST=127.0.0.1
+Environment=GF_USERS_AUTO_ASSIGN_ORG_ROLE=Editor
+Environment=GF_AUTH_DISABLE_SIGNOUT_MENU=true
 Environment=GF_PATHS_DATA=/var/lib/darz-monitor/grafana
 Environment=GF_PATHS_LOGS=/var/lib/darz-monitor/grafana/log
 Environment=GF_PATHS_PLUGINS=/var/lib/darz-monitor/grafana/plugins

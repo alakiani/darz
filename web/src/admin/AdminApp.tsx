@@ -80,6 +80,9 @@ export function AdminApp({ route }: { route: string }) {
             {label}
           </a>
         ))}
+        <a href="/grafana/" target="_blank" rel="noopener">
+          Grafana
+        </a>
         <button
           type="button"
           className="link"

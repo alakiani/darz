@@ -16,8 +16,10 @@ Binaries are pushed from the laptop, never pulled by a Node (docs/mvp-plan.md, D
 Rerunning either playbook with a newer release upgrades in place; with the same release it
 changes nothing. `DARZ_RELEASE=v0.1.0` picks a release; the default is the newest one fetched.
 
-Grafana and Prometheus listen on the Coordinator's loopback only:
-`ssh -L 3000:127.0.0.1:3000 root@<coordinator>`, then open http://127.0.0.1:3000.
+Grafana and Prometheus listen on the Coordinator's loopback only. Admins open Grafana through the
+panel at https://4miz.ir/grafana/ (the "Grafana" link in the admin nav), signed in with TOTP.
+Prometheus needs a tunnel: `ssh -L 9090:127.0.0.1:9090 ubuntu@<coordinator>`, then open
+http://127.0.0.1:9090.
 
 A release is published by pushing a tag (`git tag v0.1.0 && git push origin v0.1.0`). CI's
 `deploy` job runs both playbooks against Ubuntu 26.04 containers on every PR

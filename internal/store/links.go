@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // MeshSlots is how many /31s fit in the mesh range 10.78.0.0/16.

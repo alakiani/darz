@@ -22,13 +22,13 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/arvan"
-	"github.com/alakiani/darz/internal/auth"
-	"github.com/alakiani/darz/internal/coordinator"
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/arvan"
+	"github.com/alakiani/ways/internal/auth"
+	"github.com/alakiani/ways/internal/coordinator"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 // TestEndpointSlots is session 10's "proves in the lab" test: the
@@ -256,7 +256,7 @@ func slotAdmin(t *testing.T, co *coord) (string, *testutil.AdminClient) {
 	}
 	jar, _ := cookiejar.New(nil)
 	u, _ := url.Parse(co.admin.URL)
-	jar.SetCookies(u, []*http.Cookie{{Name: "darz_session", Value: session}})
+	jar.SetCookies(u, []*http.Cookie{{Name: "ways_session", Value: session}})
 	return secret, &testutil.AdminClient{URL: co.admin.URL, Client: &http.Client{Jar: jar}}
 }
 

@@ -39,9 +39,9 @@ type Runner interface {
 }
 
 // SystemdRunner runs each daemon as an instance of a templated systemd
-// unit, such as darz-awg@.service.
+// unit, such as ways-awg@.service.
 type SystemdRunner struct {
-	Unit string // e.g. "darz-awg@%s.service"
+	Unit string // e.g. "ways-awg@%s.service"
 }
 
 func (r SystemdRunner) Start(ctx context.Context, iface string) error {

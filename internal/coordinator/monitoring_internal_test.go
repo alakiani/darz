@@ -14,8 +14,8 @@ import (
 
 	"filippo.io/age"
 
-	"github.com/alakiani/darz/internal/backup"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/backup"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 func TestMonitorPortIsInEveryNodesState(t *testing.T) {
@@ -80,20 +80,20 @@ func TestCoordinatorMetrics(t *testing.T) {
 	m.s.QueueAlert(bg, "waiting")
 	got := internalGet(t, m.c, "/metrics")
 	for _, want := range []string{
-		`darz_node_report_age_seconds{node="ir1"} 30`,
-		`darz_node_clock_skew_seconds{node="ir1"} 120`,
-		"darz_alerts_undelivered 1",
-		"darz_ca_expiry_timestamp_seconds ",
-		"darz_db_size_bytes ",
-		`darz_irfeed_last_rejected{set="Iran"} 0`,
-		"darz_slot_eligible_bridges 0",
-		"darz_arvan_consecutive_failures 0",
+		`ways_node_report_age_seconds{node="ir1"} 30`,
+		`ways_node_clock_skew_seconds{node="ir1"} 120`,
+		"ways_alerts_undelivered 1",
+		"ways_ca_expiry_timestamp_seconds ",
+		"ways_db_size_bytes ",
+		`ways_irfeed_last_rejected{set="Iran"} 0`,
+		"ways_slot_eligible_bridges 0",
+		"ways_arvan_consecutive_failures 0",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("/metrics lacks %q:\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, "darz_backup_last_success") {
+	if strings.Contains(got, "ways_backup_last_success") {
 		t.Error("a backup metric with no backup configured")
 	}
 }
@@ -143,7 +143,7 @@ func TestBackups(t *testing.T) {
 	if err := m.c.backupIfDue(bg); err != nil {
 		t.Fatal(err)
 	}
-	if len(uploaded) != 1 || uploaded[0] != "darz-20261016T030000Z.db.age" {
+	if len(uploaded) != 1 || uploaded[0] != "ways-20261016T030000Z.db.age" {
 		t.Fatalf("uploaded %v", uploaded)
 	}
 	// Not due again within a day.
@@ -186,7 +186,7 @@ func TestBackups(t *testing.T) {
 		!st.LastAttempt.Equal(clock) || !strings.Contains(st.LastError, "unexpected EOF") || st.SizeBytes == 0 {
 		t.Errorf("status = %+v", st)
 	}
-	if got := internalGet(t, m.c, "/metrics"); !strings.Contains(got, "darz_backup_last_success_timestamp_seconds ") {
+	if got := internalGet(t, m.c, "/metrics"); !strings.Contains(got, "ways_backup_last_success_timestamp_seconds ") {
 		t.Errorf("no backup metric:\n%s", got)
 	}
 }

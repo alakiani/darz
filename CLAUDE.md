@@ -1,4 +1,4 @@
-# DARZ
+# WAYS
 
 ## Agent skills
 

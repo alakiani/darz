@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/metrics"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/metrics"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // Each instance's state, and the throughput figure the weight uses with
@@ -39,21 +39,21 @@ func TestLinkMetrics(t *testing.T) {
 	got := string(w.Bytes())
 	aws, ln := `link_id="4",link="aws/ir1",peer="aws"`, `link_id="5",link="ir1/lightnode",peer="lightnode"`
 	for _, want := range []string{
-		`darz_link_instance_up{` + aws + `,instance_id="10",transport="gre"} 0`,
-		`darz_link_instance_up{` + aws + `,instance_id="11",transport="amneziawg"} 1`,
-		`darz_link_instance_up{` + aws + `,instance_id="12",transport="wireguard"} 1`,
-		`darz_link_instance_up{` + ln + `,instance_id="20",transport="gre"} 0`,
-		`darz_link_instance_up{` + ln + `,instance_id="21",transport="amneziawg"} 0`,
-		`darz_link_throughput_mbps{` + aws + `} 5.4`,
-		`darz_link_throughput_measured_timestamp_seconds{` + aws + `} 1.7923158e+09`,
-		`darz_link_throughput_transport{` + aws + `,transport="amneziawg"} 1`,
+		`ways_link_instance_up{` + aws + `,instance_id="10",transport="gre"} 0`,
+		`ways_link_instance_up{` + aws + `,instance_id="11",transport="amneziawg"} 1`,
+		`ways_link_instance_up{` + aws + `,instance_id="12",transport="wireguard"} 1`,
+		`ways_link_instance_up{` + ln + `,instance_id="20",transport="gre"} 0`,
+		`ways_link_instance_up{` + ln + `,instance_id="21",transport="amneziawg"} 0`,
+		`ways_link_throughput_mbps{` + aws + `} 5.4`,
+		`ways_link_throughput_measured_timestamp_seconds{` + aws + `} 1.7923158e+09`,
+		`ways_link_throughput_transport{` + aws + `,transport="amneziawg"} 1`,
 	} {
 		if !strings.Contains(got, want+"\n") {
 			t.Errorf("metrics lack %s:\n%s", want, got)
 		}
 	}
 	// No figure yet on the other Link: no throughput series for it.
-	if strings.Contains(got, "darz_link_throughput_mbps{"+ln) || strings.Contains(got, "darz_link_throughput_transport{"+ln) {
+	if strings.Contains(got, "ways_link_throughput_mbps{"+ln) || strings.Contains(got, "ways_link_throughput_transport{"+ln) {
 		t.Errorf("a throughput figure for an unmeasured Link:\n%s", got)
 	}
 }

@@ -129,7 +129,7 @@ type InviteRecord struct {
 }
 
 // NewNode adds a Node from the panel. SSHHost is only used to write the
-// enroll command; DARZ learns the Node's address from its Agent.
+// enroll command; WAYS learns the Node's address from its Agent.
 type NewNode struct {
 	Name     string   `json:"name"`
 	Roles    []Role   `json:"roles"`

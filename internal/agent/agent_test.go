@@ -17,12 +17,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/agent"
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/coordinator"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/agent"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/coordinator"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 // rig is an in-process Coordinator with both listeners up.
@@ -37,7 +37,7 @@ type rig struct {
 
 func newRig(t *testing.T) *rig {
 	t.Helper()
-	s, err := store.Open(filepath.Join(t.TempDir(), "darz.db"))
+	s, err := store.Open(filepath.Join(t.TempDir(), "ways.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

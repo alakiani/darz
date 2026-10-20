@@ -14,7 +14,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alakiani/darz/internal/cidr"
+	"github.com/alakiani/ways/internal/cidr"
 )
 
 // MaxChange is how far the feed's address space may move from the last

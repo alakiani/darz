@@ -11,7 +11,7 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 func TestOnlyBridgesGetDevicesAndTheBridgeKey(t *testing.T) {

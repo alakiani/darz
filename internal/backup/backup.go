@@ -23,17 +23,17 @@ import (
 
 	"filippo.io/age"
 
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/store"
 )
 
 const (
-	prefix = "darz-"
+	prefix = "ways-"
 	suffix = ".db.age"
 	stamp  = "20060102T150405Z"
 )
 
 // Name is a backup's file name for its time, such as
-// darz-20261016T030000Z.db.age.
+// ways-20261016T030000Z.db.age.
 func Name(at time.Time) string { return prefix + at.UTC().Format(stamp) + suffix }
 
 // Write copies the database, encrypts the copy to recipients into dir, and

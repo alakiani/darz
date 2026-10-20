@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // ADR 0003's retention.

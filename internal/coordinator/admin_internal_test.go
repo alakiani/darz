@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 func TestAdminInvites(t *testing.T) {
@@ -190,7 +190,7 @@ func TestAdminTokens(t *testing.T) {
 	var issued protocol.IssuedToken
 	admin.must(400, "POST", "/v1/admin/tokens", protocol.NewToken{}, nil)
 	admin.must(200, "POST", "/v1/admin/tokens", protocol.NewToken{Name: "laptop"}, &issued)
-	if !strings.HasPrefix(issued.Secret, "darz_") || issued.Token.Scope != "nodes:enroll" {
+	if !strings.HasPrefix(issued.Secret, "ways_") || issued.Token.Scope != "nodes:enroll" {
 		t.Errorf("issued = %+v", issued)
 	}
 	if _, err := a.s.CheckAPIToken(context.Background(), issued.Secret, store.ScopeNodesEnroll); err != nil {

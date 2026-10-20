@@ -37,7 +37,7 @@ Before the transport choice, these facts about the network decide most of the ou
    [net4people #630](https://github.com/net4people/bbs/issues/630)) [measured].
    - Inbound traffic from foreign IPs reached the Iranian VPS from only about 2.8% of tested /24s.
    - **Consequence:** a Bridge in an Iranian datacenter that is not on the allowlist cannot reach
-     any Exit, whatever the transport. Which datacenter and IP range DARZ uses is a survivability
+     any Exit, whatever the transport. Which datacenter and IP range WAYS uses is a survivability
      decision before it is a transport decision.
 3. **QUIC has been blocked outright since June 2025.**
    - From before the June 2025 shutdown and continuing after it, 100% of QUIC Initial packets were

@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alakiani/darz/internal/ca"
+	"github.com/alakiani/ways/internal/ca"
 )
 
 // Timing is the alert table's durations: how long a condition must hold,
@@ -73,56 +73,56 @@ func rules(t Timing) []rule {
 	sec := func(d time.Duration) int { return int(d.Seconds()) }
 	return []rule{
 		{"NodeUnreachable",
-			fmt.Sprintf(`max_over_time(up{job="agents"}[%s]) == 0 and on (node) darz_node_report_age_seconds > %d`, duration(t.Unreachable), sec(t.Unreachable)),
+			fmt.Sprintf(`max_over_time(up{job="agents"}[%s]) == 0 and on (node) ways_node_report_age_seconds > %d`, duration(t.Unreachable), sec(t.Unreachable)),
 			0, "critical", "Node {{ $labels.node }} is unreachable: no scrape and no health report"},
 		{"CoordinatorUnreachableFromNode",
-			fmt.Sprintf(`darz_coordinator_last_contact_seconds > %d`, sec(t.ContactLost)),
+			fmt.Sprintf(`ways_coordinator_last_contact_seconds > %d`, sec(t.ContactLost)),
 			0, "warning", "Node {{ $labels.node }} has not reached the Coordinator for {{ $value | humanizeDuration }}"},
-		{"LinkDown", `max by (link) (darz_link_up) == 0`,
+		{"LinkDown", `max by (link) (ways_link_up) == 0`,
 			t.LinkDown, "warning", "Link {{ $labels.link }} has no working transport"},
 		// Every instance down at once, on both ends, is a whole-path blackout
 		// rather than one transport failing (issue #51). Three blackouts make
 		// at least 5 changes into or out of one within the hour; two make 4
 		// at most.
-		{"LinkBlackout", `changes((max by (link) (darz_link_instance_up) == bool 0)[1h:]) >= 5`,
+		{"LinkBlackout", `changes((max by (link) (ways_link_instance_up) == bool 0)[1h:]) >= 5`,
 			0, "warning", "Every instance of Link {{ $labels.link }} went down at once at least 3 times in an hour"},
-		{"BridgeHasNoDefaultPath", `darz_path_ok{default="true"} == 0`,
+		{"BridgeHasNoDefaultPath", `ways_path_ok{default="true"} == 0`,
 			t.NoPath, "critical", "Bridge {{ $labels.node }} has no Path for the default Rule"},
 		// Rebalancing moves do not count (ADR 0008).
-		{"PathFlapping", `increase(darz_path_moves_total{kind="failure"}[1h]) > 6`,
+		{"PathFlapping", `increase(ways_path_moves_total{kind="failure"}[1h]) > 6`,
 			0, "warning", "Paths of Rule {{ $labels.rule }} on {{ $labels.node }} flap: {{ $value | printf \"%.0f\" }} failure moves in an hour"},
-		{"EndpointSlotRepointed", fmt.Sprintf(`increase(darz_slot_repoints_total[%s]) > 0`, duration(t.EventWindow)),
+		{"EndpointSlotRepointed", fmt.Sprintf(`increase(ways_slot_repoints_total[%s]) > 0`, duration(t.EventWindow)),
 			0, "info", "Endpoint Slot {{ $labels.slot }} was re-pointed"},
-		{"BridgeLostSlotEligibility", `darz_slot_bridge_eligible == 0`,
+		{"BridgeLostSlotEligibility", `ways_slot_bridge_eligible == 0`,
 			0, "warning", "Bridge {{ $labels.node }} lost Endpoint Slot eligibility"},
-		{"AllSlotsOnOneBridge", `darz_slot_bridges_in_use == 1`,
+		{"AllSlotsOnOneBridge", `ways_slot_bridges_in_use == 1`,
 			t.AllSlotsOnOne, "critical", "Every Endpoint Slot points at one Bridge"},
-		{"ArvanCloudDNSFailing", `darz_arvan_consecutive_failures >= 3`,
+		{"ArvanCloudDNSFailing", `ways_arvan_consecutive_failures >= 3`,
 			0, "warning", "ArvanCloud's DNS API failed {{ $value }} times in a row"},
-		{"ProbeFailing", `darz_slot_probe_ok == 0`,
+		{"ProbeFailing", `ways_slot_probe_ok == 0`,
 			t.ProbeFailing, "warning", "The probe Device fails on Bridge {{ $labels.node }}"},
 		// Node certificates renew at 30 days left, so less means renewal is broken.
-		{"CertificateOrTokenExpiring", fmt.Sprintf(`darz_client_cert_expiry_timestamp_seconds - time() < %d`, 30*day),
+		{"CertificateOrTokenExpiring", fmt.Sprintf(`ways_client_cert_expiry_timestamp_seconds - time() < %d`, 30*day),
 			0, "warning", "The client certificate of Node {{ $labels.node }} expires in {{ $value | humanizeDuration }}"},
-		{"CertificateOrTokenExpiring", fmt.Sprintf(`darz_public_tls_expiry_timestamp_seconds - time() < %d`, 14*day),
+		{"CertificateOrTokenExpiring", fmt.Sprintf(`ways_public_tls_expiry_timestamp_seconds - time() < %d`, 14*day),
 			0, "warning", "The public TLS certificate expires in {{ $value | humanizeDuration }}"},
-		{"CertificateOrTokenExpiring", fmt.Sprintf(`darz_api_token_expiry_timestamp_seconds - time() < %d`, 7*day),
+		{"CertificateOrTokenExpiring", fmt.Sprintf(`ways_api_token_expiry_timestamp_seconds - time() < %d`, 7*day),
 			0, "warning", "API token {{ $labels.token }} expires in {{ $value | humanizeDuration }}"},
-		{"ClockSkew", `abs(darz_node_clock_skew_seconds) > 60`,
+		{"ClockSkew", `abs(ways_node_clock_skew_seconds) > 60`,
 			0, "warning", "The clock of Node {{ $labels.node }} is {{ $value | humanizeDuration }} off"},
-		{"CIDRRefresh", fmt.Sprintf(`darz_irfeed_last_rejected == 1 or time() - darz_irfeed_last_success_timestamp_seconds > %d`, 3*day),
+		{"CIDRRefresh", fmt.Sprintf(`ways_irfeed_last_rejected == 1 or time() - ways_irfeed_last_success_timestamp_seconds > %d`, 3*day),
 			0, "warning", "The feed of Destination Set {{ $labels.set }} was rejected or is over 3 days old"},
-		{"BackupStale", fmt.Sprintf(`time() - darz_backup_last_success_timestamp_seconds > %d`, 36*hour),
+		{"BackupStale", fmt.Sprintf(`time() - ways_backup_last_success_timestamp_seconds > %d`, 36*hour),
 			0, "warning", "The last good backup is {{ $value | humanizeDuration }} old"},
 		// Only Bridges that answer a scrape report a backlog: healthy ones.
-		{"MeteringBacklog", fmt.Sprintf(`darz_metering_backlog_seconds > %d`, 3*hour),
+		{"MeteringBacklog", fmt.Sprintf(`ways_metering_backlog_seconds > %d`, 3*hour),
 			0, "warning", "Bridge {{ $labels.node }} has {{ $value | humanizeDuration }} of metering not acknowledged"},
 		// Under 100 MB a day, unmetered traffic such as DNS to the Bridge's
 		// own resolver would trip the 20%.
 		{"MeteringMismatch",
-			`abs(increase(darz_metered_bytes_total[1d]) - increase(darz_bridge_interface_bytes_total[1d])) > 0.2 * increase(darz_bridge_interface_bytes_total[1d]) and increase(darz_bridge_interface_bytes_total[1d]) > 1e8`,
+			`abs(increase(ways_metered_bytes_total[1d]) - increase(ways_bridge_interface_bytes_total[1d])) > 0.2 * increase(ways_bridge_interface_bytes_total[1d]) and increase(ways_bridge_interface_bytes_total[1d]) > 1e8`,
 			0, "warning", "Metered bytes on Bridge {{ $labels.node }} differ from its interface bytes by over 20% in a day"},
-		{"SnapshotApplyFailed", fmt.Sprintf(`increase(darz_snapshot_apply_failures_total[%s]) > 0`, duration(t.EventWindow)),
+		{"SnapshotApplyFailed", fmt.Sprintf(`increase(ways_snapshot_apply_failures_total[%s]) > 0`, duration(t.EventWindow)),
 			0, "warning", "Node {{ $labels.node }} reverted a snapshot that cut it off from the Coordinator"},
 		{"DiskFull", `1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} > 0.85`,
 			0, "warning", "The disk of {{ $labels.node }} is {{ $value | humanizePercentage }} full"},
@@ -135,7 +135,7 @@ func rules(t Timing) []rule {
 func Rules(t Timing) string {
 	var b strings.Builder
 	b.WriteString("# The alert table of ADR 0006. Generated by internal/monitoring; do not edit.\n")
-	b.WriteString("groups:\n  - name: darz\n    rules:\n")
+	b.WriteString("groups:\n  - name: ways\n    rules:\n")
 	for _, r := range rules(t) {
 		fmt.Fprintf(&b, "      - alert: %s\n", r.alert)
 		fmt.Fprintf(&b, "        expr: %s\n", quote(r.expr))
@@ -168,8 +168,8 @@ type PrometheusConfig struct {
 var ProductionPrometheus = PrometheusConfig{
 	Internal:     "127.0.0.1:9101",
 	Alertmanager: "127.0.0.1:9093",
-	TLSDir:       "/etc/darz/prometheus",
-	RuleFiles:    []string{"/etc/darz/prometheus/rules.yml"},
+	TLSDir:       "/etc/ways/prometheus",
+	RuleFiles:    []string{"/etc/ways/prometheus/rules.yml"},
 	Interval:     15 * time.Second,
 	SDRefresh:    30 * time.Second,
 	HostExporter: "127.0.0.1:9100",
@@ -285,7 +285,7 @@ const GrafanaDatasource = `# Grafana's data source (ADR 0006). Generated by inte
 apiVersion: 1
 datasources:
   - name: Prometheus
-    uid: darz-prometheus
+    uid: ways-prometheus
     type: prometheus
     access: proxy
     url: http://127.0.0.1:9090
@@ -296,12 +296,12 @@ datasources:
 const GrafanaProvisioning = `# Grafana's dashboards (ADR 0006). Generated by internal/monitoring; do not edit.
 apiVersion: 1
 providers:
-  - name: darz
+  - name: ways
     type: file
     disableDeletion: true
     allowUiUpdates: false
     options:
-      path: /etc/darz/grafana/dashboards
+      path: /etc/ways/grafana/dashboards
 `
 
 const deployReadme = `# Monitoring on the Coordinator VM
@@ -309,14 +309,14 @@ const deployReadme = `# Monitoring on the Coordinator VM
 Generated by ` + "`internal/monitoring`" + `; run ` + "`go test ./internal/monitoring -update`" + ` after changing it.
 The playbook (session 13) installs these with the pinned Prometheus, Alertmanager and Grafana (ADR 0006):
 
-- ` + "`prometheus.yml`, `rules.yml`" + ` in /etc/darz/prometheus. Run Prometheus with
+- ` + "`prometheus.yml`, `rules.yml`" + ` in /etc/ways/prometheus. Run Prometheus with
   ` + "`--storage.tsdb.retention.time=30d`" + ` and ` + "`--web.listen-address=127.0.0.1:9090`" + `.
   The Coordinator writes the client certificate there when started with
-  ` + "`-prometheus-tls-dir /etc/darz/prometheus`" + `.
-- ` + "`alertmanager.yml`" + ` in /etc/darz/alertmanager. Run Alertmanager with
+  ` + "`-prometheus-tls-dir /etc/ways/prometheus`" + `.
+- ` + "`alertmanager.yml`" + ` in /etc/ways/alertmanager. Run Alertmanager with
   ` + "`--web.listen-address=127.0.0.1:9093 --cluster.listen-address=`" + `.
 - ` + "`grafana/`" + `: the data source and dashboard provisioning, and the Mesh dashboard in
-  /etc/darz/grafana/dashboards.
+  /etc/ways/grafana/dashboards.
 
 Everything listens on localhost; the Coordinator's internal listener is ` + "`-internal-listen 127.0.0.1:9101`" + `.
 `

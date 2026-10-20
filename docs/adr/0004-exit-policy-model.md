@@ -4,7 +4,7 @@ status: accepted
 
 # Exit policy: ordered Rules over Destination Sets, mesh before fallback, DNS always abroad
 
-Bridges route each packet by the first matching Rule. A Rule names a Destination Set and the Tags its Exit must carry. When a Bridge loses every direct Exit for a Rule, it reaches one through another Bridge before any fallback applies. International traffic and all DNS fail closed rather than leave through a domestic NIC. Resolved in [Exit policy model: Tags, Rules, and per-Device routing on the Bridge](https://github.com/alakiani/darz/issues/13).
+Bridges route each packet by the first matching Rule. A Rule names a Destination Set and the Tags its Exit must carry. When a Bridge loses every direct Exit for a Rule, it reaches one through another Bridge before any fallback applies. International traffic and all DNS fail closed rather than leave through a domestic NIC. Resolved in [Exit policy model: Tags, Rules, and per-Device routing on the Bridge](https://github.com/alakiani/ways/issues/13).
 
 ## Model
 
@@ -33,7 +33,7 @@ Bridges route each packet by the first matching Rule. A Rule names a Destination
 
 - **Exit choice is per Bridge per Rule.** In phase one, all Devices on one Bridge share an Exit for a given Rule, picked automatically by Path health. *(Amended by [ADR 0008](0008-path-selection-and-exit-balancing.md): Exit choice is per bucket of Devices per Bridge per Rule, spread over Exits by measured capacity.)*
 - **The mesh comes before fallback.** For each (Bridge, Rule), the Coordinator's candidate Paths must include at least one that transits another Bridge whenever the mesh has one, and it must not share a first Link with the direct candidates. The Bridge fails over through these locally, without the Coordinator. `fallback` applies only when every candidate is down: the IR Rule falls through to the default (degraded, still working), and the default Rule drops.
-- **Open, handed to [Path selection and failover](https://github.com/alakiani/darz/issues/12):** when the Coordinator is unreachable and every candidate has died, should Bridges discover transit by asking neighbouring Bridges? *(Answered in [ADR 0008](0008-path-selection-and-exit-balancing.md): yes. Bridges work out candidates themselves, every neighbouring Bridge is always a transit candidate, and a "transit OK" flag in the Link probe reply says whether it can carry the Rule.)*
+- **Open, handed to [Path selection and failover](https://github.com/alakiani/ways/issues/12):** when the Coordinator is unreachable and every candidate has died, should Bridges discover transit by asking neighbouring Bridges? *(Answered in [ADR 0008](0008-path-selection-and-exit-balancing.md): yes. Bridges work out candidates themselves, every neighbouring Bridge is always a transit candidate, and a "transit OK" flag in the Link probe reply says whether it can carry the Rule.)*
 - **A dual-role Node exits locally through a zero-Link Path.** A Node holding both Roles and tagged `IR` reaches itself with latency 0, so it wins on its own merits. It forwards out of its own NIC with NAT, and needs no special capability.
 
 ## Bridge data plane
@@ -47,7 +47,7 @@ Bridges route each packet by the first matching Rule. A Rule names a Destination
 
 ## DNS is always resolved abroad
 
-- **The config's resolver is on the Bridge** at one fixed in-tunnel address, the same on every Bridge (such as `10.77.0.1`). It forwards only to public resolvers abroad and keeps no query logs. *(It is a DNS relay inside the Agent, at `10.77.0.1`, with the upstream resolvers pushed by the Coordinator; its sockets carry the default Rule's mark. DNS pauses for the second or two an Agent restart takes. Decided in [MVP 04](https://github.com/alakiani/darz/issues/20).)* *(Since [ADR 0009](0009-gre-transport.md), it reaches the upstream resolvers over DNS over TLS, because a GRE Link would carry plain DNS in clear across the filter.)*
+- **The config's resolver is on the Bridge** at one fixed in-tunnel address, the same on every Bridge (such as `10.77.0.1`). It forwards only to public resolvers abroad and keeps no query logs. *(It is a DNS relay inside the Agent, at `10.77.0.1`, with the upstream resolvers pushed by the Coordinator; its sockets carry the default Rule's mark. DNS pauses for the second or two an Agent restart takes. Decided in [MVP 04](https://github.com/alakiani/ways/issues/20).)* *(Since [ADR 0009](0009-gre-transport.md), it reaches the upstream resolvers over DNS over TLS, because a GRE Link would carry plain DNS in clear across the filter.)*
 - **The resolver's own outbound queries are policy-routed into the default Rule.** As a local process it would otherwise use the main table and leave through the domestic ISP.
 - **Devices cannot bypass it with plain DNS.** All Device traffic on port 53, UDP and TCP, to any address is redirected to the Bridge resolver, and DNS over TLS on port 853 is forced into the default Rule whatever its destination.
 - **No fallback to domestic.** If the default Rule has no working Path, DNS fails.

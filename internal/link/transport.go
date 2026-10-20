@@ -12,7 +12,7 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // Transport brings instances of one Transport up and down and reports

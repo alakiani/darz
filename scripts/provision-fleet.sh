@@ -203,9 +203,9 @@ run_wizard() {
 TOTAL_STAGES=13
 
 # Everything this wizard captures stays on the laptop, outside the repo.
-DARZ_HOME="${DARZ_HOME:-$HOME/.darz}"
-mkdir -p "$DARZ_HOME/tls" && chmod 700 "$DARZ_HOME"
-ENV_FILE="$DARZ_HOME/fleet.env"
+WAYS_HOME="${WAYS_HOME:-$HOME/.ways}"
+mkdir -p "$WAYS_HOME/tls" && chmod 700 "$WAYS_HOME"
+ENV_FILE="$WAYS_HOME/fleet.env"
 SSH_KEY="$HOME/.ssh/id_rsa"   # replaced by the operator's choice in stage 1
 SSH_OPTS=()
 PROBE_PORT=40123
@@ -270,10 +270,10 @@ rent_node() {
 # from its own interface address to REMOTE, with INNER as its /30 address.
 # Passing no INNER deletes it.
 gre_tunnel() {
-  local cmd="sudo ip link del darzchk 2>/dev/null; true"
+  local cmd="sudo ip link del wayschk 2>/dev/null; true"
   if [[ -n "${4:-}" ]]; then
     cmd="$cmd; src=\$(ip -4 route get $3 | sed -n 's/.* src \([0-9.]*\).*/\1/p'); sudo modprobe ip_gre;"
-    cmd="$cmd sudo ip link add darzchk type gre local \$src remote $3 ttl 64 && sudo ip addr add $4/30 dev darzchk && sudo ip link set darzchk up"
+    cmd="$cmd sudo ip link add wayschk type gre local \$src remote $3 ttl 64 && sudo ip addr add $4/30 dev wayschk && sudo ip link set wayschk up"
   fi
   remote "$2" "$1" "$cmd" >/dev/null 2>&1
 }
@@ -288,9 +288,9 @@ check_crossing() {
     aip=$(val "${a}_IP"); auser=$(val "${a}_USER"); out=$(mktemp)
     remote "$auser" "$aip" "timeout 15 nc -u -l $PROBE_PORT" >"$out" 2>/dev/null & pid=$!
     sleep 3
-    remote "$duser" "$dip" "for i in 1 2 3 4 5; do echo darz-probe | nc -u -w1 $aip $PROBE_PORT; sleep 1; done" >/dev/null 2>&1 || true
+    remote "$duser" "$dip" "for i in 1 2 3 4 5; do echo ways-probe | nc -u -w1 $aip $PROBE_PORT; sleep 1; done" >/dev/null 2>&1 || true
     wait "$pid" || true
-    if grep -q darz-probe "$out"; then ok "UDP $PROBE_PORT reaches $(val "${a}_NAME") ($aip)"
+    if grep -q ways-probe "$out"; then ok "UDP $PROBE_PORT reaches $(val "${a}_NAME") ($aip)"
     else warn "UDP from $dip never reached $(val "${a}_NAME") ($aip) on port $PROBE_PORT"; bad=1; fi
     rm -f "$out"
     # GRE both ways: a tunnel between the two public addresses, through
@@ -333,7 +333,7 @@ check_inbound() {
   (( bad == 0 )) || { note "Check the Coordinator provider's firewall for inbound 443 and 8443 from abroad."; return 1; }
 }
 
-banner "DARZ: provision the production fleet"
+banner "WAYS: provision the production fleet"
 
 # ── 1 ─────────────────────────────────────────────────────────────────────
 stage "Laptop: tools and your SSH key"
@@ -477,7 +477,7 @@ pause
 # ── 9 ─────────────────────────────────────────────────────────────────────
 stage "TLS certificate for 4miz.ir"
 say "The panel needs a public certificate. The simplest route is acme.sh with ArvanCloud's DNS plugin."
-TLS_CERT_FILE="$DARZ_HOME/tls/4miz.ir.crt"; TLS_KEY_FILE="$DARZ_HOME/tls/4miz.ir.key"
+TLS_CERT_FILE="$WAYS_HOME/tls/4miz.ir.crt"; TLS_KEY_FILE="$WAYS_HOME/tls/4miz.ir.key"
 open_url "https://github.com/acmesh-official/acme.sh/wiki/dnsapi#dns_arvan"
 step "Install acme.sh: brew install acme.sh (or the installer on its README)."
 step "Check the wiki page above for the variable the Arvan plugin reads (Arvan_Token)."
@@ -515,9 +515,9 @@ find_chat() {
     | grep -oE '"chat":\{"id":-?[0-9]+' | tail -n1 | grep -oE -- '-?[0-9]+$' || true)
   [[ -n "$TELEGRAM_CHAT" ]] || fail "no message seen yet: is the bot an admin of the channel? Post again." || return 1
   curl -fsS -m 15 "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
-    --data-urlencode "chat_id=$TELEGRAM_CHAT" --data-urlencode "text=DARZ alerts will arrive here." >/dev/null \
+    --data-urlencode "chat_id=$TELEGRAM_CHAT" --data-urlencode "text=WAYS alerts will arrive here." >/dev/null \
     || fail "the bot couldn't post to chat $TELEGRAM_CHAT" || return 1
-  confirm "Did 'DARZ alerts will arrive here.' appear in the channel?" || return 1
+  confirm "Did 'WAYS alerts will arrive here.' appear in the channel?" || return 1
   ok "alerts go to chat $TELEGRAM_CHAT"
 }
 retry "Telegram channel id" find_chat
@@ -528,7 +528,7 @@ pause
 # ── 11 ────────────────────────────────────────────────────────────────────
 stage "Object storage abroad for backups"
 say "The Coordinator pushes one encrypted backup a night to S3-compatible storage abroad."
-step "At an abroad provider (not one in Iran), create a private bucket, such as darz-backups."
+step "At an abroad provider (not one in Iran), create a private bucket, such as ways-backups."
 step "Create an access key limited to that bucket. Write-only, if the provider offers it."
 step "Note the S3 endpoint URL and region from the provider's docs."
 ask_until BACKUP_S3_ENDPOINT "S3 endpoint (https://…):" '^https://' "it should start with https://"
@@ -553,7 +553,7 @@ pause
 # ── 12 ────────────────────────────────────────────────────────────────────
 stage "Backup key: age, on this laptop only"
 say "Backups are encrypted to a key only you hold. A seized Coordinator can't read them."
-BACKUP_AGE_IDENTITY="$DARZ_HOME/backup-identity.txt"
+BACKUP_AGE_IDENTITY="$WAYS_HOME/backup-identity.txt"
 if [[ -f "$BACKUP_AGE_IDENTITY" ]]; then
   ok "reusing $BACKUP_AGE_IDENTITY"
 else
@@ -569,7 +569,7 @@ pause
 
 # ── 13 ────────────────────────────────────────────────────────────────────
 stage "Ansible inventory"
-INVENTORY="$DARZ_HOME/inventory.yml"
+INVENTORY="$WAYS_HOME/inventory.yml"
 if [[ ! -f "$INVENTORY" ]] || confirm "Overwrite $INVENTORY?"; then
   inv_host() { printf '        %s: {ansible_host: %s, ansible_user: %s}\n' "$(val "$1_NAME")" "$(val "$1_IP")" "$(val "$1_USER")"; }
   {

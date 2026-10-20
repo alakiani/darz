@@ -32,7 +32,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // Applier puts a Node's desired state into effect. Applying the same state
@@ -296,7 +296,7 @@ func (a *agent) certificate(ctx context.Context) (tls.Certificate, error) {
 	if err != nil {
 		return tls.Certificate{}, err
 	}
-	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{Subject: pkix.Name{CommonName: "darz-agent"}}, key)
+	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{Subject: pkix.Name{CommonName: "ways-agent"}}, key)
 	if err != nil {
 		return tls.Certificate{}, err
 	}

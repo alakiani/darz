@@ -133,9 +133,9 @@ func VerifyTOTP(secret, code string, now time.Time) bool {
 func TOTPURI(secret, handle string) string {
 	q := url.Values{}
 	q.Set("secret", secret)
-	q.Set("issuer", "DARZ")
+	q.Set("issuer", "WAYS")
 	q.Set("algorithm", "SHA1")
 	q.Set("digits", "6")
 	q.Set("period", "30")
-	return "otpauth://totp/DARZ:" + url.PathEscape(handle) + "?" + q.Encode()
+	return "otpauth://totp/WAYS:" + url.PathEscape(handle) + "?" + q.Encode()
 }

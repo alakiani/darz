@@ -1,8 +1,8 @@
 {
-  "uid": "darz-mesh",
+  "uid": "ways-mesh",
   "title": "Mesh",
   "description": "Nodes, every Link with its latency, loss, transport, instances and throughput, active Paths and their weights, and the Bridge behind each Endpoint Slot (ADR 0006).",
-  "tags": ["darz"],
+  "tags": ["ways"],
   "timezone": "utc",
   "schemaVersion": 39,
   "version": 1,
@@ -15,7 +15,7 @@
       "title": "Nodes",
       "description": "1 when Prometheus scrapes the Node's Agent.",
       "gridPos": { "x": 0, "y": 0, "w": 12, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
       "targets": [{ "refId": "A", "expr": "up{job=\"agents\"}", "legendFormat": "{{node}}" }],
       "fieldConfig": {
         "defaults": {
@@ -32,8 +32,8 @@
       "title": "Endpoint Slots",
       "description": "The Bridge each slot points to.",
       "gridPos": { "x": 12, "y": 0, "w": 12, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
-      "targets": [{ "refId": "A", "expr": "darz_slot_points_to == 1", "format": "table", "instant": true }],
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
+      "targets": [{ "refId": "A", "expr": "ways_slot_points_to == 1", "format": "table", "instant": true }],
       "transformations": [{ "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "instance": true, "job": true } } }]
     },
     {
@@ -42,12 +42,12 @@
       "title": "Links",
       "description": "Every Link: up as either end sees it, round-trip time, loss and the transport in use.",
       "gridPos": { "x": 0, "y": 5, "w": 24, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
       "targets": [
-        { "refId": "A", "expr": "max by (link) (darz_link_up)", "format": "table", "instant": true },
-        { "refId": "B", "expr": "max by (link) (darz_link_rtt_seconds)", "format": "table", "instant": true },
-        { "refId": "C", "expr": "max by (link) (darz_link_loss_ratio)", "format": "table", "instant": true },
-        { "refId": "D", "expr": "max by (link, transport) (darz_link_transport)", "format": "table", "instant": true }
+        { "refId": "A", "expr": "max by (link) (ways_link_up)", "format": "table", "instant": true },
+        { "refId": "B", "expr": "max by (link) (ways_link_rtt_seconds)", "format": "table", "instant": true },
+        { "refId": "C", "expr": "max by (link) (ways_link_loss_ratio)", "format": "table", "instant": true },
+        { "refId": "D", "expr": "max by (link, transport) (ways_link_transport)", "format": "table", "instant": true }
       ],
       "transformations": [
         { "id": "merge", "options": {} },
@@ -60,8 +60,8 @@
       "type": "timeseries",
       "title": "Link latency",
       "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
-      "targets": [{ "refId": "A", "expr": "max by (link) (darz_link_rtt_seconds)", "legendFormat": "{{link}}" }],
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
+      "targets": [{ "refId": "A", "expr": "max by (link) (ways_link_rtt_seconds)", "legendFormat": "{{link}}" }],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
     {
@@ -69,8 +69,8 @@
       "type": "timeseries",
       "title": "Link loss",
       "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
-      "targets": [{ "refId": "A", "expr": "max by (link) (darz_link_loss_ratio)", "legendFormat": "{{link}}" }],
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
+      "targets": [{ "refId": "A", "expr": "max by (link) (ways_link_loss_ratio)", "legendFormat": "{{link}}" }],
       "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 } }
     },
     {
@@ -79,8 +79,8 @@
       "title": "Active Paths",
       "description": "Buckets per candidate per Bridge per Rule (64 per Rule, ADR 0008).",
       "gridPos": { "x": 0, "y": 21, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
-      "targets": [{ "refId": "A", "expr": "darz_path_buckets > 0", "legendFormat": "{{node}} {{rule}} → {{candidate}}" }],
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
+      "targets": [{ "refId": "A", "expr": "ways_path_buckets > 0", "legendFormat": "{{node}} {{rule}} → {{candidate}}" }],
       "fieldConfig": { "defaults": { "custom": { "stacking": { "mode": "normal" } }, "max": 64 } }
     },
     {
@@ -89,8 +89,8 @@
       "title": "Bucket moves",
       "description": "Moves by kind; Path flapping counts failure moves only.",
       "gridPos": { "x": 12, "y": 21, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
-      "targets": [{ "refId": "A", "expr": "sum by (node, kind) (increase(darz_path_moves_total[1h]))", "legendFormat": "{{node}} {{kind}}" }]
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (node, kind) (increase(ways_path_moves_total[1h]))", "legendFormat": "{{node}} {{kind}}" }]
     },
     {
       "id": 8,
@@ -98,8 +98,8 @@
       "title": "Slot eligibility",
       "description": "Each domestic Bridge as the probe Device sees it.",
       "gridPos": { "x": 0, "y": 29, "w": 24, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
-      "targets": [{ "refId": "A", "expr": "darz_slot_bridge_eligible", "legendFormat": "{{node}}" }],
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
+      "targets": [{ "refId": "A", "expr": "ways_slot_bridge_eligible", "legendFormat": "{{node}}" }],
       "fieldConfig": {
         "defaults": {
           "mappings": [{ "type": "value", "options": { "0": { "text": "ineligible", "color": "red" }, "1": { "text": "eligible", "color": "green" } } }],
@@ -118,10 +118,10 @@
       "repeatDirection": "h",
       "maxPerRow": 2,
       "gridPos": { "x": 0, "y": 34, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
       "targets": [
-        { "refId": "A", "expr": "darz_path_weight{node=~\"$bridge\"} unless on (node, rule_id, candidate) darz_path_cut_off == 1", "legendFormat": "{{rule}} → {{candidate}}" },
-        { "refId": "B", "expr": "darz_path_weight{node=~\"$bridge\"} and on (node, rule_id, candidate) darz_path_cut_off == 1", "legendFormat": "{{rule}} → {{candidate}} (cut off)" }
+        { "refId": "A", "expr": "ways_path_weight{node=~\"$bridge\"} unless on (node, rule_id, candidate) ways_path_cut_off == 1", "legendFormat": "{{rule}} → {{candidate}}" },
+        { "refId": "B", "expr": "ways_path_weight{node=~\"$bridge\"} and on (node, rule_id, candidate) ways_path_cut_off == 1", "legendFormat": "{{rule}} → {{candidate}} (cut off)" }
       ],
       "fieldConfig": {
         "defaults": {},
@@ -135,11 +135,11 @@
       "title": "Throughput by Link",
       "description": "What each Link's far end can still send the Bridge measuring it: the last throughput test, raised by peaks of real traffic, with its age and the transport that carried it (ADR 0008).",
       "gridPos": { "x": 0, "y": 42, "w": 24, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
       "targets": [
-        { "refId": "A", "expr": "max by (node, link) (darz_link_throughput_mbps)", "format": "table", "instant": true },
-        { "refId": "B", "expr": "max by (node, link) (time() - darz_link_throughput_measured_timestamp_seconds)", "format": "table", "instant": true },
-        { "refId": "C", "expr": "max by (node, link, transport) (darz_link_throughput_transport)", "format": "table", "instant": true }
+        { "refId": "A", "expr": "max by (node, link) (ways_link_throughput_mbps)", "format": "table", "instant": true },
+        { "refId": "B", "expr": "max by (node, link) (time() - ways_link_throughput_measured_timestamp_seconds)", "format": "table", "instant": true },
+        { "refId": "C", "expr": "max by (node, link, transport) (ways_link_throughput_transport)", "format": "table", "instant": true }
       ],
       "transformations": [
         { "id": "merge", "options": {} },
@@ -160,8 +160,8 @@
       "repeatDirection": "h",
       "maxPerRow": 2,
       "gridPos": { "x": 0, "y": 50, "w": 12, "h": 6 },
-      "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
-      "targets": [{ "refId": "A", "expr": "darz_link_instance_up{link=~\"$link\"}", "legendFormat": "{{node}}: {{transport}} {{instance_id}}" }],
+      "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
+      "targets": [{ "refId": "A", "expr": "ways_link_instance_up{link=~\"$link\"}", "legendFormat": "{{node}}: {{transport}} {{instance_id}}" }],
       "fieldConfig": {
         "defaults": {
           "mappings": [{ "type": "value", "options": { "0": { "text": "down", "color": "red" }, "1": { "text": "up", "color": "green" } } }],
@@ -178,9 +178,9 @@
         "name": "bridge",
         "label": "Bridge",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
-        "definition": "label_values(darz_path_weight, node)",
-        "query": { "query": "label_values(darz_path_weight, node)", "refId": "bridge" },
+        "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
+        "definition": "label_values(ways_path_weight, node)",
+        "query": { "query": "label_values(ways_path_weight, node)", "refId": "bridge" },
         "refresh": 2,
         "sort": 1,
         "multi": true,
@@ -191,9 +191,9 @@
         "name": "link",
         "label": "Link",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "darz-prometheus" },
-        "definition": "label_values(darz_link_instance_up, link)",
-        "query": { "query": "label_values(darz_link_instance_up, link)", "refId": "link" },
+        "datasource": { "type": "prometheus", "uid": "ways-prometheus" },
+        "definition": "label_values(ways_link_instance_up, link)",
+        "query": { "query": "label_values(ways_link_instance_up, link)", "refId": "link" },
         "refresh": 2,
         "sort": 1,
         "multi": true,

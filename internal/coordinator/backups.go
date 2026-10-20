@@ -8,8 +8,8 @@ import (
 
 	"filippo.io/age"
 
-	"github.com/alakiani/darz/internal/backup"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/backup"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // BackupSettings configure the nightly backup (ADR 0001).
@@ -28,7 +28,7 @@ type BackupSettings struct {
 func (b BackupSettings) configured() bool { return len(b.Recipients) > 0 }
 
 // DefaultBackupSettings back up nightly, keeping a week on the VM.
-var DefaultBackupSettings = BackupSettings{Dir: "/var/lib/darz/backups", Keep: 7, Every: 24 * time.Hour}
+var DefaultBackupSettings = BackupSettings{Dir: "/var/lib/ways/backups", Keep: 7, Every: 24 * time.Hour}
 
 // RunBackups backs up whenever the last good backup is older than Every,
 // checking hourly, until ctx ends.

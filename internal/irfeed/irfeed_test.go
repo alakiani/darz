@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alakiani/darz/internal/cidr"
+	"github.com/alakiani/ways/internal/cidr"
 )
 
 // sample has the shape of MrAriaNet/Get-IP-Iran list.rsc.

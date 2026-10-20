@@ -20,10 +20,10 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/coordinator"
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/coordinator"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 // whoami answers on UDP and TCP with the source address it saw, so a test

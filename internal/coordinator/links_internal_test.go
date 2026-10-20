@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/awg"
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/awg"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 type mesh struct {
@@ -29,7 +29,7 @@ var bg = context.Background()
 // newMesh creates Nodes by name; those named ir* are tagged IR.
 func newMesh(t *testing.T, names ...string) *mesh {
 	t.Helper()
-	s, err := store.Open(filepath.Join(t.TempDir(), "darz.db"))
+	s, err := store.Open(filepath.Join(t.TempDir(), "ways.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,6 @@
-# DARZ
+# WAYS
 
-DARZ ("hole" in Farsi; tagline: there is always a way) is a censorship-circumvention VPN system: a Coordinator, a managed mesh of Nodes, and Devices that reach the open internet through an Exit chosen by policy and health.
+WAYS ("hole" in Farsi; tagline: there is always a way) is a censorship-circumvention VPN system: a Coordinator, a managed mesh of Nodes, and Devices that reach the open internet through an Exit chosen by policy and health.
 
 ## Language
 
@@ -15,7 +15,7 @@ The infrastructure node whose public IP a Device's traffic leaves from. Exits ar
 _Avoid_: Egress, VPN server, endpoint
 
 **Node**:
-Any infrastructure server DARZ manages: an Ubuntu machine with SSH access and one public IPv4. A Node holds one or more Roles and any number of Tags.
+Any infrastructure server WAYS manages: an Ubuntu machine with SSH access and one public IPv4. A Node holds one or more Roles and any number of Tags.
 _Avoid_: Server, relay, box, VM
 
 **Role**:
@@ -63,7 +63,7 @@ _Avoid_: Policy, route, filter
 ### Identity
 
 **User**:
-A person with a DARZ account. A User owns one or more Devices.
+A person with a WAYS account. A User owns one or more Devices.
 _Avoid_: Account, client, member
 
 **Device**:

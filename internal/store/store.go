@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 	_ "modernc.org/sqlite"
 )
 
@@ -256,7 +256,7 @@ type APIToken struct {
 // CreateAPIToken returns a new token's secret, which is shown once and never
 // stored, and its record.
 func (s *Store) CreateAPIToken(ctx context.Context, scope, name string, ttl time.Duration) (string, APIToken, error) {
-	secret := "darz_" + randomToken()
+	secret := "ways_" + randomToken()
 	t := APIToken{ID: "tok_" + randomHex(8), Scope: scope, Name: name, ExpiresAt: time.Unix(s.unix(), 0).Add(ttl).UTC()}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO api_tokens (id, hash, scope, name, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)`,

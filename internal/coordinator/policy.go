@@ -13,9 +13,9 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/irfeed"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/irfeed"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // DefaultDevicePort is the UDP port Bridges listen on for Devices

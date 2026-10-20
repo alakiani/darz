@@ -1,4 +1,4 @@
-// Package testutil holds helpers shared by DARZ tests.
+// Package testutil holds helpers shared by WAYS tests.
 package testutil
 
 import (
@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // Eventually polls cond until it holds, failing the test after timeout.

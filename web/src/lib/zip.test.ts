@@ -9,8 +9,8 @@ describe("zip", () => {
 
   it("stores files a reader can find through the central directory", () => {
     const zip = makeZip([
-      { name: "darz-main.conf", data: "[Interface]\n" },
-      { name: "darz-backup1.conf", data: "x" },
+      { name: "ways-main.conf", data: "[Interface]\n" },
+      { name: "ways-backup1.conf", data: "x" },
     ]);
     const view = new DataView(zip.buffer);
     // End of central directory record, at the end with no comment.
@@ -27,6 +27,6 @@ describe("zip", () => {
       names.push(new TextDecoder().decode(zip.subarray(at + 46, at + 46 + nameLen)));
       at += 46 + nameLen;
     }
-    expect(names).toEqual(["darz-main.conf", "darz-backup1.conf"]);
+    expect(names).toEqual(["ways-main.conf", "ways-backup1.conf"]);
   });
 });

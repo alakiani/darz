@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/agent"
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/metrics"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/agent"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/metrics"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 // reporting is an applier that also reports a Link, a Path and usage, and
@@ -35,7 +35,7 @@ func (r *reporting) Report(h *protocol.Health) {
 }
 
 func (r *reporting) WriteMetrics(w *metrics.Writer) {
-	w.Gauge("darz_bridge_active_devices", "Devices.", 3)
+	w.Gauge("ways_bridge_active_devices", "Devices.", 3)
 }
 
 // fakeTelegram records what reaches Telegram's sendMessage.
@@ -138,21 +138,21 @@ func TestMonitoringPort(t *testing.T) {
 		return resp.StatusCode == http.StatusOK && resp.Header.Get("Content-Type") == metrics.ContentType
 	})
 	for _, want := range []string{
-		`darz_agent_info{version="test"} 1`,
-		"darz_snapshot_applied_version 1",
-		"# TYPE darz_coordinator_last_contact_seconds gauge",
-		"darz_snapshot_apply_failures_total 0",
-		"darz_client_cert_expiry_timestamp_seconds ",
-		`darz_link_up{link_id="7",link="link 7/x1",peer="link 7"} 1`,
-		`darz_link_rtt_seconds{link_id="7",link="link 7/x1",peer="link 7"} 0.042`,
-		`darz_link_loss_ratio{link_id="7",link="link 7/x1",peer="link 7"} 0.1`,
-		`darz_link_transport{link_id="7",link="link 7/x1",peer="link 7",transport="amneziawg"} 1`,
-		`darz_path_ok{rule_id="2",rule="Default",default="true"} 1`,
-		`darz_path_eligible_candidates{rule_id="2",rule="Default",default="true"} 1`,
-		`darz_path_buckets{rule_id="2",rule="Default",default="true",candidate="link 7"} 64`,
-		"darz_metering_backlog_seconds ",
-		"darz_bridge_active_devices 3",
-		"darz_node_exporter_up 1",
+		`ways_agent_info{version="test"} 1`,
+		"ways_snapshot_applied_version 1",
+		"# TYPE ways_coordinator_last_contact_seconds gauge",
+		"ways_snapshot_apply_failures_total 0",
+		"ways_client_cert_expiry_timestamp_seconds ",
+		`ways_link_up{link_id="7",link="link 7/x1",peer="link 7"} 1`,
+		`ways_link_rtt_seconds{link_id="7",link="link 7/x1",peer="link 7"} 0.042`,
+		`ways_link_loss_ratio{link_id="7",link="link 7/x1",peer="link 7"} 0.1`,
+		`ways_link_transport{link_id="7",link="link 7/x1",peer="link 7",transport="amneziawg"} 1`,
+		`ways_path_ok{rule_id="2",rule="Default",default="true"} 1`,
+		`ways_path_eligible_candidates{rule_id="2",rule="Default",default="true"} 1`,
+		`ways_path_buckets{rule_id="2",rule="Default",default="true",candidate="link 7"} 64`,
+		"ways_metering_backlog_seconds ",
+		"ways_bridge_active_devices 3",
+		"ways_node_exporter_up 1",
 		"node_load1 0.25",
 	} {
 		if !strings.Contains(body, want) {

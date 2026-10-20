@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 func usageFixture(t *testing.T) (*store.Store, *clock, store.UserDevice, string) {

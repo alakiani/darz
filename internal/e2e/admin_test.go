@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/auth"
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/auth"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // TestAdminPanel is session 9's "proves in the lab" test: a browser walks
@@ -89,7 +89,7 @@ func TestAdminPanel(t *testing.T) {
 	m.startAgent("ab1", []protocol.Role{protocol.RoleExit}, nil)
 
 	// An alert no Exit could relay waits on the banner (ADR 0006).
-	alert, _ := co.store.QueueAlert(ctx, "DARZ\nFIRING critical NodeUnreachable: Node ab9 is unreachable")
+	alert, _ := co.store.QueueAlert(ctx, "WAYS\nFIRING critical NodeUnreachable: Node ab9 is unreachable")
 	co.store.AlertFailed(ctx, alert, "no healthy Exit")
 
 	cmd := exec.Command(node, script)

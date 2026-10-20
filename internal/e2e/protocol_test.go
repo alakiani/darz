@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/agent"
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/agent"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 // cutter is the Agent's data plane in this test: a snapshot tagged

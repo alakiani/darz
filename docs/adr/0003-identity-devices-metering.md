@@ -4,7 +4,7 @@ status: accepted
 
 # Identity, Devices, and metering: keys made in the browser, no session history
 
-Device keypairs are generated in the User's browser, so no DARZ server ever holds a private key. Users sign in with built-in credentials, without any third party. The Coordinator keeps usage at a resolution that supports quotas but not a fine record of when someone was online. This refines [ADR 0001](0001-coordinator-architecture.md), which fixed built-in auth and data minimisation, and [ADR 0002](0002-agent-coordinator-protocol.md), which fixed hourly metering buckets on Bridges. Resolved in [Identity, Device issuance, and metering model](https://github.com/alakiani/darz/issues/8).
+Device keypairs are generated in the User's browser, so no WAYS server ever holds a private key. Users sign in with built-in credentials, without any third party. The Coordinator keeps usage at a resolution that supports quotas but not a fine record of when someone was online. This refines [ADR 0001](0001-coordinator-architecture.md), which fixed built-in auth and data minimisation, and [ADR 0002](0002-agent-coordinator-protocol.md), which fixed hourly metering buckets on Bridges. Resolved in [Identity, Device issuance, and metering model](https://github.com/alakiani/ways/issues/8).
 
 ## Users, Invites, and sign-in
 

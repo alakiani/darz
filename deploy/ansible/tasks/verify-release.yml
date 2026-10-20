@@ -4,8 +4,8 @@
 # but nothing else stopped a playbook from using what it left behind.
 - name: Read the release's SHA256SUMS
   ansible.builtin.set_fact:
-    darz_release_sums: >-
-      {{ dict(lookup('file', darz_release_dir ~ '/SHA256SUMS').splitlines()
+    ways_release_sums: >-
+      {{ dict(lookup('file', ways_release_dir ~ '/SHA256SUMS').splitlines()
          | map('regex_findall', '^([0-9a-f]{64})\s+\*?(\S+)$') | select | map('first')
          | map('reverse')) }}
   delegate_to: localhost
@@ -14,11 +14,11 @@
 
 - name: Hash the release's files
   ansible.builtin.stat:
-    path: "{{ darz_release_dir }}/{{ item }}"
+    path: "{{ ways_release_dir }}/{{ item }}"
     checksum_algorithm: sha256
     follow: true
-  loop: "{{ darz_release_sums.keys() | list }}"
-  register: darz_release_files
+  loop: "{{ ways_release_sums.keys() | list }}"
+  register: ways_release_files
   delegate_to: localhost
   become: false
   run_once: true
@@ -26,17 +26,17 @@
 - name: Check the release's files match SHA256SUMS
   ansible.builtin.assert:
     that:
-      - darz_release_sums | length > 0
-      - darz_release_bad | length == 0
+      - ways_release_sums | length > 0
+      - ways_release_bad | length == 0
     fail_msg: >-
-      Release {{ darz_release }} in {{ darz_release_dir }} is incomplete or
-      damaged: {{ darz_release_bad | join(', ') if darz_release_bad else 'SHA256SUMS lists no files' }}.
-      Delete that folder and run scripts/fetch-release.sh {{ darz_release }} again.
+      Release {{ ways_release }} in {{ ways_release_dir }} is incomplete or
+      damaged: {{ ways_release_bad | join(', ') if ways_release_bad else 'SHA256SUMS lists no files' }}.
+      Delete that folder and run scripts/fetch-release.sh {{ ways_release }} again.
     quiet: true
   vars:
-    darz_release_bad: >-
-      {% set bad = [] %}{% for r in darz_release_files.results %}{% if not r.stat.exists
-      or r.stat.checksum | default('') != darz_release_sums[r.item] %}{% set _ = bad.append(r.item) %}{% endif %}{% endfor %}{{ bad }}
+    ways_release_bad: >-
+      {% set bad = [] %}{% for r in ways_release_files.results %}{% if not r.stat.exists
+      or r.stat.checksum | default('') != ways_release_sums[r.item] %}{% set _ = bad.append(r.item) %}{% endif %}{% endfor %}{{ bad }}
   delegate_to: localhost
   become: false
   run_once: true

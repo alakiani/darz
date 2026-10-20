@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/ca"
+	"github.com/alakiani/ways/internal/ca"
 )
 
 func csrPEM(t *testing.T) []byte {

@@ -12,8 +12,8 @@ import (
 
 	"filippo.io/age"
 
-	"github.com/alakiani/darz/internal/backup"
-	"github.com/alakiani/darz/internal/coordinator"
+	"github.com/alakiani/ways/internal/backup"
+	"github.com/alakiani/ways/internal/coordinator"
 )
 
 // configureMonitoring sets up the Coordinator's part in monitoring (ADR
@@ -74,8 +74,8 @@ func configureBackups(c *coordinator.Coordinator, recipient, dir string, keep in
 func backupRestore(args []string) error {
 	fs := flag.NewFlagSet("coordinator backup restore", flag.ExitOnError)
 	identityFile := fs.String("identity", "", "the operator's age identity file (required)")
-	in := fs.String("in", "", "the encrypted backup, darz-<time>.db.age (required)")
-	dbPath := fs.String("db", "darz.db", "the database to create; it must not exist")
+	in := fs.String("in", "", "the encrypted backup, ways-<time>.db.age (required)")
+	dbPath := fs.String("db", "ways.db", "the database to create; it must not exist")
 	fs.Parse(args)
 	if *identityFile == "" || *in == "" {
 		return errors.New("backup restore: -identity and -in are required")

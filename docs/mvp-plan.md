@@ -1,8 +1,8 @@
-# DARZ MVP build plan
+# WAYS MVP build plan
 
-The plan for the first build of DARZ phase one. It uses every decision on the
-[wayfinder map](https://github.com/alakiani/darz/issues/1) (ADRs 0001–0008 in `docs/adr/`) and
-was resolved in [MVP cut](https://github.com/alakiani/darz/issues/16). Every architectural decision
+The plan for the first build of WAYS phase one. It uses every decision on the
+[wayfinder map](https://github.com/alakiani/ways/issues/1) (ADRs 0001–0008 in `docs/adr/`) and
+was resolved in [MVP cut](https://github.com/alakiani/ways/issues/16). Every architectural decision
 is already made; a build session that finds one still open should stop and raise it, not decide it alone.
 
 ## Acceptance test
@@ -51,7 +51,7 @@ WireGuard app, can do all of the following on the production fleet:
 
 ## Technical baseline
 
-- **Repository:** one Go module, `github.com/alakiani/darz`, with two binaries, `cmd/coordinator` and `cmd/agent`, and packages under `internal/`.
+- **Repository:** one Go module, `github.com/alakiani/ways`, with two binaries, `cmd/coordinator` and `cmd/agent`, and packages under `internal/`.
 - **Store:** `modernc.org/sqlite` (pure Go, no cgo, static binaries), plain `database/sql` behind the store package, and SQL migrations embedded in the binary.
 - **Panel:** React, Vite, and TypeScript, embedded in the Coordinator binary. An OpenAPI spec is the contract between Go and the SPA, and the TypeScript client is generated from it. A small CSS layer handles RTL; there is no component library. The user panel is in Farsi (RTL) and the admin panel in English.
 - **Agent data plane:**

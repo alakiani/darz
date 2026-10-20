@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/link"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/link"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 var (

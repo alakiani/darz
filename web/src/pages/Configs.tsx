@@ -32,7 +32,7 @@ export function Configs({ issued, privateKey, onSaved }: { issued: IssuedDevice;
       <button
         type="button"
         data-testid="download-zip"
-        onClick={() => download(`darz-${issued.device.name.replace(/[^\w-]/g, "") || "device"}.zip`, makeZip(files.map((f) => ({ name: f.name, data: f.text }))), "application/zip")}
+        onClick={() => download(`ways-${issued.device.name.replace(/[^\w-]/g, "") || "device"}.zip`, makeZip(files.map((f) => ({ name: f.name, data: f.text }))), "application/zip")}
       >
         {fa.downloadZip}
       </button>

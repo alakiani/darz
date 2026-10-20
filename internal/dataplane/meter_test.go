@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 type fakeCounters struct{ up, down []counterElem }
@@ -148,7 +148,7 @@ func TestMeterCapsReportsAndForgetsAfterThirtyDays(t *testing.T) {
 }
 
 func TestParseCounters(t *testing.T) {
-	out := []byte(`{"nftables": [{"metainfo": {"version": "1.0.9"}}, {"set": {"family": "inet", "name": "usage_up", "table": "darz",
+	out := []byte(`{"nftables": [{"metainfo": {"version": "1.0.9"}}, {"set": {"family": "inet", "name": "usage_up", "table": "ways",
 		"type": ["ipv4_addr", "mark"], "flags": ["dynamic"], "elem": [
 		{"elem": {"val": {"concat": ["10.77.0.2", 131076]}, "counter": {"packets": 3, "bytes": 252}}},
 		{"elem": {"val": {"concat": ["10.77.0.3", 262144]}, "counter": {"packets": 1, "bytes": 84}}}]}}]}`)

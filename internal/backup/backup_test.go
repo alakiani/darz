@@ -14,14 +14,14 @@ import (
 
 	"filippo.io/age"
 
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/store"
 )
 
 var ctx = context.Background()
 
 func newStore(t *testing.T) *store.Store {
 	t.Helper()
-	s, err := store.Open(filepath.Join(t.TempDir(), "darz.db"))
+	s, err := store.Open(filepath.Join(t.TempDir(), "ways.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestBackupRestores(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Base(path) != "darz-20261016T030000Z.db.age" {
+	if filepath.Base(path) != "ways-20261016T030000Z.db.age" {
 		t.Errorf("backup named %s", path)
 	}
 	b, _ := os.ReadFile(path)
@@ -105,7 +105,7 @@ func TestPrune(t *testing.T) {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	want := "darz-20261003T030000Z.db.age darz-20261004T030000Z.db.age darz-20261005T030000Z.db.age unrelated.txt"
+	want := "unrelated.txt ways-20261003T030000Z.db.age ways-20261004T030000Z.db.age ways-20261005T030000Z.db.age"
 	if strings.Join(names, " ") != want {
 		t.Errorf("left %v", names)
 	}
@@ -119,12 +119,12 @@ func TestS3Put(t *testing.T) {
 		body, _ = io.ReadAll(r.Body)
 	}))
 	defer srv.Close()
-	s3 := &S3{Endpoint: srv.URL, Region: "eu-central-1", Bucket: "darz-backups", AccessKey: "AKID", SecretKey: "secret",
+	s3 := &S3{Endpoint: srv.URL, Region: "eu-central-1", Bucket: "ways-backups", AccessKey: "AKID", SecretKey: "secret",
 		now: func() time.Time { return time.Date(2026, 10, 16, 3, 0, 0, 0, time.UTC) }}
-	if err := s3.Put(ctx, "darz-20261016T030000Z.db.age", []byte("ciphertext")); err != nil {
+	if err := s3.Put(ctx, "ways-20261016T030000Z.db.age", []byte("ciphertext")); err != nil {
 		t.Fatal(err)
 	}
-	if got.Method != http.MethodPut || got.URL.Path != "/darz-backups/darz-20261016T030000Z.db.age" || string(body) != "ciphertext" {
+	if got.Method != http.MethodPut || got.URL.Path != "/ways-backups/ways-20261016T030000Z.db.age" || string(body) != "ciphertext" {
 		t.Errorf("%s %s with %q", got.Method, got.URL.Path, body)
 	}
 	auth := got.Header.Get("Authorization")

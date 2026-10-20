@@ -4,7 +4,7 @@ status: accepted
 
 # Monitoring and alerting: Prometheus on the Coordinator VM pulls from Agents; alerts leave Iran through an Exit
 
-Prometheus, Alertmanager, and Grafana run on the domestic Coordinator VM, so monitoring adds no machine. Prometheus pulls each Agent's `/metrics`, which narrows ADR 0001's rule that the Coordinator never dials a Node. Telegram is blocked domestically, so alerts reach it through whichever Exit is healthy. No metric carries a Device or User identifier. Resolved in [Monitoring and alerting](https://github.com/alakiani/darz/issues/15).
+Prometheus, Alertmanager, and Grafana run on the domestic Coordinator VM, so monitoring adds no machine. Prometheus pulls each Agent's `/metrics`, which narrows ADR 0001's rule that the Coordinator never dials a Node. Telegram is blocked domestically, so alerts reach it through whichever Exit is healthy. No metric carries a Device or User identifier. Resolved in [Monitoring and alerting](https://github.com/alakiani/ways/issues/15).
 
 ## Placement
 
@@ -77,7 +77,7 @@ Telegram is blocked domestically, so the Coordinator VM cannot reach it directly
 No Exit is special, so throwing one away costs nothing. An alert that no Exit could deliver shows as a banner on the admin panel, so the operator still sees it from inside Iran during an international outage.
 
 **SMS through a domestic gateway (designed, not in the MVP):**
-- A domestic gateway such as Kavenegar requires identity verification with a national ID, and every message passes through the gateway and the mobile operator. So an SMS is a bare signal only, such as "DARZ: 2 critical, check Telegram/panel", with no Node names, IPs, or domains.
+- A domestic gateway such as Kavenegar requires identity verification with a national ID, and every message passes through the gateway and the mobile operator. So an SMS is a bare signal only, such as "WAYS: 2 critical, check Telegram/panel", with no Node names, IPs, or domains.
 - Critical alerts only, at most one SMS every 15 minutes grouping everything fired in that window, plus one "all clear" when the last critical alert resolves.
 - The Coordinator sends it through the gateway's HTTPS API. The operator's phone number lives only in the Coordinator's config file, never in the database: the one exception to ADR 0001's "no phone numbers".
 - The MVP ships with no gateway key, so this channel stays switched off.
@@ -86,7 +86,7 @@ No Exit is special, so throwing one away costs nothing. An alert that no Exit co
 
 The admin panel's status board shows the present; Grafana shows history.
 
-Grafana listens on the Coordinator VM's loopback only. Admins open it through the panel at `/grafana/`: the Coordinator proxies it only for a signed-in Admin whose session proved TOTP, the same check as the Admin API, and names them to Grafana in its auth-proxy header, which Grafana trusts from loopback only. The browser's own copy of that header and the panel's session cookie are never passed on. *(Added 2026-10-19, [#56](https://github.com/alakiani/darz/issues/56); before, Grafana was reached through an SSH tunnel.)*
+Grafana listens on the Coordinator VM's loopback only. Admins open it through the panel at `/grafana/`: the Coordinator proxies it only for a signed-in Admin whose session proved TOTP, the same check as the Admin API, and names them to Grafana in its auth-proxy header, which Grafana trusts from loopback only. The browser's own copy of that header and the panel's session cookie are never passed on. *(Added 2026-10-19, [#56](https://github.com/alakiani/ways/issues/56); before, Grafana was reached through an SSH tunnel.)*
 1. **Mesh:** Nodes, a grid of every Link with latency, loss, and transport, active Paths, and the Bridge behind each Endpoint Slot.
 2. **User's-eye:** probe results and active Device counts per Bridge.
 3. **Node detail:** host metrics and the Node's Links.

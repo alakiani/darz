@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alakiani/darz/internal/cidr"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/cidr"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // The admin panel's operations (the panel prototype, issue #14). Every one

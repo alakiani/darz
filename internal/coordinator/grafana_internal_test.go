@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // fakeGrafana records the last request it was sent.
@@ -52,7 +52,7 @@ func TestGrafanaIsProxiedForAdmins(t *testing.T) {
 	a.c.GrafanaURL = g.srv.URL
 	admin := a.admin()
 
-	resp := admin.get("/grafana/d/darz-mesh?orgId=1", http.Header{
+	resp := admin.get("/grafana/d/ways-mesh?orgId=1", http.Header{
 		"X-Webauth-User": {"someone-else"},
 		"Cookie":         {"grafana_session=abc"},
 	})
@@ -60,7 +60,7 @@ func TestGrafanaIsProxiedForAdmins(t *testing.T) {
 		t.Fatalf("status %d", resp.StatusCode)
 	}
 	r := g.last.Load()
-	if r.URL.Path != "/grafana/d/darz-mesh" || r.URL.RawQuery != "orgId=1" {
+	if r.URL.Path != "/grafana/d/ways-mesh" || r.URL.RawQuery != "orgId=1" {
 		t.Errorf("Grafana got %s", r.URL)
 	}
 	if got := r.Header.Values("X-Webauth-User"); len(got) != 1 || got[0] != "admin" {

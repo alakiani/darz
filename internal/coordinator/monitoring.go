@@ -20,11 +20,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/metrics"
-	"github.com/alakiani/darz/internal/monitoring"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/metrics"
+	"github.com/alakiani/ways/internal/monitoring"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // MonitorSettings are the Coordinator's part in monitoring (ADR 0006).
@@ -149,9 +149,9 @@ func (c *Coordinator) writeMetrics(ctx context.Context, m *metrics.Writer) error
 		if h == nil {
 			continue
 		}
-		m.Gauge("darz_node_report_age_seconds", "Seconds since the Node's last health report.", now.Sub(h.ReceivedAt).Seconds(), "node", n.Name)
+		m.Gauge("ways_node_report_age_seconds", "Seconds since the Node's last health report.", now.Sub(h.ReceivedAt).Seconds(), "node", n.Name)
 		if !h.Time.IsZero() {
-			m.Gauge("darz_node_clock_skew_seconds", "The Node's clock minus the Coordinator's, at its last report.",
+			m.Gauge("ways_node_clock_skew_seconds", "The Node's clock minus the Coordinator's, at its last report.",
 				h.Time.Sub(h.ReceivedAt).Round(time.Second).Seconds(), "node", n.Name)
 		}
 	}
@@ -166,27 +166,27 @@ func (c *Coordinator) writeMetrics(ctx context.Context, m *metrics.Writer) error
 		if b.Probe == nil {
 			continue
 		}
-		m.Bool("darz_slot_probe_ok", "1 while the probe Device passes on the Bridge.", b.Probe.OK, "node", b.Name)
-		m.Bool("darz_slot_bridge_eligible", "1 while the Bridge may hold an Endpoint Slot.", b.Eligible, "node", b.Name)
+		m.Bool("ways_slot_probe_ok", "1 while the probe Device passes on the Bridge.", b.Probe.OK, "node", b.Name)
+		m.Bool("ways_slot_bridge_eligible", "1 while the Bridge may hold an Endpoint Slot.", b.Eligible, "node", b.Name)
 		if b.Eligible {
 			eligible++
 		}
 	}
-	m.Gauge("darz_slot_eligible_bridges", "Bridges that may hold an Endpoint Slot.", float64(eligible))
+	m.Gauge("ways_slot_eligible_bridges", "Bridges that may hold an Endpoint Slot.", float64(eligible))
 	inUse := map[string]bool{}
 	for _, s := range slots.Slots {
 		if s.Bridge == "" {
 			continue
 		}
 		inUse[s.Bridge] = true
-		m.Gauge("darz_slot_points_to", "The Bridge each Endpoint Slot points to.", 1, "slot", s.Name, "node", s.Bridge)
-		m.Counter("darz_slot_repoints_total", "Moves of the Endpoint Slot off a failed Bridge.", float64(s.Repoints), "slot", s.Name)
+		m.Gauge("ways_slot_points_to", "The Bridge each Endpoint Slot points to.", 1, "slot", s.Name, "node", s.Bridge)
+		m.Counter("ways_slot_repoints_total", "Moves of the Endpoint Slot off a failed Bridge.", float64(s.Repoints), "slot", s.Name)
 	}
-	m.Gauge("darz_slot_bridges_in_use", "Bridges holding at least one Endpoint Slot.", float64(len(inUse)))
+	m.Gauge("ways_slot_bridges_in_use", "Bridges holding at least one Endpoint Slot.", float64(len(inUse)))
 	c.slots.mu.Lock()
 	dnsFailures := c.slots.dnsFailures
 	c.slots.mu.Unlock()
-	m.Gauge("darz_arvan_consecutive_failures", "ArvanCloud DNS API calls failed in a row.", float64(dnsFailures))
+	m.Gauge("ways_arvan_consecutive_failures", "ArvanCloud DNS API calls failed in a row.", float64(dnsFailures))
 
 	// The IR feed (ADR 0004).
 	sets, err := c.store.DestinationSets(ctx)
@@ -202,9 +202,9 @@ func (c *Coordinator) writeMetrics(ctx context.Context, m *metrics.Writer) error
 			return err
 		}
 		if !st.UpdatedAt.IsZero() {
-			m.Gauge("darz_irfeed_last_success_timestamp_seconds", "When the set's feed last passed its gates.", float64(st.UpdatedAt.Unix()), "set", s.Name)
+			m.Gauge("ways_irfeed_last_success_timestamp_seconds", "When the set's feed last passed its gates.", float64(st.UpdatedAt.Unix()), "set", s.Name)
 		}
-		m.Bool("darz_irfeed_last_rejected", "1 if a gate rejected the set's last feed update.", st.LastError != "", "set", s.Name)
+		m.Bool("ways_irfeed_last_rejected", "1 if a gate rejected the set's last feed update.", st.LastError != "", "set", s.Name)
 	}
 
 	if c.Backup.configured() {
@@ -216,28 +216,28 @@ func (c *Coordinator) writeMetrics(ctx context.Context, m *metrics.Writer) error
 		if good != nil {
 			at = float64(good.At.Unix())
 		}
-		m.Gauge("darz_backup_last_success_timestamp_seconds", "When the last nightly backup succeeded; 0 for never.", at)
+		m.Gauge("ways_backup_last_success_timestamp_seconds", "When the last nightly backup succeeded; 0 for never.", at)
 	}
 	size, err := c.store.Size(ctx)
 	if err != nil {
 		return err
 	}
-	m.Gauge("darz_db_size_bytes", "The database's size.", float64(size))
+	m.Gauge("ways_db_size_bytes", "The database's size.", float64(size))
 	pending, err := c.store.PendingAlerts(ctx)
 	if err != nil {
 		return err
 	}
-	m.Gauge("darz_alerts_undelivered", "Alerts no Exit has relayed to Telegram yet.", float64(len(pending)))
+	m.Gauge("ways_alerts_undelivered", "Alerts no Exit has relayed to Telegram yet.", float64(len(pending)))
 
 	// Expiry of the CA, the public certificate and API tokens.
 	if c.ca != nil {
-		m.Gauge("darz_ca_expiry_timestamp_seconds", "When the Coordinator's CA certificate expires.", float64(c.ca.NotAfter().Unix()))
+		m.Gauge("ways_ca_expiry_timestamp_seconds", "When the Coordinator's CA certificate expires.", float64(c.ca.NotAfter().Unix()))
 	}
 	if c.Monitor.PublicCertFile != "" {
 		if notAfter, err := certExpiry(c.Monitor.PublicCertFile); err != nil {
 			c.log.Warn("read the public TLS certificate", "err", err)
 		} else {
-			m.Gauge("darz_public_tls_expiry_timestamp_seconds", "When the public TLS certificate expires.", float64(notAfter.Unix()))
+			m.Gauge("ways_public_tls_expiry_timestamp_seconds", "When the public TLS certificate expires.", float64(notAfter.Unix()))
 		}
 	}
 	tokens, revoked, err := c.store.APITokens(ctx)
@@ -246,7 +246,7 @@ func (c *Coordinator) writeMetrics(ctx context.Context, m *metrics.Writer) error
 	}
 	for i, t := range tokens {
 		if !revoked[i] && t.ExpiresAt.After(now) {
-			m.Gauge("darz_api_token_expiry_timestamp_seconds", "When the API token expires.", float64(t.ExpiresAt.Unix()), "token", t.Name)
+			m.Gauge("ways_api_token_expiry_timestamp_seconds", "When the API token expires.", float64(t.ExpiresAt.Unix()), "token", t.Name)
 		}
 	}
 	return nil

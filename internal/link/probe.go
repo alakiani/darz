@@ -53,7 +53,7 @@ func encodeReply(seq uint32, f Flags) []byte {
 	return b
 }
 
-var errNotProbe = errors.New("not a DARZ probe")
+var errNotProbe = errors.New("not a WAYS probe")
 
 func decode(b []byte) (typ byte, seq uint32, f Flags, err error) {
 	if len(b) < 9 || [4]byte(b[:4]) != probeMagic {

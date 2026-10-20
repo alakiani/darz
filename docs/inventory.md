@@ -1,8 +1,8 @@
 # Infrastructure inventory
 
 Recorded 2026-10-14 while resolving the wayfinder ticket
-[Inventory the current infrastructure](https://github.com/alakiani/darz/issues/2).
-Deliberately thin: DARZ discovers what works, so this file records only what
+[Inventory the current infrastructure](https://github.com/alakiani/ways/issues/2).
+Deliberately thin: WAYS discovers what works, so this file records only what
 no probe can learn.
 
 ## Nodes
@@ -54,7 +54,7 @@ not a problem solved here.
 3. **Nodes join by SSH.** The operator adds a Node by handing the system SSH
    access; provisioning installs the Agent and enrolls the Node. The mechanism
    (Coordinator-driven or a runner pipeline) is decided in
-   [Agent-Coordinator protocol and Node enrollment](https://github.com/alakiani/darz/issues/11).
+   [Agent-Coordinator protocol and Node enrollment](https://github.com/alakiani/ways/issues/11).
 
 ## Deliberately not recorded
 

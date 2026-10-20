@@ -17,7 +17,7 @@ const cfg = {
 describe("config files", () => {
   it("renders one stock WireGuard config per Endpoint Slot", () => {
     const files = configFiles(cfg, "PRIVATEKEY=");
-    expect(files.map((f) => f.name)).toEqual(["darz-main.conf", "darz-backup1.conf", "darz-backup2.conf"]);
+    expect(files.map((f) => f.name)).toEqual(["ways-main.conf", "ways-backup1.conf", "ways-backup2.conf"]);
     expect(files[0].text).toBe(
       "[Interface]\n" +
         "PrivateKey = PRIVATEKEY=\n" +

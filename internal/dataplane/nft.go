@@ -12,7 +12,7 @@ import (
 const (
 	// DeviceIface is the Bridge's Device-facing WireGuard interface. It
 	// must not match "dz*", the Link instances' pattern.
-	DeviceIface = "darz0"
+	DeviceIface = "ways0"
 	devicePool  = "10.77.0.0/16"
 	meshRange   = "10.78.0.0/16" // every instance's /31 (ADR 0007)
 
@@ -88,9 +88,9 @@ type nftRule struct {
 func render(r ruleset) string {
 	var b strings.Builder
 	w := func(format string, args ...any) { fmt.Fprintf(&b, format+"\n", args...) }
-	w("table inet darz")
-	w("delete table inet darz")
-	w("table inet darz {")
+	w("table inet ways")
+	w("delete table inet ways")
+	w("table inet ways {")
 
 	if r.Bridge {
 		for _, rule := range r.Rules {
@@ -247,8 +247,8 @@ func bucketUpdates(mapName string, old, new [buckets]string) string {
 		if markFor(old[i]) == markFor(new[i]) {
 			continue
 		}
-		fmt.Fprintf(&b, "delete element inet darz %s { 0.0.0.%d }\n", mapName, i)
-		fmt.Fprintf(&b, "add element inet darz %s { 0.0.0.%d : %#x }\n", mapName, i, markFor(new[i]))
+		fmt.Fprintf(&b, "delete element inet ways %s { 0.0.0.%d }\n", mapName, i)
+		fmt.Fprintf(&b, "add element inet ways %s { 0.0.0.%d : %#x }\n", mapName, i, markFor(new[i]))
 	}
 	return b.String()
 }

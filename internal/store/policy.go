@@ -11,8 +11,8 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/alakiani/darz/internal/cidr"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/cidr"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // DevicePool holds every Device's /32. Its first address belongs to the

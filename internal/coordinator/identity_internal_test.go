@@ -20,10 +20,10 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/auth"
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/auth"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // covered records every route pattern that answered 2xx in some test, so
@@ -68,7 +68,7 @@ type api struct {
 
 func newAPI(t *testing.T) *api {
 	t.Helper()
-	s, err := store.Open(filepath.Join(t.TempDir(), "darz.db"))
+	s, err := store.Open(filepath.Join(t.TempDir(), "ways.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +250,7 @@ func TestSessionCookieIsLockedDown(t *testing.T) {
 	}
 	resp.Body.Close()
 	cookie := resp.Header.Get("Set-Cookie")
-	for _, want := range []string{"darz_session=", "HttpOnly", "Secure", "SameSite=Strict", "Max-Age=2592000"} {
+	for _, want := range []string{"ways_session=", "HttpOnly", "Secure", "SameSite=Strict", "Max-Age=2592000"} {
 		if !strings.Contains(cookie, want) {
 			t.Errorf("cookie %q lacks %s", cookie, want)
 		}
@@ -276,7 +276,7 @@ func TestTOTP(t *testing.T) {
 	cl, _ := a.user("maryam")
 	var offer protocol.TOTPOffer
 	cl.must(200, "POST", "/v1/me/totp", nil, &offer)
-	if !strings.HasPrefix(offer.URI, "otpauth://totp/DARZ:maryam?") {
+	if !strings.HasPrefix(offer.URI, "otpauth://totp/WAYS:maryam?") {
 		t.Errorf("uri = %s", offer.URI)
 	}
 	cl.must(403, "POST", "/v1/me/totp/confirm", protocol.TOTPCode{Code: "000000"}, nil)
@@ -539,14 +539,14 @@ func TestNodesRoutesAndSpec(t *testing.T) {
 		var out protocol.CreateNodeResponse
 		json.NewDecoder(resp.Body).Decode(&out)
 		if out.Node.ID != "" {
-			a.t.Setenv("DARZ_TEST_NODE", out.Node.ID)
+			a.t.Setenv("WAYS_TEST_NODE", out.Node.ID)
 		}
 		return resp.StatusCode
 	}
 	if got := call("POST", "/v1/nodes", protocol.CreateNodeRequest{Name: "b1", Roles: []protocol.Role{"bridge"}}); got != 200 {
 		t.Fatalf("create node: %d", got)
 	}
-	if got := call("GET", "/v1/nodes/"+os.Getenv("DARZ_TEST_NODE"), nil); got != 200 {
+	if got := call("GET", "/v1/nodes/"+os.Getenv("WAYS_TEST_NODE"), nil); got != 200 {
 		t.Errorf("get node: %d", got)
 	}
 	resp, err := http.Get(a.srv.URL + "/v1/openapi.json")

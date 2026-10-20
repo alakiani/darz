@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/lab"
+	"github.com/alakiani/ways/internal/lab"
 )
 
 // TestLab is session 1's "proves in the lab" test: the lab brings up 4 empty

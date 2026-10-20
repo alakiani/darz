@@ -9,16 +9,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/coordinator"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/coordinator"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 func newAdmin(t *testing.T) (*testutil.AdminClient, *store.Store) {
 	t.Helper()
-	s, err := store.Open(filepath.Join(t.TempDir(), "darz.db"))
+	s, err := store.Open(filepath.Join(t.TempDir(), "ways.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ var bridge = protocol.CreateNodeRequest{Name: "b1", Roles: []protocol.Role{"brid
 func TestAdminAPINeedsANodesEnrollToken(t *testing.T) {
 	admin, s := newAdmin(t)
 	other, _, _ := s.CreateAPIToken(context.Background(), "something-else", "x", time.Hour)
-	for _, token := range []string{"", "darz_wrong", other} {
+	for _, token := range []string{"", "ways_wrong", other} {
 		c := *admin
 		c.Token = token
 		if status := c.Do(t, http.MethodPost, "/v1/nodes", bridge, nil); status != http.StatusUnauthorized {

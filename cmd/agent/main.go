@@ -15,10 +15,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alakiani/darz/internal/agent"
-	"github.com/alakiani/darz/internal/dataplane"
-	"github.com/alakiani/darz/internal/link"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/agent"
+	"github.com/alakiani/ways/internal/dataplane"
+	"github.com/alakiani/ways/internal/link"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // version is set at release time with -ldflags "-X main.version=...".
@@ -36,11 +36,11 @@ func main() {
 	var o options
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.StringVar(&o.coordinators, "coordinators", "https://4miz.ir:8443", "comma-separated Agent API URLs, tried in turn")
-	flag.StringVar(&o.caPath, "ca", "/etc/darz/ca.crt", "pinned Coordinator CA certificate")
-	flag.StringVar(&o.stateDir, "state-dir", "/var/lib/darz-agent", "keys, certificate and last applied state")
+	flag.StringVar(&o.caPath, "ca", "/etc/ways/ca.crt", "pinned Coordinator CA certificate")
+	flag.StringVar(&o.stateDir, "state-dir", "/var/lib/ways-agent", "keys, certificate and last applied state")
 	flag.StringVar(&o.tokenFile, "enroll-token-file", "", "file holding a one-time enrollment token, used only if not yet enrolled")
-	flag.StringVar(&o.awgRunner, "awg-runner", "systemd", "how to run amneziawg-go daemons: systemd (darz-awg@<iface>.service) or exec")
-	flag.StringVar(&o.awgBinary, "awg-binary", "/usr/local/lib/darz/amneziawg-go", "amneziawg-go binary, for -awg-runner=exec")
+	flag.StringVar(&o.awgRunner, "awg-runner", "systemd", "how to run amneziawg-go daemons: systemd (ways-awg@<iface>.service) or exec")
+	flag.StringVar(&o.awgBinary, "awg-binary", "/usr/local/lib/ways/amneziawg-go", "amneziawg-go binary, for -awg-runner=exec")
 	flag.DurationVar(&o.healthInterval, "health-interval", 30*time.Second, "how often to report health")
 	flag.StringVar(&o.telegramAPI, "telegram-api", agent.DefaultTelegramAPI, "Telegram's Bot API, where an Exit relays the Coordinator's alerts")
 	flag.StringVar(&o.nodeExporter, "node-exporter", "http://127.0.0.1:9100/metrics", "node_exporter on localhost, served through /metrics; empty for none")
@@ -74,7 +74,7 @@ func run(log *slog.Logger, o options) error {
 		return err
 	}
 
-	var runner link.Runner = link.SystemdRunner{Unit: "darz-awg@%s.service"}
+	var runner link.Runner = link.SystemdRunner{Unit: "ways-awg@%s.service"}
 	switch o.awgRunner {
 	case "systemd":
 	case "exec":

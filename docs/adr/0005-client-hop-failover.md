@@ -4,7 +4,7 @@ status: accepted
 
 # Client-hop failover: three domestic Endpoint Slots, one shared Bridge identity, one user action
 
-Stock WireGuard apps never re-resolve an endpoint while the tunnel is up, never report a dead endpoint, and hold one endpoint per config (research for issue #4). Without a provider floating IP, hands-free recovery is therefore impossible on every platform. Instead, each Device carries three configs, one per **Endpoint Slot**. Each slot is a hostname the Coordinator keeps pointed at a healthy domestic Bridge, and every Bridge presents the same WireGuard identity. Recovery is one user action: toggle the tunnel, or switch to a Backup. This replaces the map's earlier "one config per Device" note. Resolved in [Client-hop failover for stock WireGuard](https://github.com/alakiani/darz/issues/10).
+Stock WireGuard apps never re-resolve an endpoint while the tunnel is up, never report a dead endpoint, and hold one endpoint per config (research for issue #4). Without a provider floating IP, hands-free recovery is therefore impossible on every platform. Instead, each Device carries three configs, one per **Endpoint Slot**. Each slot is a hostname the Coordinator keeps pointed at a healthy domestic Bridge, and every Bridge presents the same WireGuard identity. Recovery is one user action: toggle the tunnel, or switch to a Backup. This replaces the map's earlier "one config per Device" note. Resolved in [Client-hop failover for stock WireGuard](https://github.com/alakiani/ways/issues/10).
 
 ## When a Device must hop
 
@@ -27,7 +27,7 @@ Failures of a Bridge's Links or Exits that the mesh can route around (ADR 0004) 
 - **Re-pointing:**
   - A slot moves after its Bridge has been ineligible for 60 s.
   - It does not move back automatically when that Bridge recovers.
-  - *(An Admin can rebalance the slots on demand from the panel: the fewest moves that spread them over the eligible Bridges. They still never move back automatically. Decided in [#49](https://github.com/alakiani/darz/issues/49).)*
+  - *(An Admin can rebalance the slots on demand from the panel: the fewest moves that spread them over the eligible Bridges. They still never move back automatically. Decided in [#49](https://github.com/alakiani/ways/issues/49).)*
   - The Coordinator updates the record through the ArvanCloud DNS API, with the lowest TTL ArvanCloud allows (target 60 s).
   - Self-hosting DNS on the Coordinator was rejected, because a dead Coordinator would then stop every Device from resolving.
 - **Floating IPs are an optional optimisation.** Where a provider offers one, a slot may use it and have the Agent move it, giving zero-touch recovery for that slot. It is never required (inventory constraint 2).
@@ -35,7 +35,7 @@ Failures of a Bridge's Links or Exits that the mesh can route around (ADR 0004) 
 ## Shared Bridge identity
 
 - **Every Bridge presents one WireGuard keypair**, so a config works on whichever Bridge its slot points at, and all Bridges accept every non-blocked Device (ADR 0004).
-- **Every Bridge listens for Devices on one UDP port**, `61873` by default, held by the Coordinator and written into every config. It is outside the 10000–60000 range Link instances draw from (ADR 0007), so the two never collide on a Bridge, and avoids `51820`, the WireGuard default. Changing it affects only configs issued afterwards. *(Decided in [MVP 04](https://github.com/alakiani/darz/issues/20).)*
+- **Every Bridge listens for Devices on one UDP port**, `61873` by default, held by the Coordinator and written into every config. It is outside the 10000–60000 range Link instances draw from (ADR 0007), so the two never collide on a Bridge, and avoids `51820`, the WireGuard default. Changing it affects only configs issued afterwards. *(Decided in [MVP 04](https://github.com/alakiani/ways/issues/20).)*
 - **The private key is held by the Coordinator and shipped only in Bridge snapshots.** Exits never receive it. It is included in the age-encrypted nightly backup.
 - **Why the Coordinator holds it:** portability. Bridges can be added or rebuilt without the operator's laptop. The rejected alternative was to generate the key on the laptop and distribute it by Ansible only.
 - **Accepted risk:** whoever seizes the domestic Coordinator gets the key that impersonates every Bridge. If ArvanCloud is compelled to re-point the slot records as well, a state actor could intercept Users' traffic before it enters a Link. A seized Bridge leaks the same key.

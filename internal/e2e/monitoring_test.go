@@ -21,11 +21,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/monitoring"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/monitoring"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 // Where the lab's fake Telegram listens: an address in Telegram's own
@@ -43,7 +43,7 @@ func TestMonitoring(t *testing.T) {
 	prometheus, alertmanager := filepath.Join(bin, "prometheus"), filepath.Join(bin, "alertmanager")
 	for _, b := range []string{prometheus, alertmanager} {
 		if !testutil.Exists(b) {
-			t.Fatalf("%s is missing: CI downloads the pinned Prometheus and Alertmanager into DARZ_BIN", b)
+			t.Fatalf("%s is missing: CI downloads the pinned Prometheus and Alertmanager into WAYS_BIN", b)
 		}
 	}
 	if out, err := execCommand("modprobe", "wireguard"); err != nil {
@@ -147,12 +147,12 @@ func TestMonitoring(t *testing.T) {
 		return slices.Equal(up, nodes)
 	})
 	testutil.Eventually(t, 30*time.Second, "Link and Path metrics from the Agents", func() bool {
-		return len(prom.series(`darz_link_up == 1`, "node")) > 0 &&
-			slices.Equal(prom.series(`darz_path_ok{default="true"} == 1`, "node"), []string{"ir1", "ir3"}) &&
-			len(prom.series(`darz_coordinator_last_contact_seconds < 30`, "node")) == len(nodes)
+		return len(prom.series(`ways_link_up == 1`, "node")) > 0 &&
+			slices.Equal(prom.series(`ways_path_ok{default="true"} == 1`, "node"), []string{"ir1", "ir3"}) &&
+			len(prom.series(`ways_coordinator_last_contact_seconds < 30`, "node")) == len(nodes)
 	})
 	testutil.Eventually(t, 60*time.Second, "both Bridges are eligible for slots", func() bool {
-		return slices.Equal(prom.series(`darz_slot_bridge_eligible == 1`, "node"), []string{"ir1", "ir3"})
+		return slices.Equal(prom.series(`ways_slot_bridge_eligible == 1`, "node"), []string{"ir1", "ir3"})
 	})
 	for _, q := range monitoring.MeshDashboardQueries() {
 		prom.mustParse(q)
@@ -226,13 +226,13 @@ func TestMonitoring(t *testing.T) {
 	slices.Sort(transports)
 	transports = slices.Compact(transports)
 	testutil.Eventually(t, 30*time.Second, "every instance of ab2/ir1 is down on both ends", func() bool {
-		down := slices.Compact(prom.series(`darz_link_instance_up{link="ab2/ir1",node="ir1"} == 0`, "transport"))
-		ends := slices.Compact(prom.series(`darz_link_instance_up{link="ab2/ir1"} == 0`, "node"))
-		up := prom.series(`darz_link_instance_up{link="ab2/ir1"} == 1`, "instance_id")
+		down := slices.Compact(prom.series(`ways_link_instance_up{link="ab2/ir1",node="ir1"} == 0`, "transport"))
+		ends := slices.Compact(prom.series(`ways_link_instance_up{link="ab2/ir1"} == 0`, "node"))
+		up := prom.series(`ways_link_instance_up{link="ab2/ir1"} == 1`, "instance_id")
 		return len(transports) > 1 && slices.Equal(down, transports) && slices.Equal(ends, []string{"ab2", "ir1"}) && len(up) == 0
 	})
 	// A Link left alone still has an instance Up.
-	if up := prom.series(`darz_link_instance_up{link="ab2/ir3"} == 1`, "node"); len(up) == 0 {
+	if up := prom.series(`ways_link_instance_up{link="ab2/ir3"} == 1`, "node"); len(up) == 0 {
 		t.Errorf("no instance of ab2/ir3 is Up")
 	}
 

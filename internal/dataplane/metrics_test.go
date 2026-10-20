@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/link"
-	"github.com/alakiani/darz/internal/metrics"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/link"
+	"github.com/alakiani/ways/internal/metrics"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // Path flapping counts failure moves, not buckets: one Link dying moves
@@ -24,10 +24,10 @@ func TestMovesAreCountedByStepAndKind(t *testing.T) {
 	p.WriteMetrics(&w)
 	got := string(w.Bytes())
 	for _, want := range []string{
-		`darz_path_moves_total{rule="Default",kind="failure"} 1`,
-		`darz_path_moves_total{rule="Default",kind="rebalance"} 1`,
-		`darz_path_moves_total{rule="IR",kind="failure"} 1`,
-		`darz_path_bucket_moves_total{rule="Default",kind="failure"} 3`,
+		`ways_path_moves_total{rule="Default",kind="failure"} 1`,
+		`ways_path_moves_total{rule="Default",kind="rebalance"} 1`,
+		`ways_path_moves_total{rule="IR",kind="failure"} 1`,
+		`ways_path_bucket_moves_total{rule="Default",kind="failure"} 3`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("metrics lack %q:\n%s", want, got)
@@ -92,20 +92,20 @@ func TestPathMetricsFollowPathSelection(t *testing.T) {
 	got := scrape()
 	lightnode := 141.9 * 150 / 300 // over the RTT floor
 	for series, want := range map[string]float64{
-		"darz_path_weight" + def("aws"):             5.4,
-		"darz_path_weight" + def("lightnode"):       lightnode,
-		"darz_path_target_share" + def("aws"):       5.4 / (5.4 + lightnode),
-		"darz_path_target_share" + def("lightnode"): lightnode / (5.4 + lightnode),
-		"darz_path_cut_off" + def("aws"):            1,
-		"darz_path_cut_off" + def("lightnode"):      0,
-		"darz_path_availability" + def("aws"):       1,
-		"darz_path_availability" + def("lightnode"): 1,
+		"ways_path_weight" + def("aws"):             5.4,
+		"ways_path_weight" + def("lightnode"):       lightnode,
+		"ways_path_target_share" + def("aws"):       5.4 / (5.4 + lightnode),
+		"ways_path_target_share" + def("lightnode"): lightnode / (5.4 + lightnode),
+		"ways_path_cut_off" + def("aws"):            1,
+		"ways_path_cut_off" + def("lightnode"):      0,
+		"ways_path_availability" + def("aws"):       1,
+		"ways_path_availability" + def("lightnode"): 1,
 		// The transit candidate is weighed, at 1 until measured, but takes
 		// nothing while a direct one is eligible.
-		"darz_path_weight" + def("ir3"):                                                 1,
-		"darz_path_target_share" + def("ir3"):                                           0,
-		"darz_path_cut_off" + def("ir3"):                                                0,
-		`darz_path_target_share{rule_id="1",rule="IR",default="false",candidate="ir3"}`: 0,
+		"ways_path_weight" + def("ir3"):                                                 1,
+		"ways_path_target_share" + def("ir3"):                                           0,
+		"ways_path_cut_off" + def("ir3"):                                                0,
+		`ways_path_target_share{rule_id="1",rule="IR",default="false",candidate="ir3"}`: 0,
 	} {
 		if v, ok := got[series]; !ok || v != want {
 			t.Errorf("%s = %v (present %v), want %v", series, v, ok, want)
@@ -123,12 +123,12 @@ func TestPathMetricsFollowPathSelection(t *testing.T) {
 	links.links[1].Up = false
 	got = scrape()
 	for series, want := range map[string]float64{
-		"darz_path_availability" + def("lightnode"): 0,
-		"darz_path_weight" + def("lightnode"):       0,
-		"darz_path_target_share" + def("lightnode"): 0,
-		"darz_path_cut_off" + def("lightnode"):      0,
-		"darz_path_target_share" + def("aws"):       1,
-		"darz_path_cut_off" + def("aws"):            0,
+		"ways_path_availability" + def("lightnode"): 0,
+		"ways_path_weight" + def("lightnode"):       0,
+		"ways_path_target_share" + def("lightnode"): 0,
+		"ways_path_cut_off" + def("lightnode"):      0,
+		"ways_path_target_share" + def("aws"):       1,
+		"ways_path_cut_off" + def("aws"):            0,
 	} {
 		if v, ok := got[series]; !ok || v != want {
 			t.Errorf("after lightnode went down: %s = %v (present %v), want %v", series, v, ok, want)

@@ -1,17 +1,17 @@
 # Managed by coordinator.yml (ADR 0006). Admins reach it through the panel
-# at {{ darz_api_url }}/grafana/: the Coordinator proxies it for a signed-in
+# at {{ ways_api_url }}/grafana/: the Coordinator proxies it for a signed-in
 # Admin and names them in X-WEBAUTH-USER, which Grafana trusts from
 # loopback only.
 [Unit]
-Description=Grafana for DARZ
-After=network-online.target darz-prometheus.service
+Description=Grafana for WAYS
+After=network-online.target ways-prometheus.service
 
 [Service]
-User=darz-monitor
-Group=darz-monitor
+User=ways-monitor
+Group=ways-monitor
 Environment=GF_SERVER_HTTP_ADDR=127.0.0.1
 Environment=GF_SERVER_HTTP_PORT=3000
-Environment=GF_SERVER_ROOT_URL={{ darz_api_url }}/grafana/
+Environment=GF_SERVER_ROOT_URL={{ ways_api_url }}/grafana/
 Environment=GF_SERVER_SERVE_FROM_SUB_PATH=true
 Environment=GF_AUTH_PROXY_ENABLED=true
 Environment=GF_AUTH_PROXY_HEADER_NAME=X-WEBAUTH-USER
@@ -20,10 +20,10 @@ Environment=GF_AUTH_PROXY_AUTO_SIGN_UP=true
 Environment=GF_AUTH_PROXY_WHITELIST=127.0.0.1
 Environment=GF_USERS_AUTO_ASSIGN_ORG_ROLE=Editor
 Environment=GF_AUTH_DISABLE_SIGNOUT_MENU=true
-Environment=GF_PATHS_DATA=/var/lib/darz-monitor/grafana
-Environment=GF_PATHS_LOGS=/var/lib/darz-monitor/grafana/log
-Environment=GF_PATHS_PLUGINS=/var/lib/darz-monitor/grafana/plugins
-Environment=GF_PATHS_PROVISIONING=/etc/darz/grafana/provisioning
+Environment=GF_PATHS_DATA=/var/lib/ways-monitor/grafana
+Environment=GF_PATHS_LOGS=/var/lib/ways-monitor/grafana/log
+Environment=GF_PATHS_PLUGINS=/var/lib/ways-monitor/grafana/plugins
+Environment=GF_PATHS_PROVISIONING=/etc/ways/grafana/provisioning
 Environment=GF_ANALYTICS_REPORTING_ENABLED=false
 Environment=GF_ANALYTICS_CHECK_FOR_UPDATES=false
 Environment=GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
@@ -32,8 +32,8 @@ Environment=GF_NEWS_NEWS_FEED_ENABLED=false
 # start, which fails in this root-owned install and can leave Prometheus
 # unregistered, so every panel says No Data; it may also download from abroad.
 Environment=GF_PLUGINS_PREINSTALL_DISABLED=true
-ExecStart=/usr/local/lib/darz/grafana-{{ darz_versions.GRAFANA }}/bin/grafana server \
-  --homepath /usr/local/lib/darz/grafana-{{ darz_versions.GRAFANA }}
+ExecStart=/usr/local/lib/ways/grafana-{{ ways_versions.GRAFANA }}/bin/grafana server \
+  --homepath /usr/local/lib/ways/grafana-{{ ways_versions.GRAFANA }}
 Restart=always
 RestartSec=5
 

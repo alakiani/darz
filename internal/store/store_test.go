@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 var ctx = context.Background()
@@ -21,7 +21,7 @@ func (c *clock) advance(d time.Duration) { c.t = c.t.Add(d) }
 func newClock() *clock                   { return &clock{time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)} }
 func open(t *testing.T, c *clock) *store.Store {
 	t.Helper()
-	s, err := store.Open(filepath.Join(t.TempDir(), "darz.db"))
+	s, err := store.Open(filepath.Join(t.TempDir(), "ways.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func mustNode(t *testing.T, s *store.Store, name string) store.Node {
 }
 
 func TestReopenKeepsDataAndMigrationsRunOnce(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "darz.db")
+	path := filepath.Join(t.TempDir(), "ways.db")
 	s, err := store.Open(path)
 	if err != nil {
 		t.Fatal(err)

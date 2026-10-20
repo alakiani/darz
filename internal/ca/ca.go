@@ -33,12 +33,12 @@ const ClientCertLifetime = 365 * 24 * time.Hour
 const (
 	// AgentServerName is on every Node's certificate, besides its id, so
 	// Prometheus can check any Agent with one name.
-	AgentServerName = "agent.darz"
+	AgentServerName = "agent.ways"
 	// PrometheusName and CoordinatorName are the client identities the
 	// metrics port admits: Prometheus to /metrics, the Coordinator to the
 	// Telegram relay. Node ids start nd_, so neither names a Node.
-	PrometheusName  = "darz-prometheus"
-	CoordinatorName = "darz-coordinator"
+	PrometheusName  = "ways-prometheus"
+	CoordinatorName = "ways-coordinator"
 )
 
 // CA signs certificates with a key loaded from disk.
@@ -85,7 +85,7 @@ func create() (certPEM, keyPEM []byte, err error) {
 	now := time.Now()
 	tmpl := &x509.Certificate{
 		SerialNumber:          randomSerial(),
-		Subject:               pkix.Name{CommonName: "DARZ Coordinator CA"},
+		Subject:               pkix.Name{CommonName: "WAYS Coordinator CA"},
 		NotBefore:             now.Add(-time.Hour),
 		NotAfter:              now.Add(20 * 365 * 24 * time.Hour),
 		IsCA:                  true,
@@ -211,7 +211,7 @@ func (c *CA) ServerCert(hosts []string, now time.Time) (tls.Certificate, error) 
 	}
 	tmpl := &x509.Certificate{
 		SerialNumber: randomSerial(),
-		Subject:      pkix.Name{CommonName: "DARZ Coordinator"},
+		Subject:      pkix.Name{CommonName: "WAYS Coordinator"},
 		NotBefore:    now.Add(-5 * time.Minute),
 		NotAfter:     now.Add(ClientCertLifetime),
 		KeyUsage:     x509.KeyUsageDigitalSignature,

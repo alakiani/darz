@@ -2,27 +2,27 @@
 # already enrolled. Roles and Tags come from the inventory group (domestic or
 # abroad); the Node's name is its inventory name.
 #
-#   scripts/darz-ansible enroll.yml              every Node
-#   scripts/darz-ansible enroll.yml -l ir-1      one Node
-#   scripts/darz-ansible enroll.yml -l ir-1 -e reenroll=true   re-key it
+#   scripts/ways-ansible enroll.yml              every Node
+#   scripts/ways-ansible enroll.yml -l ir-1      one Node
+#   scripts/ways-ansible enroll.yml -l ir-1 -e reenroll=true   re-key it
 - name: Nodes
   hosts: all:!coordinators
   become: true
   vars:
     reenroll: false
-    darz_api_token: "{{ lookup('file', darz_home ~ '/enroll-token') }}"
-    darz_api_headers:
-      Authorization: "Bearer {{ darz_api_token }}"
+    ways_api_token: "{{ lookup('file', ways_home ~ '/enroll-token') }}"
+    ways_api_headers:
+      Authorization: "Bearer {{ ways_api_token }}"
   pre_tasks:
     - name: Check the laptop has the release, the pinned CA and the token
       ansible.builtin.assert:
         that:
-          - darz_release | length > 0
-          - darz_roles is defined
-          - (darz_home ~ '/ca.crt') is file
-          - (darz_home ~ '/enroll-token') is file
+          - ways_release | length > 0
+          - ways_roles is defined
+          - (ways_home ~ '/ca.crt') is file
+          - (ways_home ~ '/enroll-token') is file
         fail_msg: >-
-          Set DARZ_RELEASE, put the Node in the domestic or abroad group, and
+          Set WAYS_RELEASE, put the Node in the domestic or abroad group, and
           run coordinator.yml first: it brings back ca.crt and enroll-token.
       delegate_to: localhost
       become: false
@@ -33,7 +33,7 @@
   tasks:
     - name: Install Ubuntu's packages
       ansible.builtin.apt:
-        name: "{{ ['nftables', 'prometheus-node-exporter', 'wireguard-tools'] + (['chrony'] if darz_chrony else []) }}"
+        name: "{{ ['nftables', 'prometheus-node-exporter', 'wireguard-tools'] + (['chrony'] if ways_chrony else []) }}"
         update_cache: true
         cache_valid_time: 3600
 
@@ -66,17 +66,17 @@
         content: "{{ item.content }}"
         mode: "0644"
       loop:
-        - dest: /etc/systemd/networkd.conf.d/darz.conf
+        - dest: /etc/systemd/networkd.conf.d/ways.conf
           content: |
             # Managed by enroll.yml: leave the Agent's ip rules and routes alone.
             [Network]
             ManageForeignRoutingPolicyRules=no
             ManageForeignRoutes=no
-        - dest: /etc/systemd/network/00-darz-unmanaged.network
+        - dest: /etc/systemd/network/00-ways-unmanaged.network
           content: |
             # Managed by enroll.yml: the Agent's Link and Device interfaces.
             [Match]
-            Name=dz* darz0
+            Name=dz* ways0
 
             [Link]
             Unmanaged=yes
@@ -96,24 +96,24 @@
         state: directory
         mode: "{{ item.mode }}"
       loop:
-        - { path: /etc/darz, mode: "0755" }
-        - { path: /usr/local/lib/darz, mode: "0755" }
-        - { path: /var/lib/darz-agent, mode: "0700" }
+        - { path: /etc/ways, mode: "0755" }
+        - { path: /usr/local/lib/ways, mode: "0755" }
+        - { path: /var/lib/ways-agent, mode: "0700" }
 
     - name: Install the Agent and the pinned amneziawg-go
       ansible.builtin.copy:
-        src: "{{ darz_release_dir }}/{{ item.src }}"
+        src: "{{ ways_release_dir }}/{{ item.src }}"
         dest: "{{ item.dest }}"
         mode: "0755"
       loop:
-        - { src: darz-agent, dest: /usr/local/bin/darz-agent }
-        - { src: amneziawg-go, dest: /usr/local/lib/darz/amneziawg-go }
+        - { src: ways-agent, dest: /usr/local/bin/ways-agent }
+        - { src: amneziawg-go, dest: /usr/local/lib/ways/amneziawg-go }
       register: binaries
 
     - name: Pin the Coordinator's CA
       ansible.builtin.copy:
-        src: "{{ darz_home }}/ca.crt"
-        dest: /etc/darz/ca.crt
+        src: "{{ ways_home }}/ca.crt"
+        dest: /etc/ways/ca.crt
         mode: "0644"
       register: ca
 
@@ -123,24 +123,24 @@
         dest: "/etc/systemd/system/{{ item.dest }}"
         mode: "0644"
       loop:
-        - { src: darz-agent.service.j2, dest: darz-agent.service }
-        - { src: "{{ playbook_dir }}/../systemd/darz-awg@.service", dest: "darz-awg@.service" }
+        - { src: ways-agent.service.j2, dest: ways-agent.service }
+        - { src: "{{ playbook_dir }}/../systemd/ways-awg@.service", dest: "ways-awg@.service" }
       register: units
 
     # Idempotent: an enrolled Node gets no token unless reenroll is set, and
     # a Node that exists with other Roles or Tags is refused (409).
     - name: Create the Node, or get a fresh enrollment token for it
       ansible.builtin.uri:
-        url: "{{ darz_api_url }}/v1/nodes"
+        url: "{{ ways_api_url }}/v1/nodes"
         method: POST
-        headers: "{{ darz_api_headers }}"
+        headers: "{{ ways_api_headers }}"
         body_format: json
         body:
           name: "{{ inventory_hostname }}"
-          roles: "{{ darz_roles }}"
-          tags: "{{ darz_tags }}"
+          roles: "{{ ways_roles }}"
+          tags: "{{ ways_tags }}"
           reenroll: "{{ reenroll | bool }}"
-        ca_path: "{{ darz_api_ca_path or omit }}"
+        ca_path: "{{ ways_api_ca_path or omit }}"
       delegate_to: localhost
       become: false
       register: node
@@ -149,7 +149,7 @@
 
     - name: Forget the old identity, to re-key
       ansible.builtin.file:
-        path: "/var/lib/darz-agent/{{ item }}"
+        path: "/var/lib/ways-agent/{{ item }}"
         state: absent
       loop: [agent.key, agent.crt]
       when: reenroll | bool
@@ -159,7 +159,7 @@
     - name: Hand the Agent its one-time enrollment token
       ansible.builtin.copy:
         content: "{{ node.json.enrollment_token | default('') }}\n"
-        dest: /etc/darz/enroll-token
+        dest: /etc/ways/enroll-token
         mode: "0600"
       when: node.json.enrollment_token is defined
       no_log: true
@@ -168,29 +168,29 @@
     - name: Make sure the token file exists
       ansible.builtin.copy:
         content: "\n"
-        dest: /etc/darz/enroll-token
+        dest: /etc/ways/enroll-token
         mode: "0600"
         force: false
 
     - name: Start the Agent, restarting it if anything changed
       ansible.builtin.systemd_service:
-        name: darz-agent
+        name: ways-agent
         enabled: true
         daemon_reload: "{{ units.changed }}"
         state: "{{ 'restarted' if (binaries.changed or ca.changed or units.changed or token.changed) else 'started' }}"
 
     - name: Wait for its first health report from this release
       ansible.builtin.uri:
-        url: "{{ darz_api_url }}/v1/nodes/{{ node.json.node.id }}"
-        headers: "{{ darz_api_headers }}"
-        ca_path: "{{ darz_api_ca_path or omit }}"
+        url: "{{ ways_api_url }}/v1/nodes/{{ node.json.node.id }}"
+        headers: "{{ ways_api_headers }}"
+        ca_path: "{{ ways_api_ca_path or omit }}"
       delegate_to: localhost
       become: false
       register: status
       until: >-
         status.json.enrolled
         and status.json.last_health is defined
-        and status.json.last_health.agent_version == darz_release
+        and status.json.last_health.agent_version == ways_release
       retries: 60
       delay: 5
       no_log: true
@@ -198,7 +198,7 @@
     - name: Empty the used enrollment token
       ansible.builtin.copy:
         content: "\n"
-        dest: /etc/darz/enroll-token
+        dest: /etc/ways/enroll-token
         mode: "0600"
       when: token.changed
       no_log: true
@@ -208,9 +208,9 @@
     # yet is down too, so this warns rather than fails.
     - name: Wait for this Node's Links to come up
       ansible.builtin.uri:
-        url: "{{ darz_api_url }}/v1/nodes/{{ node.json.node.id }}"
-        headers: "{{ darz_api_headers }}"
-        ca_path: "{{ darz_api_ca_path or omit }}"
+        url: "{{ ways_api_url }}/v1/nodes/{{ node.json.node.id }}"
+        headers: "{{ ways_api_headers }}"
+        ca_path: "{{ ways_api_ca_path or omit }}"
       delegate_to: localhost
       become: false
       register: link_status
@@ -238,6 +238,6 @@
     - name: Report
       ansible.builtin.debug:
         msg: >-
-          {{ inventory_hostname }} ({{ status.json.id }}) runs {{ darz_release }} as
-          {{ darz_roles | join('+') }}{{ ' tagged ' ~ (darz_tags | join(',')) if darz_tags else '' }},
+          {{ inventory_hostname }} ({{ status.json.id }}) runs {{ ways_release }} as
+          {{ ways_roles | join('+') }}{{ ' tagged ' ~ (ways_tags | join(',')) if ways_tags else '' }},
           seen from {{ status.json.last_health.seen_addr }}

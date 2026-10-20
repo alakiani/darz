@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 func TestEnsureLinkIsOnePerPair(t *testing.T) {

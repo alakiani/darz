@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 type awgParams = protocol.AWGParams
@@ -119,7 +119,7 @@ func decoy() string {
 
 var tagRE = regexp.MustCompile(`<([a-z]+)(?: ([^>]*))?>`)
 
-// Validate checks parameters against amneziawg-go's rules and DARZ's
+// Validate checks parameters against amneziawg-go's rules and WAYS's
 // limits.
 func Validate(p protocol.AWGParams) error {
 	switch {

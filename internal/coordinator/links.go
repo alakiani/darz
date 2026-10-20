@@ -9,9 +9,9 @@ import (
 	"slices"
 	"time"
 
-	"github.com/alakiani/darz/internal/awg"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/awg"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // MeshRange holds every instance's /31 (ADR 0007).

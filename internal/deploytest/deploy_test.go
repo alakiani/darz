@@ -1,12 +1,12 @@
 // Package deploytest runs the deployment playbooks (coordinator.yml and
 // enroll.yml) against throwaway Ubuntu 26.04 containers, through the same
-// scripts/darz-ansible the operator runs, with release bundles built by
+// scripts/ways-ansible the operator runs, with release bundles built by
 // scripts/build-release.sh.
 //
 // It needs Docker, ansible-playbook, the wireguard module loaded on the host,
-// 4miz.ir resolving to coordIP, and two releases under DARZ_DEPLOY_RELEASES
+// 4miz.ir resolving to coordIP, and two releases under WAYS_DEPLOY_RELEASES
 // named ci-1 and ci-2. CI's deploy job sets all of that up; elsewhere the
-// test skips unless DARZ_DEPLOY_TEST=1.
+// test skips unless WAYS_DEPLOY_TEST=1.
 package deploytest
 
 import (
@@ -34,16 +34,16 @@ import (
 
 	"filippo.io/age"
 
-	"github.com/alakiani/darz/internal/auth"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/auth"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 const (
-	network = "darz-deploytest"
+	network = "ways-deploytest"
 	subnet  = "172.30.0.0/24"
 	coordIP = "172.30.0.10"
-	image   = "darz-deploytest"
+	image   = "ways-deploytest"
 )
 
 type host struct{ name, group, ip string }
@@ -62,13 +62,13 @@ var (
 )
 
 func TestDeploy(t *testing.T) {
-	if os.Getenv("DARZ_DEPLOY_TEST") != "1" {
-		t.Skip("set DARZ_DEPLOY_TEST=1 (CI's deploy job does)")
+	if os.Getenv("WAYS_DEPLOY_TEST") != "1" {
+		t.Skip("set WAYS_DEPLOY_TEST=1 (CI's deploy job does)")
 	}
-	releases := os.Getenv("DARZ_DEPLOY_RELEASES")
+	releases := os.Getenv("WAYS_DEPLOY_RELEASES")
 	for _, v := range []string{"ci-1", "ci-2"} {
 		if !testutil.Exists(filepath.Join(releases, v, "SHA256SUMS")) {
-			t.Fatalf("no release %s under DARZ_DEPLOY_RELEASES=%q", v, releases)
+			t.Fatalf("no release %s under WAYS_DEPLOY_RELEASES=%q", v, releases)
 		}
 	}
 	if addrs, _ := net.LookupHost("4miz.ir"); len(addrs) != 1 || addrs[0] != coordIP {
@@ -88,7 +88,7 @@ func TestDeploy(t *testing.T) {
 			t.Fatalf("coordinator.yml brought back no %s", file)
 		}
 	}
-	for _, unit := range []string{"darz-coordinator", "darz-prometheus", "darz-alertmanager", "darz-grafana", "prometheus-node-exporter"} {
+	for _, unit := range []string{"ways-coordinator", "ways-prometheus", "ways-alertmanager", "ways-grafana", "prometheus-node-exporter"} {
 		f.eventually(t, coordinator, "systemctl is-active --quiet "+unit, unit+" active")
 	}
 	f.eventually(t, coordinator, "curl -fsS http://127.0.0.1:9090/-/ready", "Prometheus ready")
@@ -134,19 +134,19 @@ func TestDeploy(t *testing.T) {
 
 	// A release with files that fail SHA256SUMS, like a download cut off
 	// half-way, is refused before any host is touched.
-	f.brokenRelease(t, "ci-2", "ci-2-broken", "darz-coordinator", "darz-agent")
+	f.brokenRelease(t, "ci-2", "ci-2-broken", "ways-coordinator", "ways-agent")
 	for _, pb := range []string{"coordinator.yml", "enroll.yml"} {
 		out, err := f.runAnsible("ci-2-broken", pb)
 		if err == nil {
 			t.Errorf("%s ran with a broken release:\n%s", pb, out)
 		}
-		for _, file := range []string{"darz-coordinator", "darz-agent"} {
+		for _, file := range []string{"ways-coordinator", "ways-agent"} {
 			if !strings.Contains(out, file) {
 				t.Errorf("%s didn't name the broken %s:\n%s", pb, file, out)
 			}
 		}
 	}
-	if v := strings.TrimSpace(f.mustExec(t, coordinator, "/usr/local/bin/darz-coordinator -version")); v != "ci-1" {
+	if v := strings.TrimSpace(f.mustExec(t, coordinator, "/usr/local/bin/ways-coordinator -version")); v != "ci-1" {
 		t.Errorf("Coordinator runs %q after a refused upgrade, want ci-1", v)
 	}
 	for _, n := range nodes {
@@ -158,10 +158,10 @@ func TestDeploy(t *testing.T) {
 	// Upgrading keeps every Node's identity.
 	certs := map[string]string{}
 	for _, n := range nodes {
-		certs[n.name] = f.mustExec(t, n, "sha256sum /var/lib/darz-agent/agent.crt")
+		certs[n.name] = f.mustExec(t, n, "sha256sum /var/lib/ways-agent/agent.crt")
 	}
 	f.ansible(t, "ci-2", "coordinator.yml")
-	if v := strings.TrimSpace(f.mustExec(t, coordinator, "/usr/local/bin/darz-coordinator -version")); v != "ci-2" {
+	if v := strings.TrimSpace(f.mustExec(t, coordinator, "/usr/local/bin/ways-coordinator -version")); v != "ci-2" {
 		t.Errorf("Coordinator runs %q after the upgrade, want ci-2", v)
 	}
 	f.ansible(t, "ci-2", "enroll.yml")
@@ -170,14 +170,14 @@ func TestDeploy(t *testing.T) {
 		if st.ID != ids[n.name] || st.LastHealth.AgentVersion != "ci-2" {
 			t.Errorf("%s after the upgrade: id %s (was %s), Agent %s", n.name, st.ID, ids[n.name], st.LastHealth.AgentVersion)
 		}
-		if got := f.mustExec(t, n, "sha256sum /var/lib/darz-agent/agent.crt"); got != certs[n.name] {
+		if got := f.mustExec(t, n, "sha256sum /var/lib/ways-agent/agent.crt"); got != certs[n.name] {
 			t.Errorf("%s was re-keyed by an upgrade", n.name)
 		}
 	}
 	f.linksUp(t, ids)
 }
 
-// fleet is the containers plus the laptop's ~/.darz for them.
+// fleet is the containers plus the laptop's ~/.ways for them.
 type fleet struct {
 	home, key, apiCA string
 	admin            *testutil.AdminClient
@@ -185,7 +185,7 @@ type fleet struct {
 
 func newFleet(t *testing.T, releases string) *fleet {
 	dir := t.TempDir()
-	f := &fleet{home: filepath.Join(dir, "darz"), key: filepath.Join(dir, "id_ed25519")}
+	f := &fleet{home: filepath.Join(dir, "ways"), key: filepath.Join(dir, "id_ed25519")}
 	must(t, os.MkdirAll(filepath.Join(f.home, "releases"), 0o700))
 	for _, v := range []string{"ci-1", "ci-2"} {
 		must(t, os.Symlink(filepath.Join(releases, v), filepath.Join(f.home, "releases", v)))
@@ -215,14 +215,14 @@ func newFleet(t *testing.T, releases string) *fleet {
 	run(t, "docker", "network", "create", "--subnet", subnet, network)
 	t.Cleanup(func() { exec.Command("docker", "network", "rm", network).Run() })
 	for _, h := range append([]host{coordinator}, nodes...) {
-		name := "darz-" + h.name
+		name := "ways-" + h.name
 		exec.Command("docker", "rm", "-f", name).Run()
 		run(t, "docker", "run", "-d", "--privileged", "--name", name, "--hostname", h.name,
 			"--network", network, "--ip", h.ip, "--add-host", "4miz.ir:"+coordIP,
 			"--tmpfs", "/run", "--tmpfs", "/run/lock", image)
 		t.Cleanup(func() {
 			if t.Failed() {
-				out, _ := f.exec(h, "journalctl --no-pager -n 200 -u 'darz-*'")
+				out, _ := f.exec(h, "journalctl --no-pager -n 200 -u 'ways-*'")
 				t.Logf("journal on %s:\n%s", h.name, out)
 			}
 			exec.Command("docker", "rm", "-f", name).Run()
@@ -256,7 +256,7 @@ func inventory(key string) string {
 	return b.String()
 }
 
-// ansible runs a playbook through scripts/darz-ansible, as the operator does.
+// ansible runs a playbook through scripts/ways-ansible, as the operator does.
 func (f *fleet) ansible(t *testing.T, release, playbook string) string {
 	t.Helper()
 	out, err := f.runAnsible(release, playbook)
@@ -267,11 +267,11 @@ func (f *fleet) ansible(t *testing.T, release, playbook string) string {
 	return out
 }
 
-// runAnsible runs a playbook through scripts/darz-ansible, as the operator does.
+// runAnsible runs a playbook through scripts/ways-ansible, as the operator does.
 func (f *fleet) runAnsible(release, playbook string) (string, error) {
-	cmd := exec.Command("../../scripts/darz-ansible", playbook,
-		"-e", "darz_chrony=false", "-e", "darz_api_ca_path="+f.apiCA)
-	cmd.Env = append(os.Environ(), "DARZ_HOME="+f.home, "DARZ_RELEASE="+release,
+	cmd := exec.Command("../../scripts/ways-ansible", playbook,
+		"-e", "ways_chrony=false", "-e", "ways_api_ca_path="+f.apiCA)
+	cmd.Env = append(os.Environ(), "WAYS_HOME="+f.home, "WAYS_RELEASE="+release,
 		"ANSIBLE_HOST_KEY_CHECKING=False", "ANSIBLE_FORCE_COLOR=0", "ANSIBLE_NOCOLOR=1")
 	out, err := cmd.CombinedOutput()
 	return string(out), err
@@ -343,7 +343,7 @@ func (f *fleet) linksUp(t *testing.T, ids map[string]string) {
 }
 
 func (f *fleet) exec(h host, script string) (string, error) {
-	out, err := exec.Command("docker", "exec", "darz-"+h.name, "sh", "-c", script).CombinedOutput()
+	out, err := exec.Command("docker", "exec", "ways-"+h.name, "sh", "-c", script).CombinedOutput()
 	return string(out), err
 }
 
@@ -437,7 +437,7 @@ func (f *fleet) grafanaThroughThePanel(t *testing.T, invite string) {
 		t.Errorf("Grafana through the panel: %d, signed in as %q, want ops", code, user.Login)
 	}
 	var dash struct{ Dashboard struct{ Title string } }
-	if code := admin.Do(t, "GET", "/grafana/api/dashboards/uid/darz-mesh", nil, &dash); code != 200 || dash.Dashboard.Title != "Mesh" {
+	if code := admin.Do(t, "GET", "/grafana/api/dashboards/uid/ways-mesh", nil, &dash); code != 200 || dash.Dashboard.Title != "Mesh" {
 		t.Errorf("the Mesh dashboard through the panel: %d, %q", code, dash.Dashboard.Title)
 	}
 
@@ -450,7 +450,7 @@ func (f *fleet) grafanaThroughThePanel(t *testing.T, invite string) {
 		q := map[string]any{
 			"from": strconv.FormatInt(now.Add(-5*time.Minute).UnixMilli(), 10), "to": strconv.FormatInt(now.UnixMilli(), 10),
 			"queries": []map[string]any{{"refId": "A", "expr": `up{job="coordinator"}`, "range": true, "intervalMs": 15000,
-				"datasource": map[string]string{"type": "prometheus", "uid": "darz-prometheus"}}},
+				"datasource": map[string]string{"type": "prometheus", "uid": "ways-prometheus"}}},
 		}
 		var res struct {
 			Results map[string]struct {
@@ -469,7 +469,7 @@ func (f *fleet) grafanaThroughThePanel(t *testing.T, invite string) {
 		}
 		return false
 	})
-	if out, _ := f.exec(coordinator, "journalctl -u darz-grafana -o cat --no-pager | grep 'logger=plugin.backgroundinstaller' | head -3"); out != "" {
+	if out, _ := f.exec(coordinator, "journalctl -u ways-grafana -o cat --no-pager | grep 'logger=plugin.backgroundinstaller' | head -3"); out != "" {
 		t.Errorf("Grafana tried to install plugins; it must use the bundled ones as they are:\n%s", out)
 	}
 }
@@ -482,16 +482,16 @@ func (f *fleet) grafanaThroughThePanel(t *testing.T, invite string) {
 // hide a lost rule.
 func (f *fleet) rulesSurviveNetworkd(t *testing.T, n host) {
 	t.Helper()
-	f.mustExec(t, n, `ip link show darzt0 >/dev/null 2>&1 || ip link add darzt0 type dummy
-printf '[Match]\nName=darzt0\n\n[Network]\nAddress=192.0.2.1/32\n' > /etc/systemd/network/50-darzt0.network`)
+	f.mustExec(t, n, `ip link show wayst0 >/dev/null 2>&1 || ip link add wayst0 type dummy
+printf '[Match]\nName=wayst0\n\n[Network]\nAddress=192.0.2.1/32\n' > /etc/systemd/network/50-wayst0.network`)
 	count := "ip rule show | grep -c fwmark || true"
 	before := strings.TrimSpace(f.mustExec(t, n, count))
 	if before == "0" {
 		t.Fatalf("%s has no fwmark rules to keep", n.name)
 	}
-	f.mustExec(t, n, "systemctl kill -s STOP darz-agent")
+	f.mustExec(t, n, "systemctl kill -s STOP ways-agent")
 	out, err := f.exec(n, "systemctl restart systemd-networkd && sleep 3; "+count)
-	f.mustExec(t, n, "systemctl kill -s CONT darz-agent")
+	f.mustExec(t, n, "systemctl kill -s CONT ways-agent")
 	if err != nil {
 		t.Fatalf("restarting systemd-networkd on %s: %v: %s", n.name, err, out)
 	}

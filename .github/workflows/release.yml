@@ -40,4 +40,4 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/release/* \
             --title "$GITHUB_REF_NAME" \
-            --notes "Download with scripts/fetch-release.sh $GITHUB_REF_NAME, then deploy with scripts/darz-ansible."
+            --notes "Download with scripts/fetch-release.sh $GITHUB_REF_NAME, then deploy with scripts/ways-ansible."

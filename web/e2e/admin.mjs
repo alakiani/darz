@@ -133,7 +133,7 @@ try {
   await screen("/admin/tokens", "API tokens");
   await page.fill("input[name=name]", "ops-laptop");
   await page.getByRole("button", { name: "Make a nodes:enroll token" }).click();
-  await page.locator("[data-testid=token-secret]", { hasText: "darz_" }).waitFor();
+  await page.locator("[data-testid=token-secret]", { hasText: "ways_" }).waitFor();
   await page.locator("[data-testid=token-ops-laptop]").getByRole("button", { name: "Revoke" }).click();
   await page.locator("[data-testid=token-ops-laptop] .status", { hasText: "revoked" }).waitFor();
 

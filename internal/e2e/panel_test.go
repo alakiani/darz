@@ -21,9 +21,9 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // wgConf is a parsed WireGuard config, as the stock apps read it.
@@ -197,10 +197,10 @@ func TestPanelIssuesAWorkingDevice(t *testing.T) {
 		confs[f.Name] = string(b)
 	}
 	names := slices.Sorted(maps.Keys(confs))
-	if !slices.Equal(names, []string{"darz-backup1.conf", "darz-backup2.conf", "darz-main.conf"}) {
+	if !slices.Equal(names, []string{"ways-backup1.conf", "ways-backup2.conf", "ways-main.conf"}) {
 		t.Fatalf("zip holds %v", names)
 	}
-	main := parseConf(t, confs["darz-main.conf"])
+	main := parseConf(t, confs["ways-main.conf"])
 	if pub, _ := co.c.BridgePublicKey(ctx); main.peerKey.String() != pub {
 		t.Error("the config names another Bridge key")
 	}

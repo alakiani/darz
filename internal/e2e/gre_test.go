@@ -14,10 +14,10 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/coordinator"
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/coordinator"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 // TestGRE is ADR 0009's "proves in the lab" test: a Link that crosses the
@@ -202,7 +202,7 @@ func ifaceMTU(t *testing.T, n *lab.Node, iface string) int {
 // outer header, as a spoofer claiming n's address would.
 func sendGRE(t *testing.T, n *lab.Node, dst, src, target netip.Addr, port uint16) {
 	t.Helper()
-	payload := []byte("darz-spoof")
+	payload := []byte("ways-spoof")
 	inner := make([]byte, 28+len(payload))
 	inner[0], inner[8], inner[9] = 0x45, 64, 17 // IPv4, TTL 64, UDP
 	binary.BigEndian.PutUint16(inner[2:], uint16(len(inner)))

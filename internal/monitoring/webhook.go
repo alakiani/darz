@@ -36,5 +36,5 @@ func (w Webhook) Text() string {
 	if len(lines) == 0 {
 		return ""
 	}
-	return "DARZ\n" + strings.Join(lines, "\n")
+	return "WAYS\n" + strings.Join(lines, "\n")
 }

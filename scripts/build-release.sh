@@ -4,21 +4,21 @@
 # Prometheus, Alertmanager and Grafana tarballs, and a SHA256SUMS over them.
 # The panel must already be built (web: npm run build).
 #
-# DARZ_DOWNLOAD_CACHE, if set, keeps the upstream tarballs between builds.
+# WAYS_DOWNLOAD_CACHE, if set, keeps the upstream tarballs between builds.
 set -euo pipefail
 version="$1" out="$2"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=../deploy/versions.env
 . "$root/deploy/versions.env"
-cache="${DARZ_DOWNLOAD_CACHE:-$(mktemp -d)}"
+cache="${WAYS_DOWNLOAD_CACHE:-$(mktemp -d)}"
 mkdir -p "$out" "$cache"
 
 ls "$root"/internal/panel/dist/app/index.html >/dev/null 2>&1 \
   || { echo "build the panel first: (cd web && npm ci && npm run build)" >&2; exit 1; }
 
 export CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-(cd "$root" && go build -trimpath -ldflags "-X main.version=$version" -o "$out/darz-agent" ./cmd/agent)
-(cd "$root" && go build -trimpath -ldflags "-X main.version=$version" -o "$out/darz-coordinator" ./cmd/coordinator)
+(cd "$root" && go build -trimpath -ldflags "-X main.version=$version" -o "$out/ways-agent" ./cmd/agent)
+(cd "$root" && go build -trimpath -ldflags "-X main.version=$version" -o "$out/ways-coordinator" ./cmd/coordinator)
 (cd "$root" && go build -trimpath -o "$out/amneziawg-go" github.com/amnezia-vpn/amneziawg-go)
 
 fetch() { # fetch URL SHA256

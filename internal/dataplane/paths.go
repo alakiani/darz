@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/alakiani/darz/internal/link"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/link"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // Path selection (ADR 0008): each Bridge works out the candidates for each

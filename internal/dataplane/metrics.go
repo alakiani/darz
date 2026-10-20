@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alakiani/darz/internal/metrics"
+	"github.com/alakiani/ways/internal/metrics"
 )
 
 // activeWithin is how recent a Device's handshake must be for it to count
@@ -37,11 +37,11 @@ func (p *Plane) WriteMetrics(w *metrics.Writer) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, k := range sortedPairs(p.moves) {
-		w.Counter("darz_path_moves_total", "Steps that moved buckets of a Rule's Device traffic, by kind; Path flapping counts failures.",
+		w.Counter("ways_path_moves_total", "Steps that moved buckets of a Rule's Device traffic, by kind; Path flapping counts failures.",
 			float64(p.moves[k]), "rule", k[0], "kind", k[1])
 	}
 	for _, k := range sortedPairs(p.movedBuckets) {
-		w.Counter("darz_path_bucket_moves_total", "Buckets of a Rule's Device traffic moved, by kind.",
+		w.Counter("ways_path_bucket_moves_total", "Buckets of a Rule's Device traffic moved, by kind.",
 			float64(p.movedBuckets[k]), "rule", k[0], "kind", k[1])
 	}
 	p.writePaths(w)
@@ -55,17 +55,17 @@ func (p *Plane) WriteMetrics(w *metrics.Writer) {
 				active++
 			}
 		}
-		w.Gauge("darz_bridge_active_devices", "Devices with a handshake in the last 3 minutes.", float64(active))
+		w.Gauge("ways_bridge_active_devices", "Devices with a handshake in the last 3 minutes.", float64(active))
 	}
 	if n, ok := ifaceBytes(DeviceIface); ok {
-		w.Counter("darz_bridge_interface_bytes_total", "Bytes through the Device interface, both ways.", float64(n))
+		w.Counter("ways_bridge_interface_bytes_total", "Bytes through the Device interface, both ways.", float64(n))
 	}
-	w.Counter("darz_metered_bytes_total", "Bytes metered since the Agent started, both ways.", float64(p.meter.metered()))
+	w.Counter("ways_metered_bytes_total", "Bytes metered since the Agent started, both ways.", float64(p.meter.metered()))
 }
 
 // writePaths writes, on a Bridge, how the last step weighed each Rule's
 // candidates for its own Devices (ADR 0008). The labels are
-// darz_path_buckets', so the two join: a candidate is its Link's far end
+// ways_path_buckets', so the two join: a candidate is its Link's far end
 // by name, or "local". Call with mu held.
 func (p *Plane) writePaths(w *metrics.Writer) {
 	if p.st == nil || p.st.Bridge == nil {
@@ -86,10 +86,10 @@ func (p *Plane) writePaths(w *metrics.Writer) {
 				cand = "link " + id
 			}
 			l := append(slices.Clip(labels), "candidate", cand)
-			w.Gauge("darz_path_weight", "The candidate's weight for the Rule: throughput in Mbit/s × availability² × RTT factor.", v.weight, l...)
-			w.Gauge("darz_path_target_share", "The share of the Rule's buckets the candidate's weight asks for, before the cutoff.", v.target, l...)
-			w.Bool("darz_path_cut_off", "1 while the candidate's weight is under the cutoff fraction of the best, so it gets no buckets.", v.cut, l...)
-			w.Gauge("darz_path_availability", "The candidate's availability over the window, less the flap penalty, as its weight uses it.", v.avail, l...)
+			w.Gauge("ways_path_weight", "The candidate's weight for the Rule: throughput in Mbit/s × availability² × RTT factor.", v.weight, l...)
+			w.Gauge("ways_path_target_share", "The share of the Rule's buckets the candidate's weight asks for, before the cutoff.", v.target, l...)
+			w.Bool("ways_path_cut_off", "1 while the candidate's weight is under the cutoff fraction of the best, so it gets no buckets.", v.cut, l...)
+			w.Gauge("ways_path_availability", "The candidate's availability over the window, less the flap penalty, as its weight uses it.", v.avail, l...)
 		}
 	}
 }

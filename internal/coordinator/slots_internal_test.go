@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/arvan"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/arvan"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 func TestPlanSlots(t *testing.T) {

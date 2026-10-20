@@ -1,4 +1,4 @@
-module github.com/alakiani/darz
+module github.com/alakiani/ways
 
 go 1.27.0
 

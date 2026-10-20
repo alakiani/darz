@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // instance is one end of one candidate Transport instance, with the prober

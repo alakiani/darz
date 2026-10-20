@@ -87,7 +87,7 @@ func StartSpecs(t testing.TB, specs ...Spec) *Lab {
 
 	suffix := make([]byte, 3)
 	rand.Read(suffix)
-	l := &Lab{t: t, prefix: "darz-" + hex.EncodeToString(suffix)}
+	l := &Lab{t: t, prefix: "ways-" + hex.EncodeToString(suffix)}
 	l.wan = l.prefix + "-wan"
 	t.Cleanup(l.Close)
 

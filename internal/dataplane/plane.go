@@ -29,9 +29,9 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/agent"
-	"github.com/alakiani/darz/internal/link"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/agent"
+	"github.com/alakiani/ways/internal/link"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // LinkSource is the Link layer as the data plane uses it.
@@ -332,7 +332,7 @@ func (p *Plane) set(ctx context.Context, hash string) ([]string, error) {
 // syncRules keeps exactly this plane's ip rules: each Link's mark leads
 // to the Link's table, the local mark to the main table, and the drop mark
 // to a blackhole. Device traffic that matches no Rule is dropped by
-// nftables, not by an ip rule: an "iif darz0" rule would also catch the
+// nftables, not by an ip rule: an "iif ways0" rule would also catch the
 // kernel's reverse-path lookups for replies to Devices and drop them all.
 // It returns how many rules it added.
 func (p *Plane) syncRules(ctx context.Context) (int, error) {
@@ -523,7 +523,7 @@ func (p *Plane) collectUsage(ctx context.Context, st *protocol.State) {
 
 // readCounters lists a counting set's elements and their byte counters.
 func readCounters(ctx context.Context, set string) ([]counterElem, error) {
-	out, err := exec.CommandContext(ctx, "nft", "-j", "list", "set", "inet", "darz", set).Output()
+	out, err := exec.CommandContext(ctx, "nft", "-j", "list", "set", "inet", "ways", set).Output()
 	if err != nil {
 		return nil, err
 	}

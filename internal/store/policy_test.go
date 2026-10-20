@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 func TestDevicesGetUnusedAddressesThatAreNeverReused(t *testing.T) {

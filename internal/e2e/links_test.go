@@ -10,18 +10,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 // binDir holds the agent and amneziawg-go binaries the lab runs. CI builds
 // them before the tests; see .github/workflows/ci.yml.
 func binDir(t *testing.T) string {
-	dir := os.Getenv("DARZ_BIN")
+	dir := os.Getenv("WAYS_BIN")
 	if dir == "" {
-		t.Skip("DARZ_BIN is not set: build ./cmd/agent and amneziawg-go into a directory and point DARZ_BIN at it")
+		t.Skip("WAYS_BIN is not set: build ./cmd/agent and amneziawg-go into a directory and point WAYS_BIN at it")
 	}
 	return dir
 }

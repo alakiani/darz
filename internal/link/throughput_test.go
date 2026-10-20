@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 var loopback = netip.MustParseAddr("127.0.0.1")

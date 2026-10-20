@@ -4,7 +4,7 @@ status: accepted
 
 # Agent-Coordinator protocol: HTTPS long-poll of per-Node snapshots, with commit-confirm
 
-Agents talk to the Coordinator over plain HTTPS: they long-poll for a complete, versioned snapshot of their own desired state, apply it under a commit-confirm timer, and POST health and metering back. Nodes join in one step from the operator's laptop through a narrowly scoped API token. This builds on [ADR 0001](0001-coordinator-architecture.md), which already fixed mTLS, Agent-initiated connections, the absence of SSH credentials on the Coordinator, and offline behaviour (persisted state, no expiry). Resolved in [Agent-Coordinator protocol and Node enrollment](https://github.com/alakiani/darz/issues/11).
+Agents talk to the Coordinator over plain HTTPS: they long-poll for a complete, versioned snapshot of their own desired state, apply it under a commit-confirm timer, and POST health and metering back. Nodes join in one step from the operator's laptop through a narrowly scoped API token. This builds on [ADR 0001](0001-coordinator-architecture.md), which already fixed mTLS, Agent-initiated connections, the absence of SSH credentials on the Coordinator, and offline behaviour (persisted state, no expiry). Resolved in [Agent-Coordinator protocol and Node enrollment](https://github.com/alakiani/ways/issues/11).
 
 ## Enrollment
 

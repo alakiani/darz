@@ -1,4 +1,4 @@
-// Command coordinator runs the DARZ Coordinator: identity, topology, policy and metering for the mesh.
+// Command coordinator runs the WAYS Coordinator: identity, topology, policy and metering for the mesh.
 // It never touches a packet on the data path.
 //
 // Usage:
@@ -24,11 +24,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alakiani/darz/internal/arvan"
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/coordinator"
-	"github.com/alakiani/darz/internal/irfeed"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/arvan"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/coordinator"
+	"github.com/alakiani/ways/internal/irfeed"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // version is set at release time with -ldflags "-X main.version=...".
@@ -56,8 +56,8 @@ func main() {
 func serve(args []string, log *slog.Logger) error {
 	fs := flag.NewFlagSet("coordinator", flag.ExitOnError)
 	showVersion := fs.Bool("version", false, "print the version and exit")
-	dbPath := fs.String("db", "/var/lib/darz/darz.db", "SQLite database")
-	caDir := fs.String("ca-dir", "/etc/darz/ca", "directory holding ca.crt and ca.key, created if empty")
+	dbPath := fs.String("db", "/var/lib/ways/ways.db", "SQLite database")
+	caDir := fs.String("ca-dir", "/etc/ways/ca", "directory holding ca.crt and ca.key, created if empty")
 	adminListen := fs.String("admin-listen", ":443", "Admin API listen address")
 	adminCert := fs.String("admin-tls-cert", "", "public TLS certificate for the Admin API; plain HTTP if unset")
 	adminKey := fs.String("admin-tls-key", "", "key for -admin-tls-cert")
@@ -174,7 +174,7 @@ func serve(args []string, log *slog.Logger) error {
 
 func tokenCreate(args []string) error {
 	fs := flag.NewFlagSet("coordinator token create", flag.ExitOnError)
-	dbPath := fs.String("db", "/var/lib/darz/darz.db", "SQLite database")
+	dbPath := fs.String("db", "/var/lib/ways/ways.db", "SQLite database")
 	scope := fs.String("scope", store.ScopeNodesEnroll, "token scope")
 	name := fs.String("name", "", "what the token is for, such as laptop (required)")
 	ttl := fs.Duration("ttl", 90*24*time.Hour, "how long the token lasts")
@@ -201,7 +201,7 @@ func tokenCreate(args []string) error {
 
 func inviteCreate(args []string, log *slog.Logger) error {
 	fs := flag.NewFlagSet("coordinator invite create", flag.ExitOnError)
-	dbPath := fs.String("db", "/var/lib/darz/darz.db", "SQLite database")
+	dbPath := fs.String("db", "/var/lib/ways/ways.db", "SQLite database")
 	admin := fs.Bool("admin", false, "the Invite makes an Admin, who must turn on TOTP before acting as one")
 	deviceCap := fs.Int("device-cap", 0, "Device cap for the new User; 0 for the default of 3")
 	panelURL := fs.String("panel-url", "https://4miz.ir", "where the panel is served")

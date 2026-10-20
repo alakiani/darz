@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // TestThroughputWeights is session 12's "proves in the lab" test: bucket
@@ -141,8 +141,8 @@ func TestThroughputWeights(t *testing.T) {
 			var total, kept float64
 			var got []string
 			for _, ab := range []string{"ab1", "ab2", "ab3"} {
-				w, okW := s["darz_path_weight"+lbl(ab)]
-				c, okC := s["darz_path_cut_off"+lbl(ab)]
+				w, okW := s["ways_path_weight"+lbl(ab)]
+				c, okC := s["ways_path_cut_off"+lbl(ab)]
 				if !okW || !okC {
 					return "", fmt.Errorf("no weight or cutoff for %s", ab)
 				}
@@ -154,11 +154,11 @@ func TestThroughputWeights(t *testing.T) {
 					kept += w
 				}
 				got = append(got, fmt.Sprintf("%s weight %.1f share %.2f cut %v buckets %v", ab, w,
-					s["darz_path_target_share"+lbl(ab)], c, s["darz_path_buckets"+lbl(ab)]))
+					s["ways_path_target_share"+lbl(ab)], c, s["ways_path_buckets"+lbl(ab)]))
 			}
 			for _, ab := range []string{"ab1", "ab2", "ab3"} {
-				w, b := s["darz_path_weight"+lbl(ab)], s["darz_path_buckets"+lbl(ab)]
-				if share := s["darz_path_target_share"+lbl(ab)]; math.Abs(share-w/total) > 1e-9 {
+				w, b := s["ways_path_weight"+lbl(ab)], s["ways_path_buckets"+lbl(ab)]
+				if share := s["ways_path_target_share"+lbl(ab)]; math.Abs(share-w/total) > 1e-9 {
 					return "", fmt.Errorf("%s target share %v, want %v", ab, share, w/total)
 				}
 				want := 0.0

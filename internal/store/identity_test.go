@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/store"
 )
 
 func TestNewInviteIsSingleUseAndExpires(t *testing.T) {

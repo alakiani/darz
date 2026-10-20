@@ -24,8 +24,8 @@ import (
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-	"github.com/alakiani/darz/internal/awg"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/awg"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // Config configures a Manager.

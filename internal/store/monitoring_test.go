@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/store"
 )
 
 func TestAlertOutbox(t *testing.T) {

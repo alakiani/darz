@@ -83,7 +83,7 @@ func TestTOTPAcceptsOneStepOfSkewOnly(t *testing.T) {
 
 func TestTOTPURI(t *testing.T) {
 	uri := TOTPURI("JBSWY3DPEHPK3PXP", "maryam")
-	if uri != "otpauth://totp/DARZ:maryam?algorithm=SHA1&digits=6&issuer=DARZ&period=30&secret=JBSWY3DPEHPK3PXP" {
+	if uri != "otpauth://totp/WAYS:maryam?algorithm=SHA1&digits=6&issuer=WAYS&period=30&secret=JBSWY3DPEHPK3PXP" {
 		t.Errorf("uri = %s", uri)
 	}
 }

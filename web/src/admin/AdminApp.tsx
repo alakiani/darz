@@ -74,7 +74,7 @@ export function AdminApp({ route }: { route: string }) {
   return (
     <div className="admin">
       <nav className="admin-nav">
-        <strong>DARZ admin</strong>
+        <strong>WAYS admin</strong>
         {screens.map(([path, label]) => (
           <a key={path} href={`#${path}`} className={route === path ? "current" : ""}>
             {label}
@@ -125,7 +125,7 @@ function AdminLogin({ me, onSignedIn }: { me: Me | null; onSignedIn: (m: Me) => 
   };
   return (
     <form className="card admin-login" onSubmit={submit}>
-      <h1>DARZ admin</h1>
+      <h1>WAYS admin</h1>
       <label>
         Handle
         <input name="handle" autoComplete="username" value={handle} onChange={(e) => setHandle(e.target.value)} />

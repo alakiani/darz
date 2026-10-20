@@ -24,12 +24,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/coordinator"
-	"github.com/alakiani/darz/internal/lab"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
-	"github.com/alakiani/darz/internal/testutil"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/coordinator"
+	"github.com/alakiani/ways/internal/lab"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
+	"github.com/alakiani/ways/internal/testutil"
 )
 
 // coord is a Coordinator running in-process, its Agent API listening inside
@@ -44,7 +44,7 @@ type coord struct {
 
 func startCoordinator(t *testing.T, node *lab.Node) *coord {
 	t.Helper()
-	s, err := store.Open(filepath.Join(t.TempDir(), "darz.db"))
+	s, err := store.Open(filepath.Join(t.TempDir(), "ways.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

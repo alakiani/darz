@@ -19,9 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/metrics"
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/metrics"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // MetricsWriter is implemented by an Applier with metrics of its own, such
@@ -157,13 +157,13 @@ func (a *agent) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 
 	var m metrics.Writer
-	m.Gauge("darz_agent_info", "The Agent's version.", 1, "version", a.cfg.Version)
-	m.Gauge("darz_snapshot_applied_version", "The snapshot version in effect.", float64(current))
-	m.Gauge("darz_coordinator_last_contact_seconds", "Seconds since the Agent last reached the Coordinator, or since it started.",
+	m.Gauge("ways_agent_info", "The Agent's version.", 1, "version", a.cfg.Version)
+	m.Gauge("ways_snapshot_applied_version", "The snapshot version in effect.", float64(current))
+	m.Gauge("ways_coordinator_last_contact_seconds", "Seconds since the Agent last reached the Coordinator, or since it started.",
 		now.Sub(lastContact).Seconds())
-	m.Counter("darz_snapshot_apply_failures_total", "Snapshots reverted because they cut contact with the Coordinator.", float64(failures))
+	m.Counter("ways_snapshot_apply_failures_total", "Snapshots reverted because they cut contact with the Coordinator.", float64(failures))
 	if c := a.mon.certificate(); c != nil && c.Leaf != nil {
-		m.Gauge("darz_client_cert_expiry_timestamp_seconds", "When the Node's certificate expires.", float64(c.Leaf.NotAfter.Unix()))
+		m.Gauge("ways_client_cert_expiry_timestamp_seconds", "When the Node's certificate expires.", float64(c.Leaf.NotAfter.Unix()))
 	}
 
 	// Links, labelled by their two Nodes.
@@ -179,11 +179,11 @@ func (a *agent) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, lh := range h.Links {
 		labels := metrics.LinkLabels(lh.LinkID, st.Node.Name, peers[lh.LinkID])
-		m.Bool("darz_link_up", "1 while the Link has a working transport.", lh.Up, labels...)
-		m.Gauge("darz_link_rtt_seconds", "Round-trip time over the Link's active instance.", lh.RTTMillis/1000, labels...)
-		m.Gauge("darz_link_loss_ratio", "Probe loss over the last 30 s on the active instance.", lh.Loss, labels...)
+		m.Bool("ways_link_up", "1 while the Link has a working transport.", lh.Up, labels...)
+		m.Gauge("ways_link_rtt_seconds", "Round-trip time over the Link's active instance.", lh.RTTMillis/1000, labels...)
+		m.Gauge("ways_link_loss_ratio", "Probe loss over the last 30 s on the active instance.", lh.Loss, labels...)
 		if lh.Transport != "" {
-			m.Gauge("darz_link_transport", "The transport carrying the Link.", 1, append(labels, "transport", string(lh.Transport))...)
+			m.Gauge("ways_link_transport", "The transport carrying the Link.", 1, append(labels, "transport", string(lh.Transport))...)
 		}
 	}
 
@@ -196,16 +196,16 @@ func (a *agent) serveMetrics(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, rh := range h.Paths {
 			labels := []string{"rule_id", strconv.FormatUint(rh.RuleID, 10), "rule", rules[rh.RuleID], "default", strconv.FormatBool(rh.RuleID == defaultRule)}
-			m.Bool("darz_path_ok", "1 while the Rule has a Path of its own, direct, local or transit.",
+			m.Bool("ways_path_ok", "1 while the Rule has a Path of its own, direct, local or transit.",
 				rh.Mode != "" && rh.Mode != "fallback", labels...)
-			m.Gauge("darz_path_eligible_candidates", "Eligible candidates for the Rule.", float64(rh.Eligible), labels...)
+			m.Gauge("ways_path_eligible_candidates", "Eligible candidates for the Rule.", float64(rh.Eligible), labels...)
 			for _, key := range slices.Sorted(maps.Keys(rh.Shares)) {
 				cand := key
 				if id, ok := strings.CutPrefix(key, "link:"); ok {
 					n, _ := strconv.ParseUint(id, 10, 64)
 					cand = peerName(n)
 				}
-				m.Gauge("darz_path_buckets", "Buckets of the Rule's Device traffic on each candidate.", float64(rh.Shares[key]),
+				m.Gauge("ways_path_buckets", "Buckets of the Rule's Device traffic on each candidate.", float64(rh.Shares[key]),
 					append(labels, "candidate", cand)...)
 			}
 		}
@@ -216,7 +216,7 @@ func (a *agent) serveMetrics(w http.ResponseWriter, r *http.Request) {
 				backlog = age
 			}
 		}
-		m.Gauge("darz_metering_backlog_seconds", "Age of the oldest hour of metering the Coordinator has not acknowledged.", backlog)
+		m.Gauge("ways_metering_backlog_seconds", "Age of the oldest hour of metering the Coordinator has not acknowledged.", backlog)
 	}
 	if mw, ok := a.cfg.Applier.(MetricsWriter); ok {
 		mw.WriteMetrics(&m)
@@ -225,7 +225,7 @@ func (a *agent) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	// Host metrics, from node_exporter on localhost, so the Node keeps one port.
 	if a.cfg.NodeExporter != "" {
 		body, err := a.nodeExporter(r.Context())
-		m.Bool("darz_node_exporter_up", "1 when node_exporter answered.", err == nil)
+		m.Bool("ways_node_exporter_up", "1 when node_exporter answered.", err == nil)
 		if err == nil {
 			m.Raw(body)
 		}

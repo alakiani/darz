@@ -17,15 +17,15 @@ export interface ConfigFile {
 }
 
 const fileNames: Record<string, string> = {
-  Main: "darz-main",
-  "Backup 1": "darz-backup1",
-  "Backup 2": "darz-backup2",
+  Main: "ways-main",
+  "Backup 1": "ways-backup1",
+  "Backup 2": "ways-backup2",
 };
 
 export function configFiles(cfg: DeviceConfig, privateKey: string): ConfigFile[] {
   return cfg.endpoints.map((e, i) => ({
     label: e.label,
-    name: (fileNames[e.label] ?? `darz-${i + 1}`) + ".conf",
+    name: (fileNames[e.label] ?? `ways-${i + 1}`) + ".conf",
     text:
       "[Interface]\n" +
       `PrivateKey = ${privateKey}\n` +

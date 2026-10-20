@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // The throughput test (ADR 0008): a Bridge asks the far end of each of its

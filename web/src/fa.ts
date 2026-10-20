@@ -1,7 +1,7 @@
 // The user panel's words, in Farsi (the admin panel is in English).
 
 export const fa = {
-  appName: "درز",
+  appName: "راه",
   tagline: "همیشه راهی هست",
   working: "سرویس کار می‌کند",
 
@@ -17,7 +17,7 @@ export const fa = {
   passwordsDiffer: "دو گذرواژه یکی نیستند",
   tooMany: "تلاش‌های ناموفق زیاد بود؛ کمی بعد دوباره امتحان کنید",
 
-  inviteTitle: "به درز خوش آمدید",
+  inviteTitle: "به راه خوش آمدید",
   inviteNew: "یک نام کاربری و گذرواژه برای خودتان انتخاب کنید. نام واقعی یا شماره تلفن لازم نیست.",
   inviteRecovery: (h: string) => `این دعوت‌نامه گذرواژهٔ حساب «${h}» را عوض می‌کند. دستگاه‌هایتان سر جایشان می‌مانند.`,
   inviteInvalid: "این دعوت‌نامه استفاده شده، منقضی شده یا نامعتبر است. از مدیر یک دعوت‌نامهٔ تازه بخواهید.",

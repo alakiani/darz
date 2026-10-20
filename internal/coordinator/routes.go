@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/alakiani/darz/internal/panel"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/panel"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // authLevel is who may call a route of the Admin API listener.
@@ -139,7 +139,7 @@ func requireJSON(next http.Handler) http.Handler {
 	})
 }
 
-const sessionCookie = "darz_session"
+const sessionCookie = "ways_session"
 
 type sessionKey struct{}
 

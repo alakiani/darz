@@ -1,0 +1,18 @@
+# Managed by coordinator.yml (ADR 0006).
+[Unit]
+Description=Alertmanager for WAYS
+After=network-online.target
+
+[Service]
+User=ways-monitor
+Group=ways-monitor
+ExecStart=/usr/local/lib/ways/alertmanager-{{ ways_versions.ALERTMANAGER }}/alertmanager \
+  --config.file=/etc/ways/alertmanager/alertmanager.yml \
+  --storage.path=/var/lib/ways-monitor/alertmanager \
+  --web.listen-address=127.0.0.1:9093 \
+  --cluster.listen-address=
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

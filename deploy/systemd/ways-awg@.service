@@ -1,11 +1,11 @@
 # One amneziawg-go daemon per AmneziaWG instance (ADR 0007). The Agent starts
 # and stops these; tunnels outlive Agent restarts.
 [Unit]
-Description=DARZ AmneziaWG instance %i
+Description=WAYS AmneziaWG instance %i
 After=network-online.target
 
 [Service]
-ExecStart=/usr/local/lib/darz/amneziawg-go -f %i
+ExecStart=/usr/local/lib/ways/amneziawg-go -f %i
 Restart=on-failure
 RestartSec=5
 

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alakiani/darz/internal/ca"
+	"github.com/alakiani/ways/internal/ca"
 )
 
 var update = flag.Bool("update", false, "rewrite deploy/monitoring from this package")
@@ -36,14 +36,14 @@ func TestRulesCoverTheAlertTable(t *testing.T) {
 	}
 	for _, want := range []string{
 		// ADR 0006's durations and severities.
-		`max_over_time(up{job="agents"}[3m]) == 0 and on (node) darz_node_report_age_seconds > 180`,
+		`max_over_time(up{job="agents"}[3m]) == 0 and on (node) ways_node_report_age_seconds > 180`,
 		"severity: critical",
 		"for: 2m",
-		`darz_slot_bridge_eligible == 0`,
-		`increase(darz_path_moves_total{kind="failure"}[1h]) > 6`,
-		`changes((max by (link) (darz_link_instance_up) == bool 0)[1h:]) >= 5`,
-		`darz_client_cert_expiry_timestamp_seconds - time() < 2592000`,
-		`time() - darz_backup_last_success_timestamp_seconds > 129600`,
+		`ways_slot_bridge_eligible == 0`,
+		`increase(ways_path_moves_total{kind="failure"}[1h]) > 6`,
+		`changes((max by (link) (ways_link_instance_up) == bool 0)[1h:]) >= 5`,
+		`ways_client_cert_expiry_timestamp_seconds - time() < 2592000`,
+		`time() - ways_backup_last_success_timestamp_seconds > 129600`,
 	} {
 		// Expressions are quoted in the file.
 		if !strings.Contains(rules, want) && !strings.Contains(rules, quote(want)) {
@@ -56,12 +56,12 @@ func TestRulesCoverTheAlertTable(t *testing.T) {
 }
 
 func TestPrometheusConfig(t *testing.T) {
-	got := Prometheus(PrometheusConfig{Internal: "127.0.0.1:9101", Alertmanager: "127.0.0.1:9093", TLSDir: "/etc/darz/prometheus",
-		RuleFiles: []string{"/etc/darz/prometheus/rules.yml"}, Interval: time.Second, SDRefresh: 2 * time.Second})
+	got := Prometheus(PrometheusConfig{Internal: "127.0.0.1:9101", Alertmanager: "127.0.0.1:9093", TLSDir: "/etc/ways/prometheus",
+		RuleFiles: []string{"/etc/ways/prometheus/rules.yml"}, Interval: time.Second, SDRefresh: 2 * time.Second})
 	for _, want := range []string{
 		"scrape_interval: 1s", "scrape_timeout: 1s",
 		"url: http://127.0.0.1:9101/v1/sd/agents", "refresh_interval: 2s",
-		"cert_file: /etc/darz/prometheus/prometheus.crt", "server_name: " + ca.AgentServerName,
+		"cert_file: /etc/ways/prometheus/prometheus.crt", "server_name: " + ca.AgentServerName,
 		`targets: ["127.0.0.1:9093"]`, `targets: ["127.0.0.1:9101"]`,
 	} {
 		if !strings.Contains(got, want) {
@@ -98,11 +98,11 @@ func TestMeshDashboard(t *testing.T) {
 	qs := MeshDashboardQueries()
 	joined := strings.Join(qs, "\n")
 	// ADR 0006's Mesh dashboard: Nodes, the Link grid, Paths, slots.
-	for _, want := range []string{`up{job="agents"}`, "darz_link_rtt_seconds", "darz_link_loss_ratio", "darz_link_transport",
-		"darz_path_buckets", "darz_slot_points_to",
+	for _, want := range []string{`up{job="agents"}`, "ways_link_rtt_seconds", "ways_link_loss_ratio", "ways_link_transport",
+		"ways_path_buckets", "ways_slot_points_to",
 		// Issue #51: weights and cutoff, throughput with its age, instances.
-		"darz_path_weight", "darz_path_cut_off", "darz_link_throughput_mbps",
-		"darz_link_throughput_measured_timestamp_seconds", "darz_link_throughput_transport", "darz_link_instance_up"} {
+		"ways_path_weight", "ways_path_cut_off", "ways_link_throughput_mbps",
+		"ways_link_throughput_measured_timestamp_seconds", "ways_link_throughput_transport", "ways_link_instance_up"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("no panel queries %s", want)
 		}
@@ -132,9 +132,9 @@ func TestMeshDashboardRepeatsPerBridgeAndLink(t *testing.T) {
 		vars[v.Name] = v.Definition
 	}
 	for _, want := range []struct{ typ, title, repeat, varQuery string }{
-		{"timeseries", "Path weights: $bridge", "bridge", "label_values(darz_path_weight, node)"},
+		{"timeseries", "Path weights: $bridge", "bridge", "label_values(ways_path_weight, node)"},
 		{"table", "Throughput by Link", "", ""},
-		{"state-timeline", "Instances Up: $link", "link", "label_values(darz_link_instance_up, link)"},
+		{"state-timeline", "Instances Up: $link", "link", "label_values(ways_link_instance_up, link)"},
 	} {
 		found := false
 		for _, p := range d.Panels {
@@ -191,8 +191,8 @@ func deployFiles() map[string][]byte {
 		"rules.yml":                     []byte(Rules(ADRTiming)),
 		"alertmanager.yml":              []byte(Alertmanager(ProductionAlertmanager)),
 		"grafana/dashboards/mesh.json":  MeshDashboard(),
-		"grafana/provisioning/darz.yml": []byte(GrafanaProvisioning),
-		"grafana/datasources/darz.yml":  []byte(GrafanaDatasource),
+		"grafana/provisioning/ways.yml": []byte(GrafanaProvisioning),
+		"grafana/datasources/ways.yml":  []byte(GrafanaDatasource),
 		"README.md":                     []byte(deployReadme),
 	}
 }
@@ -216,12 +216,12 @@ func TestDeployFilesAreCurrent(t *testing.T) {
 }
 
 // TestConfigsPassPromtool checks the configs with the pinned promtool and
-// amtool, when DARZ_BIN holds them (CI downloads them for the lab).
+// amtool, when WAYS_BIN holds them (CI downloads them for the lab).
 func TestConfigsPassPromtool(t *testing.T) {
-	bin := os.Getenv("DARZ_BIN")
+	bin := os.Getenv("WAYS_BIN")
 	promtool, amtool := filepath.Join(bin, "promtool"), filepath.Join(bin, "amtool")
 	if _, err := os.Stat(promtool); bin == "" || err != nil {
-		t.Skip("no promtool in DARZ_BIN")
+		t.Skip("no promtool in WAYS_BIN")
 	}
 	dir := t.TempDir()
 	write := func(name, content string) string {
@@ -258,19 +258,19 @@ evaluation_interval: 15s
 tests:
   - interval: 15s
     input_series:
-      - series: 'darz_link_instance_up{node="ir1",link="ab1/ir1",instance_id="1",transport="gre"}'
+      - series: 'ways_link_instance_up{node="ir1",link="ab1/ir1",instance_id="1",transport="gre"}'
         values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
-      - series: 'darz_link_instance_up{node="ir1",link="ab1/ir1",instance_id="2",transport="amneziawg"}'
+      - series: 'ways_link_instance_up{node="ir1",link="ab1/ir1",instance_id="2",transport="amneziawg"}'
         values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
-      - series: 'darz_link_instance_up{node="ab1",link="ab1/ir1",instance_id="1",transport="gre"}'
+      - series: 'ways_link_instance_up{node="ab1",link="ab1/ir1",instance_id="1",transport="gre"}'
         values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
-      - series: 'darz_link_instance_up{node="ab1",link="ab1/ir1",instance_id="2",transport="amneziawg"}'
+      - series: 'ways_link_instance_up{node="ab1",link="ab1/ir1",instance_id="2",transport="amneziawg"}'
         values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
-      - series: 'darz_link_instance_up{node="ir1",link="ab2/ir1",instance_id="3",transport="gre"}'
+      - series: 'ways_link_instance_up{node="ir1",link="ab2/ir1",instance_id="3",transport="gre"}'
         values: '1x10 0x4 1x10 0x4 1x10 0x4 1x10'
-      - series: 'darz_link_instance_up{node="ir1",link="ab2/ir1",instance_id="4",transport="amneziawg"}'
+      - series: 'ways_link_instance_up{node="ir1",link="ab2/ir1",instance_id="4",transport="amneziawg"}'
         values: '1x58'
-      - series: 'darz_link_instance_up{node="ir1",link="ab3/ir1",instance_id="5",transport="gre"}'
+      - series: 'ways_link_instance_up{node="ir1",link="ab3/ir1",instance_id="5",transport="gre"}'
         values: '1x10 0x4 1x10 0x4 1x26'
     alert_rule_test:
       - eval_time: 5m
@@ -288,10 +288,10 @@ tests:
 
 func TestRuleExpressionsUseKnownMetrics(t *testing.T) {
 	// Metric names in the rules either come from the exporters this repo
-	// writes (darz_*), Prometheus itself (up), or node_exporter (node_*).
+	// writes (ways_*), Prometheus itself (up), or node_exporter (node_*).
 	re := regexp.MustCompile(`\b([a-z_]+_(?:seconds|total|ratio|bytes|eligible|ok|up|failures|use|limit|entries|rejected))\b`)
 	for _, m := range re.FindAllStringSubmatch(Rules(ADRTiming), -1) {
-		if !strings.HasPrefix(m[1], "darz_") && !strings.HasPrefix(m[1], "node_") && m[1] != "up" {
+		if !strings.HasPrefix(m[1], "ways_") && !strings.HasPrefix(m[1], "node_") && m[1] != "up" {
 			t.Errorf("unknown metric %s", m[1])
 		}
 	}

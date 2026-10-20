@@ -7,7 +7,7 @@ Links and converge on their own?
 
 Every claim below is cited to a primary source: vendor docs, source code, an RFC, or a
 daemon manual. The research was done on 2026-10-14. Items marked **Unverified** could not
-be confirmed from a primary source. To keep DARZ vocabulary intact, other products'
+be confirmed from a primary source. To keep WAYS vocabulary intact, other products'
 traffic-forwarding servers are called "forwarding servers" here, whatever the product
 calls them.
 
@@ -213,7 +213,7 @@ subnet-router primaries), the server decides, and failover takes around 15s.
 - **Go drivability.** No mature Go-native OSPF was found. You would drive BIRD or FRR.
 - **Policy.** OSPF computes destination-based shortest paths only.
 
-## 3. Comparison against the DARZ requirements
+## 3. Comparison against the WAYS requirements
 
 | Criterion | Central (Coordinator computes, Agent fails over locally) | Babel (babeld/BIRD, RTT on) | BGP + BFD (GoBGP/FRR) | OSPF (+BFD) |
 |---|---|---|---|---|
@@ -244,15 +244,15 @@ subnet-router primaries), the server decides, and failover takes around 15s.
   `ip rule` and tables. Upgrades of a C daemon must match Ubuntu 26.04 packaging.
 - **BGP / OSPF.** Configuration drift in route-maps or interface costs written by the
   Agent. Timer mismatches (OSPF hello/dead must match on both ends). In practice the
-  protocol adds a second decision engine whose metric ignores what DARZ actually
+  protocol adds a second decision engine whose metric ignores what WAYS actually
   measures.
 
-## 4. Fit with DARZ specifics
+## 4. Fit with WAYS specifics
 
 - **Topology is tiny and shallow.** A Path is Bridge → Exit or Bridge → Bridge → Exit,
   at most two Links. With fewer than 50 Nodes, the full Bridge × Exit × intermediate set
   is at most a few thousand candidates. Computing it is trivial anywhere. Distributed
-  shortest-path protocols solve a problem DARZ does not have: discovering multi-hop
+  shortest-path protocols solve a problem WAYS does not have: discovering multi-hop
   paths in large graphs without global knowledge.
 - **The decision is policy plus health, not shortest path.** The Exit is chosen by
   Device Rules (CIDR sets to Tags) and health. None of Babel, BGP or OSPF can express
@@ -262,7 +262,7 @@ subnet-router primaries), the server decides, and failover takes around 15s.
   that sees it must react without a round trip. Every comparable system does this at the
   endpoint, choosing among pre-distributed candidates (Tailscale's DERP and direct-path
   selection, Netbird's connect race, Nebula's list, Tor's preemptive circuits).
-- **Coordinator independence is already a DARZ requirement.** A precomputed ranked
+- **Coordinator independence is already a WAYS requirement.** A precomputed ranked
   candidate list (primary plus backups per Exit) satisfies it directly. This matches
   Tailscale's documented outage behaviour: cached state keeps working, but nothing new
   is computed.
@@ -318,5 +318,5 @@ own.
   against the Agent's own probe loop on a few lab Links would validate the phase-two
   option.
 - `cunicu/go-babel` returned 404 on 2026-10-14. No other Go-native Babel was found.
-- Some source URLs contain banned DARZ words in their paths (Netbird's and Nebula's
+- Some source URLs contain banned WAYS words in their paths (Netbird's and Nebula's
   source files). They are left as-is because they are external identifiers.

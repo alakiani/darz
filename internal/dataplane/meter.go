@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alakiani/darz/internal/protocol"
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 // Metering on a Bridge (ADR 0002, ADR 0003): nftables counts bytes per

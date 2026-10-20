@@ -23,10 +23,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alakiani/darz/internal/ca"
-	"github.com/alakiani/darz/internal/irfeed"
-	"github.com/alakiani/darz/internal/protocol"
-	"github.com/alakiani/darz/internal/store"
+	"github.com/alakiani/ways/internal/ca"
+	"github.com/alakiani/ways/internal/irfeed"
+	"github.com/alakiani/ways/internal/protocol"
+	"github.com/alakiani/ways/internal/store"
 )
 
 // EnrollmentTokenTTL is how long an enrollment token stays valid (ADR 0002).

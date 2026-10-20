@@ -146,7 +146,7 @@ awk -F'|' '$2=="IR" && ($3=="ipv4"||$3=="ipv6") && ($7=="allocated"||$7=="assign
 Cross-check fetch (same data, already CIDR, JSON):
 
 ```sh
-curl -fsS "https://stat.ripe.net/data/country-resource-list/data.json?resource=IR&v4_format=prefix&sourceapp=darz-coordinator"
+curl -fsS "https://stat.ripe.net/data/country-resource-list/data.json?resource=IR&v4_format=prefix&sourceapp=ways-coordinator"
 # .data.resources.ipv4[], .data.resources.ipv6[], .data.query_time
 ```
 

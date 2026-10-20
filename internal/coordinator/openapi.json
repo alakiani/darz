@@ -1522,14 +1522,14 @@
       },
       "session": {
         "in": "cookie",
-        "name": "darz_session",
+        "name": "ways_session",
         "type": "apiKey"
       }
     }
   },
   "info": {
     "description": "The panel's and the enroll playbook's API. Changes must be application/json.",
-    "title": "DARZ Coordinator API",
+    "title": "WAYS Coordinator API",
     "version": "1"
   },
   "openapi": "3.1.0",

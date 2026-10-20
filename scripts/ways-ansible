@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# ways-ansible PLAYBOOK [ansible-playbook args] runs a deployment playbook
+# against the fleet in ~/.ways: it loads fleet.env (from
+# scripts/provision-fleet.sh) and uses inventory.yml beside it.
+# WAYS_RELEASE picks the release in ~/.ways/releases; it defaults to the
+# newest one there (scripts/fetch-release.sh downloads one).
+#
+#   scripts/ways-ansible coordinator.yml
+#   scripts/ways-ansible enroll.yml -l ir-1
+set -euo pipefail
+export WAYS_HOME="${WAYS_HOME:-$HOME/.ways}"
+[[ $# -ge 1 ]] || { sed -n '2,10s/^# \{0,1\}//p' "$0"; exit 2; }
+[[ -f "$WAYS_HOME/fleet.env" ]] || { echo "no $WAYS_HOME/fleet.env: run scripts/provision-fleet.sh first" >&2; exit 1; }
+set -a
+# shellcheck source=/dev/null
+. "$WAYS_HOME/fleet.env"
+set +a
+if [[ -z "${WAYS_RELEASE:-}" ]]; then
+  WAYS_RELEASE=$(ls -t "$WAYS_HOME/releases" 2>/dev/null | head -n1 || true)
+  [[ -n "$WAYS_RELEASE" ]] || { echo "no release in $WAYS_HOME/releases: run scripts/fetch-release.sh VERSION" >&2; exit 1; }
+fi
+export WAYS_RELEASE
+echo "release $WAYS_RELEASE" >&2
+playbook="$1"; shift
+cd "$(dirname "$0")/../deploy/ansible"
+exec ansible-playbook -i "${WAYS_INVENTORY:-$WAYS_HOME/inventory.yml}" "$playbook" "$@"

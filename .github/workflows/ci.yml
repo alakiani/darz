@@ -59,7 +59,7 @@ jobs:
 
       - name: Build the lab's binaries
         # The pinned amneziawg-go is a tool dependency in go.mod.
-        run: go build -o "$RUNNER_TEMP/darz-bin/" ./cmd/agent github.com/amnezia-vpn/amneziawg-go
+        run: go build -o "$RUNNER_TEMP/ways-bin/" ./cmd/agent github.com/amnezia-vpn/amneziawg-go
 
       - name: Download the pinned Prometheus and Alertmanager for the lab
         # The versions and checksums the Coordinator VM runs (ADR 0006).
@@ -71,11 +71,11 @@ jobs:
           curl -fsSLO "https://github.com/prometheus/alertmanager/releases/download/v${ALERTMANAGER}/alertmanager-${ALERTMANAGER}.linux-amd64.tar.gz"
           echo "${PROMETHEUS_SHA256}  prometheus-${PROMETHEUS}.linux-amd64.tar.gz" | sha256sum -c -
           echo "${ALERTMANAGER_SHA256}  alertmanager-${ALERTMANAGER}.linux-amd64.tar.gz" | sha256sum -c -
-          tar -xzf "prometheus-${PROMETHEUS}.linux-amd64.tar.gz" --strip-components=1 -C darz-bin "prometheus-${PROMETHEUS}.linux-amd64/prometheus" "prometheus-${PROMETHEUS}.linux-amd64/promtool"
-          tar -xzf "alertmanager-${ALERTMANAGER}.linux-amd64.tar.gz" --strip-components=1 -C darz-bin "alertmanager-${ALERTMANAGER}.linux-amd64/alertmanager" "alertmanager-${ALERTMANAGER}.linux-amd64/amtool"
+          tar -xzf "prometheus-${PROMETHEUS}.linux-amd64.tar.gz" --strip-components=1 -C ways-bin "prometheus-${PROMETHEUS}.linux-amd64/prometheus" "prometheus-${PROMETHEUS}.linux-amd64/promtool"
+          tar -xzf "alertmanager-${ALERTMANAGER}.linux-amd64.tar.gz" --strip-components=1 -C ways-bin "alertmanager-${ALERTMANAGER}.linux-amd64/alertmanager" "alertmanager-${ALERTMANAGER}.linux-amd64/amtool"
 
       - name: Test, with the lab (as root)
-        run: go test -exec "sudo env DARZ_BIN=$RUNNER_TEMP/darz-bin PATH=$PATH PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/pw" -race -count=1 -v -timeout 20m ./...
+        run: go test -exec "sudo env WAYS_BIN=$RUNNER_TEMP/ways-bin PATH=$PATH PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/pw" -race -count=1 -v -timeout 20m ./...
 
   # The deployment playbooks against Ubuntu 26.04 containers, with two
   # release bundles built as the Release workflow builds them.
@@ -102,12 +102,12 @@ jobs:
 
       - uses: actions/cache@v4
         with:
-          path: ~/.cache/darz-downloads
-          key: darz-downloads-${{ hashFiles('deploy/versions.env') }}
+          path: ~/.cache/ways-downloads
+          key: ways-downloads-${{ hashFiles('deploy/versions.env') }}
 
       - name: Build two releases
         run: |
-          export DARZ_DOWNLOAD_CACHE="$HOME/.cache/darz-downloads"
+          export WAYS_DOWNLOAD_CACHE="$HOME/.cache/ways-downloads"
           scripts/build-release.sh ci-1 "$RUNNER_TEMP/releases/ci-1"
           scripts/build-release.sh ci-2 "$RUNNER_TEMP/releases/ci-2"
 
@@ -122,5 +122,5 @@ jobs:
 
       - name: Test the playbooks
         env:
-          DARZ_DEPLOY_TEST: "1"
-        run: DARZ_DEPLOY_RELEASES="$RUNNER_TEMP/releases" go test -count=1 -v -timeout 30m ./internal/deploytest
+          WAYS_DEPLOY_TEST: "1"
+        run: WAYS_DEPLOY_RELEASES="$RUNNER_TEMP/releases" go test -count=1 -v -timeout 30m ./internal/deploytest

@@ -1,0 +1,18 @@
+# Managed by coordinator.yml (ADR 0006).
+[Unit]
+Description=Prometheus for WAYS
+After=network-online.target ways-coordinator.service
+
+[Service]
+User=ways-monitor
+Group=ways-monitor
+ExecStart=/usr/local/lib/ways/prometheus-{{ ways_versions.PROMETHEUS }}/prometheus \
+  --config.file=/etc/ways/prometheus/prometheus.yml \
+  --storage.tsdb.path=/var/lib/ways-monitor/prometheus \
+  --storage.tsdb.retention.time=30d \
+  --web.listen-address=127.0.0.1:9090
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

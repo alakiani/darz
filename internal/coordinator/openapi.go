@@ -66,7 +66,7 @@ func (c *Coordinator) OpenAPI() ([]byte, error) {
 	}
 	doc := map[string]any{
 		"openapi": "3.1.0",
-		"info": map[string]any{"title": "DARZ Coordinator API", "version": "1",
+		"info": map[string]any{"title": "WAYS Coordinator API", "version": "1",
 			"description": "The panel's and the enroll playbook's API. Changes must be application/json."},
 		"paths": paths,
 		"components": map[string]any{

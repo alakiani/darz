@@ -209,6 +209,7 @@ ENV_FILE="$WAYS_HOME/fleet.env"
 SSH_KEY="$HOME/.ssh/id_rsa"   # replaced by the operator's choice in stage 1
 SSH_OPTS=()
 PROBE_PORT=40123
+ABROADS=(ABROAD1) # gains ABROAD2 if a second Exit is rented in stage 3
 
 # val NAME prints the value of the variable called NAME, or nothing.
 val() { local n="$1"; printf '%s' "${!n:-}"; }
@@ -284,7 +285,7 @@ gre_tunnel() {
 check_crossing() {
   local dip duser a aip auser out pid code bad=0 gre_bad=0
   dip=$(val "$1_IP"); duser=$(val "$1_USER")
-  for a in ABROAD1 ABROAD2; do
+  for a in "${ABROADS[@]}"; do
     aip=$(val "${a}_IP"); auser=$(val "${a}_USER"); out=$(mktemp)
     remote "$auser" "$aip" "timeout 15 nc -u -l $PROBE_PORT" >"$out" 2>/dev/null & pid=$!
     sleep 3
@@ -310,7 +311,7 @@ check_crossing() {
   code=$(remote "$duser" "$dip" "curl -sS -m 10 -o /dev/null -w '%{http_code}' https://www.cloudflare.com/" 2>/dev/null || true)
   if [[ "$code" =~ ^[23] ]]; then ok "HTTPS abroad works"; else warn "HTTPS abroad failed (got '${code:-nothing}')"; bad=1; fi
   if (( bad )); then
-    note "If both abroad Nodes fail, this datacenter probably only lets allowlisted IPs out: cancel it."
+    note "If every abroad Node fails, this datacenter probably only lets allowlisted IPs out: cancel it."
     note "If only one fails, check that Node's provider firewall (and 'sudo ufw status') for UDP $PROBE_PORT."
     return 1
   fi
@@ -320,7 +321,7 @@ check_crossing() {
 check_inbound() {
   local cip cuser a aip auser port pid bad=0
   cip=$(val COORD_IP); cuser=$(val COORD_USER)
-  for a in ABROAD1 ABROAD2; do
+  for a in "${ABROADS[@]}"; do
     aip=$(val "${a}_IP"); auser=$(val "${a}_USER")
     for port in 443 8443; do
       remote "$cuser" "$cip" "sudo timeout 15 nc -l $port" >/dev/null 2>&1 & pid=$!
@@ -376,14 +377,22 @@ rent_node ABROAD1 "de-1"
 pause
 
 # ── 3 ─────────────────────────────────────────────────────────────────────
-stage "Abroad Node 2"
-say "Rent the second abroad VM at a different provider from $(val ABROAD1_PROVIDER)."
-step "Same size, Ubuntu 26.04, your SSH key, inbound UDP and TCP 22 allowed."
-pause "Press Enter once it's running."
-rent_node ABROAD2 "nl-1"
-if [[ "$(lower "$ABROAD2_PROVIDER")" == "$(lower "$ABROAD1_PROVIDER")" ]]; then
-  warn "both abroad Nodes are at $ABROAD1_PROVIDER: one provider outage takes out every Exit"
-  confirm "Keep it anyway?" || SKIPPED+=("move the second abroad Node to another provider")
+stage "Abroad Node 2 (optional)"
+say "A second abroad Exit, at a different provider from $(val ABROAD1_PROVIDER), keeps traffic"
+say "abroad flowing when one is blocked. You can also add it later: list it under abroad in"
+say "the inventory and run enroll.yml for it."
+if confirm "Rent a second abroad Node now?"; then
+  step "Same size, Ubuntu 26.04, your SSH key, inbound UDP, GRE and TCP 22 allowed."
+  pause "Press Enter once it's running."
+  rent_node ABROAD2 "nl-1"
+  ABROADS+=(ABROAD2)
+  if [[ "$(lower "$ABROAD2_PROVIDER")" == "$(lower "$ABROAD1_PROVIDER")" ]]; then
+    warn "both abroad Nodes are at $ABROAD1_PROVIDER: one provider outage takes out every Exit"
+    confirm "Keep it anyway?" || SKIPPED+=("move the second abroad Node to another provider")
+  fi
+else
+  warn "one Exit abroad: if the filter blocks $(val ABROAD1_NAME), Devices lose everything abroad"
+  SKIPPED+=("a second abroad Exit at another provider")
 fi
 pause
 
@@ -577,12 +586,12 @@ if [[ ! -f "$INVENTORY" ]] || confirm "Overwrite $INVENTORY?"; then
     printf 'all:\n  vars:\n    ansible_ssh_private_key_file: %s\n  children:\n' "$SSH_KEY"
     printf '    coordinators:\n      hosts:\n'; inv_host COORD
     printf '    domestic:\n      hosts:\n';    inv_host DOM1; inv_host DOM2
-    printf '    abroad:\n      hosts:\n';      inv_host ABROAD1; inv_host ABROAD2
+    printf '    abroad:\n      hosts:\n';      for a in "${ABROADS[@]}"; do inv_host "$a"; done
   } > "$INVENTORY"
   ok "wrote $INVENTORY"
 fi
 say "Your fleet:"
-for p in COORD DOM1 DOM2 ABROAD1 ABROAD2; do
+for p in COORD DOM1 DOM2 "${ABROADS[@]}"; do
   note "  $(printf '%-12s %-15s %s' "$(val "${p}_NAME")" "$(val "${p}_IP")" "$(val "${p}_ASN")")"
 done
 pause "Press Enter to finish."

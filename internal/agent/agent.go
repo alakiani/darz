@@ -104,7 +104,7 @@ func (as Appliers) UseFetch(f Fetch) {
 // Config configures an Agent.
 type Config struct {
 	// Coordinators are base URLs of the Agent API, such as
-	// https://4miz.ir:8443. On failure the Agent moves to the next.
+	// https://wayfinder.ir:8443. On failure the Agent moves to the next.
 	Coordinators []string
 	// CACertPEM is the pinned Coordinator CA certificate.
 	CACertPEM []byte

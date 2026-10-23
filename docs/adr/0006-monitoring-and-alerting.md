@@ -41,7 +41,7 @@ A consequence: per-Device anomalies, such as one Device using unusually much, ar
 - **Bridge:** count of active Devices (handshake in the last 3 minutes), total WireGuard bytes, version and age of its IR Destination Set, and metering backlog (hourly buckets not yet acknowledged).
 - **Endpoint Slot:** the Bridge each slot points to, re-point count, number of eligible Bridges, ArvanCloud API errors.
 - **Probe Device**, per Bridge: handshake success, DNS query success, latency.
-- **Coordinator:** age of each Node's last report, CIDR refresh last success and gate rejections, last successful backup, HTTP errors, database size, and expiry of the CA, the public TLS certificate for `4miz.ir`, and API tokens.
+- **Coordinator:** age of each Node's last report, CIDR refresh last success and gate rejections, last successful backup, HTTP errors, database size, and expiry of the CA, the public TLS certificate for `wayfinder.ir`, and API tokens.
 
 ## Alerts
 
@@ -95,7 +95,7 @@ Grafana listens on the Coordinator VM's loopback only. Admins open it through th
 ## Considered options
 
 - **The Coordinator re-publishes the health Agents push to it, so nothing dials a Node.** Rejected by the operator in favour of a direct pull, which is simpler and sees host metrics the health report does not carry.
-- **Grafana on its own subdomain (`grafana.4miz.ir`) behind Grafana's own login.** Rejected: Grafana's login page and any Grafana flaw would face the internet from the one permanent host, and a `grafana` name in public DNS points at it.
+- **Grafana on its own subdomain (`grafana.wayfinder.ir`) behind Grafana's own login.** Rejected: Grafana's login page and any Grafana flaw would face the internet from the one permanent host, and a `grafana` name in public DNS points at it.
 - **Grafana only through an SSH tunnel.** The first deployment's way; dropped because it needs a laptop with the fleet's SSH key.
 - **Prometheus and Grafana on a separate VM abroad.** Rejected: an extra permanent machine, and it goes blind exactly when the border link is cut.
 - **A domestic messenger (Bale, Eitaa) for alerts.** Not chosen; SMS was preferred as the domestic channel.

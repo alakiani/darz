@@ -13,16 +13,16 @@ func newClient(t *testing.T, f *Fake) *Client {
 	t.Helper()
 	srv := httptest.NewServer(f)
 	t.Cleanup(srv.Close)
-	return &Client{BaseURL: srv.URL, APIKey: "secret", Zone: "4miz.ir", TTL: 120}
+	return &Client{BaseURL: srv.URL, APIKey: "secret", Zone: "wayfinder.ir", TTL: 120}
 }
 
 func TestSetAUpdatesTheExistingRecord(t *testing.T) {
-	f := NewFake("secret", "4miz.ir")
+	f := NewFake("secret", "wayfinder.ir")
 	f.Put("a", "192.0.2.1")
 	f.Put("b", "192.0.2.2")
 	c := newClient(t, f)
 
-	if err := c.SetA(context.Background(), "a.4miz.ir", netip.MustParseAddr("203.0.113.7")); err != nil {
+	if err := c.SetA(context.Background(), "a.wayfinder.ir", netip.MustParseAddr("203.0.113.7")); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.A("a"); got != "203.0.113.7" {
@@ -40,9 +40,9 @@ func TestSetAUpdatesTheExistingRecord(t *testing.T) {
 }
 
 func TestSetACreatesAMissingRecord(t *testing.T) {
-	f := NewFake("secret", "4miz.ir")
+	f := NewFake("secret", "wayfinder.ir")
 	c := newClient(t, f)
-	if err := c.SetA(context.Background(), "c.4miz.ir", netip.MustParseAddr("203.0.113.9")); err != nil {
+	if err := c.SetA(context.Background(), "c.wayfinder.ir", netip.MustParseAddr("203.0.113.9")); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.A("c"); got != "203.0.113.9" {
@@ -51,13 +51,13 @@ func TestSetACreatesAMissingRecord(t *testing.T) {
 }
 
 func TestSetAFindsRecordsOnLaterPages(t *testing.T) {
-	f := NewFake("secret", "4miz.ir")
+	f := NewFake("secret", "wayfinder.ir")
 	f.PerPage = 2
 	for _, n := range []string{"w", "x", "y", "z", "a"} {
 		f.Put(n, "192.0.2.1")
 	}
 	c := newClient(t, f)
-	if err := c.SetA(context.Background(), "a.4miz.ir", netip.MustParseAddr("203.0.113.7")); err != nil {
+	if err := c.SetA(context.Background(), "a.wayfinder.ir", netip.MustParseAddr("203.0.113.7")); err != nil {
 		t.Fatal(err)
 	}
 	if f.Records() != 5 || f.A("a") != "203.0.113.7" {
@@ -66,24 +66,24 @@ func TestSetAFindsRecordsOnLaterPages(t *testing.T) {
 }
 
 func TestSetARejectsNamesOutsideTheZone(t *testing.T) {
-	c := newClient(t, NewFake("secret", "4miz.ir"))
+	c := newClient(t, NewFake("secret", "wayfinder.ir"))
 	if err := c.SetA(context.Background(), "a.example.com", netip.MustParseAddr("203.0.113.7")); err == nil {
 		t.Error("want an error for a name outside the zone")
 	}
 }
 
 func TestSetAReportsAPIErrors(t *testing.T) {
-	f := NewFake("other-key", "4miz.ir")
+	f := NewFake("other-key", "wayfinder.ir")
 	c := newClient(t, f)
-	err := c.SetA(context.Background(), "a.4miz.ir", netip.MustParseAddr("203.0.113.7"))
+	err := c.SetA(context.Background(), "a.wayfinder.ir", netip.MustParseAddr("203.0.113.7"))
 	if err == nil || !strings.Contains(err.Error(), "401") {
 		t.Errorf("err = %v, want the 401", err)
 	}
 
-	f = NewFake("secret", "4miz.ir")
+	f = NewFake("secret", "wayfinder.ir")
 	f.FailWith = http.StatusServiceUnavailable
 	c = newClient(t, f)
-	if err := c.SetA(context.Background(), "a.4miz.ir", netip.MustParseAddr("203.0.113.7")); err == nil {
+	if err := c.SetA(context.Background(), "a.wayfinder.ir", netip.MustParseAddr("203.0.113.7")); err == nil {
 		t.Error("want an error while the API fails")
 	}
 }

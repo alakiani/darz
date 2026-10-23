@@ -104,9 +104,9 @@ Each session fits one agent session. They run in this order: the mesh first, bec
 - [ ] 2 domestic Nodes in datacenters on different ASes, whose IPs can reach abroad (check before committing; the research found source-IP allowlisting).
 - [ ] 2 abroad Nodes at different providers.
 - [ ] Ubuntu 26.04 on all of them.
-- [ ] ArvanCloud DNS zone for `4miz.ir`, with an API key able to edit `a`, `b`, and `c.4miz.ir`.
+- [ ] ArvanCloud DNS zone for `wayfinder.ir`, with an API key able to edit `a`, `b`, and `c.wayfinder.ir`.
 - [ ] Telegram bot token and alert channel.
 - [ ] Object storage abroad for the nightly backup, plus the operator's `age` key on the laptop only.
-- [ ] Public TLS certificate for `4miz.ir`.
+- [ ] Public TLS certificate for `wayfinder.ir`.
 
 This new fleet becomes production. The old fleet keeps serving Users until the separate migration effort.

@@ -35,7 +35,7 @@ type options struct {
 func main() {
 	var o options
 	showVersion := flag.Bool("version", false, "print the version and exit")
-	flag.StringVar(&o.coordinators, "coordinators", "https://4miz.ir:8443", "comma-separated Agent API URLs, tried in turn")
+	flag.StringVar(&o.coordinators, "coordinators", "https://wayfinder.ir:8443", "comma-separated Agent API URLs, tried in turn")
 	flag.StringVar(&o.caPath, "ca", "/etc/ways/ca.crt", "pinned Coordinator CA certificate")
 	flag.StringVar(&o.stateDir, "state-dir", "/var/lib/ways-agent", "keys, certificate and last applied state")
 	flag.StringVar(&o.tokenFile, "enroll-token-file", "", "file holding a one-time enrollment token, used only if not yet enrolled")

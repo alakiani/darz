@@ -22,7 +22,7 @@ const (
 )
 
 // DefaultEndpointSlots are the three domestic Endpoint Slots (ADR 0005).
-var DefaultEndpointSlots = []string{"a.4miz.ir", "b.4miz.ir", "c.4miz.ir"}
+var DefaultEndpointSlots = []string{"a.wayfinder.ir", "b.wayfinder.ir", "c.wayfinder.ir"}
 
 // IPv6Placeholder is the ULA /128 every config carries, so dual-stack apps
 // keep IPv6 inside the tunnel, where Bridges drop it (ADR 0003).

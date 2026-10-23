@@ -435,66 +435,66 @@ write_env COORD_EGRESS_IP "${egress:-$COORD_IP}"
 pause
 
 # ── 7 ─────────────────────────────────────────────────────────────────────
-stage "ArvanCloud: the 4miz.ir zone"
-say "The panel and Agents use 4miz.ir; the Endpoint Slots a, b and c.4miz.ir live in the same zone."
+stage "ArvanCloud: the wayfinder.ir zone"
+say "The panel and Agents use wayfinder.ir; the Endpoint Slots a, b and c.wayfinder.ir live in the same zone."
 open_url "https://panel.arvancloud.ir"
-step "Add the domain 4miz.ir (CDN service). ArvanCloud then shows you two nameservers."
-step "At your .ir registrar (nic.ir or your reseller), set those two nameservers for 4miz.ir."
-step "In ArvanCloud's DNS records for 4miz.ir, add an A record: name @, value $COORD_IP."
+step "Add the domain wayfinder.ir (CDN service). ArvanCloud then shows you two nameservers."
+step "At your .ir registrar (nic.ir or your reseller), set those two nameservers for wayfinder.ir."
+step "In ArvanCloud's DNS records for wayfinder.ir, add an A record: name @, value $COORD_IP."
 step "Turn the cloud (proxy) icon OFF on that record: Agents need a direct connection on 8443."
 note "Don't create a, b or c yourself: the Coordinator creates and re-points them."
 pause "Press Enter once the A record is saved."
 check_dns() {
   local got
-  got=$(dig +short A 4miz.ir @"$(dig +short NS 4miz.ir | head -n1)" 2>/dev/null | head -n1)
-  [[ "$got" == "$COORD_IP" ]] || fail "4miz.ir resolves to '${got:-nothing}' via its nameservers, not $COORD_IP (nameserver changes can take hours)" || return 1
-  ok "4miz.ir → $COORD_IP"
+  got=$(dig +short A wayfinder.ir @"$(dig +short NS wayfinder.ir | head -n1)" 2>/dev/null | head -n1)
+  [[ "$got" == "$COORD_IP" ]] || fail "wayfinder.ir resolves to '${got:-nothing}' via its nameservers, not $COORD_IP (nameserver changes can take hours)" || return 1
+  ok "wayfinder.ir → $COORD_IP"
 }
-retry "DNS: 4miz.ir A record → Coordinator" check_dns
+retry "DNS: wayfinder.ir A record → Coordinator" check_dns
 pause
 
 # ── 8 ─────────────────────────────────────────────────────────────────────
 stage "ArvanCloud: API key for the Endpoint Slots"
-say "The Coordinator re-points a, b and c.4miz.ir through ArvanCloud's API."
+say "The Coordinator re-points a, b and c.wayfinder.ir through ArvanCloud's API."
 open_url "https://panel.arvancloud.ir"
 step "Open your account menu and find API keys (or machine users). I don't know the exact"
 step "menu path in the current panel; ArvanCloud's docs search for 'API key' finds it."
-step "Create a key with DNS rights limited to 4miz.ir if the panel allows that, and copy it."
+step "Create a key with DNS rights limited to wayfinder.ir if the panel allows that, and copy it."
 check_arvan() {
   ask_secret ARVAN_API_KEY "Paste the API key:"
   # The panel shows "apikey <key>"; keep only the key, whatever its case.
   ARVAN_API_KEY="${ARVAN_API_KEY//[[:space:]]/}"
   if [[ "$(lower "${ARVAN_API_KEY:0:6}")" == apikey ]]; then ARVAN_API_KEY="${ARVAN_API_KEY:6}"; fi
   curl -fsS -m 15 -H "Authorization: Apikey $ARVAN_API_KEY" \
-    "https://napi.arvancloud.ir/cdn/4.0/domains/4miz.ir/dns-records" >/dev/null 2>&1 \
-    || fail "ArvanCloud rejected that key for 4miz.ir" || return 1
-  ok "the key can read 4miz.ir's records"
+    "https://napi.arvancloud.ir/cdn/4.0/domains/wayfinder.ir/dns-records" >/dev/null 2>&1 \
+    || fail "ArvanCloud rejected that key for wayfinder.ir" || return 1
+  ok "the key can read wayfinder.ir's records"
 }
 retry "ArvanCloud API key" check_arvan
 write_env ARVAN_API_KEY "$ARVAN_API_KEY"
 pause
 
 # ── 9 ─────────────────────────────────────────────────────────────────────
-stage "TLS certificate for 4miz.ir"
+stage "TLS certificate for wayfinder.ir"
 say "The panel needs a public certificate. The simplest route is acme.sh with ArvanCloud's DNS plugin."
-TLS_CERT_FILE="$WAYS_HOME/tls/4miz.ir.crt"; TLS_KEY_FILE="$WAYS_HOME/tls/4miz.ir.key"
+TLS_CERT_FILE="$WAYS_HOME/tls/wayfinder.ir.crt"; TLS_KEY_FILE="$WAYS_HOME/tls/wayfinder.ir.key"
 open_url "https://github.com/acmesh-official/acme.sh/wiki/dnsapi#dns_arvan"
 step "Install acme.sh: brew install acme.sh (or the installer on its README)."
 step "Check the wiki page above for the variable the Arvan plugin reads (Arvan_Token)."
 step "Then run, on this laptop:"
 note "    export Arvan_Token='Apikey <your key>'   # as the wiki says"
-note "    acme.sh --issue --server letsencrypt --dns dns_arvan -d 4miz.ir"
-note "    acme.sh --install-cert -d 4miz.ir --fullchain-file $TLS_CERT_FILE --key-file $TLS_KEY_FILE"
+note "    acme.sh --issue --server letsencrypt --dns dns_arvan -d wayfinder.ir"
+note "    acme.sh --install-cert -d wayfinder.ir --fullchain-file $TLS_CERT_FILE --key-file $TLS_KEY_FILE"
 note "Any other CA works too: just put the full chain and key at those two paths."
 pause "Press Enter once both files exist."
 check_tls() {
   [[ -s "$TLS_CERT_FILE" && -s "$TLS_KEY_FILE" ]] || fail "missing $TLS_CERT_FILE or $TLS_KEY_FILE" || return 1
-  openssl x509 -in "$TLS_CERT_FILE" -noout -checkhost 4miz.ir 2>/dev/null | grep -q "does match" \
-    || fail "the certificate isn't valid for 4miz.ir" || return 1
-  ok "certificate for 4miz.ir, $(openssl x509 -in "$TLS_CERT_FILE" -noout -enddate)"
+  openssl x509 -in "$TLS_CERT_FILE" -noout -checkhost wayfinder.ir 2>/dev/null | grep -q "does match" \
+    || fail "the certificate isn't valid for wayfinder.ir" || return 1
+  ok "certificate for wayfinder.ir, $(openssl x509 -in "$TLS_CERT_FILE" -noout -enddate)"
   chmod 600 "$TLS_KEY_FILE"
 }
-retry "TLS certificate for 4miz.ir" check_tls
+retry "TLS certificate for wayfinder.ir" check_tls
 write_env TLS_CERT_FILE "$TLS_CERT_FILE"
 write_env TLS_KEY_FILE "$TLS_KEY_FILE"
 note "Let's Encrypt certificates last 90 days; the Coordinator alerts before expiry."

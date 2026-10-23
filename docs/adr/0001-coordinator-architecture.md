@@ -10,7 +10,7 @@ The Coordinator is a single Go binary with its web assets embedded and SQLite as
 
 **Shape.** One binary and one SQLite file (WAL mode), with every query going through a single store package. Background jobs run as goroutines in that binary: the daily RIPE CIDR refresh with its validation gates, Path computation, metering rollups, and DNS updates for the Bridge hostname. Prometheus and Grafana run separately. Anything not core to phase one, accounting included, is left out.
 
-**Hosting.** A dedicated domestic VM, ideally at a different provider from the Bridges. It is not a Node, and its IP never carries a Link. Panel, API, and Agent endpoints live on `4miz.ir`; `id.4miz.ir` is dropped.
+**Hosting.** A dedicated domestic VM, ideally at a different provider from the Bridges. It is not a Node, and its IP never carries a Link. Panel, API, and Agent endpoints live on `wayfinder.ir`; `id.wayfinder.ir` is dropped.
 
 **Data minimisation** (this is the condition for domestic hosting):
 - User: a display handle and credentials only. No email, phone, or real name. An Admin delivers Invites out of band, for example on Telegram.

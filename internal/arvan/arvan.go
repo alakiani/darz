@@ -31,7 +31,7 @@ func NormalizeKey(s string) string {
 type Client struct {
 	BaseURL string // DefaultBaseURL if empty
 	APIKey  string // needs DNS administrator rights on the zone
-	Zone    string // such as 4miz.ir
+	Zone    string // such as wayfinder.ir
 	// TTL is the records' TTL in seconds: the lowest ArvanCloud allows,
 	// targeting 60 s (ADR 0005).
 	TTL  int

@@ -7,10 +7,10 @@ ways_release_dir: "{{ ways_home }}/releases/{{ ways_release }}"
 
 # The Admin API as the laptop reaches it, and the CA it trusts there:
 # empty for the public CAs.
-ways_api_url: https://4miz.ir
+ways_api_url: https://wayfinder.ir
 ways_api_ca_path: ""
 # What Agents dial (ADR 0002); they trust only the pinned Coordinator CA.
-ways_agent_coordinators: https://4miz.ir:8443
+ways_agent_coordinators: https://wayfinder.ir:8443
 
 # chrony keeps Node clocks right; containers in the deploy test can't run it.
 ways_chrony: true

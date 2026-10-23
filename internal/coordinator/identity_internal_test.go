@@ -459,7 +459,7 @@ func TestAdminUserOperations(t *testing.T) {
 
 	var inv protocol.IssuedInvite
 	admin.must(200, "POST", "/v1/admin/invites", protocol.CreateInvite{DeviceCap: 1}, &inv)
-	if !strings.HasPrefix(inv.URL, "https://4miz.ir/#/invite/") || !strings.HasSuffix(inv.URL, inv.Token) {
+	if !strings.HasPrefix(inv.URL, "https://wayfinder.ir/#/invite/") || !strings.HasSuffix(inv.URL, inv.Token) {
 		t.Errorf("invite url = %s", inv.URL)
 	}
 	admin.must(400, "POST", "/v1/admin/invites", protocol.CreateInvite{DeviceCap: -1}, nil)

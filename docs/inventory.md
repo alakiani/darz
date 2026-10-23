@@ -25,8 +25,8 @@ match). Roles say what a Node does; Tags say what it is.
 
 | Domain | Intended use | Blocked inside Iran (2026-10-14) |
 | --- | --- | --- |
-| `4miz.ir` | Main service panel | No |
-| `id.4miz.ir` | Identity provider | No |
+| `wayfinder.ir` | Main service panel | No |
+| `id.wayfinder.ir` | Identity provider | No |
 | `chaarmiz.ir` | Secondary, reserved | No |
 
 Both are `.ir` domains, registered through IRNIC and therefore under

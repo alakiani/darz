@@ -18,7 +18,7 @@ changes nothing. Both first check every file of the release against its `SHA256S
 naming the bad files, if a download was cut off or damaged. `WAYS_RELEASE=v0.1.0` picks a release; the default is the newest one fetched.
 
 Grafana and Prometheus listen on the Coordinator's loopback only. Admins open Grafana through the
-panel at https://4miz.ir/grafana/ (the "Grafana" link in the admin nav), signed in with TOTP.
+panel at https://wayfinder.ir/grafana/ (the "Grafana" link in the admin nav), signed in with TOTP.
 Prometheus needs a tunnel: `ssh -L 9090:127.0.0.1:9090 ubuntu@<coordinator>`, then open
 http://127.0.0.1:9090.
 

@@ -210,7 +210,7 @@ type SlotStatus struct {
 
 // SlotTile is one Endpoint Slot.
 type SlotTile struct {
-	Name   string `json:"name"`             // such as a.4miz.ir
+	Name   string `json:"name"`             // such as a.wayfinder.ir
 	Bridge string `json:"bridge,omitempty"` // the Bridge's name; absent until one was eligible
 	// Addr is what the DNS record holds; empty while an update is due.
 	Addr     string     `json:"addr,omitempty"`
@@ -240,7 +240,7 @@ type SlotRebalance struct {
 
 // SlotMove is one Endpoint Slot moving to another Bridge.
 type SlotMove struct {
-	Slot string `json:"slot"`           // such as a.4miz.ir
+	Slot string `json:"slot"`           // such as a.wayfinder.ir
 	From string `json:"from,omitempty"` // the Bridge's name; absent for an unassigned slot
 	To   string `json:"to"`
 }

@@ -179,10 +179,10 @@ func TestRebalanceSlots(t *testing.T) {
 func TestAdminSlotRebalance(t *testing.T) {
 	a := newAPI(t)
 	ctx := context.Background()
-	dns := arvan.NewFake("key", "4miz.ir")
+	dns := arvan.NewFake("key", "wayfinder.ir")
 	srv := httptest.NewServer(dns)
 	t.Cleanup(srv.Close)
-	a.c.DNS = &arvan.Client{BaseURL: srv.URL, APIKey: "key", Zone: "4miz.ir", TTL: 120}
+	a.c.DNS = &arvan.Client{BaseURL: srv.URL, APIKey: "key", Zone: "wayfinder.ir", TTL: 120}
 
 	// Three eligible domestic Bridges, all three slots on ir1.
 	addrs := map[string]string{"ir1": "192.0.2.1", "ir2": "192.0.2.2", "ir3": "192.0.2.3"}
@@ -208,7 +208,7 @@ func TestAdminSlotRebalance(t *testing.T) {
 	a.client().must(401, "GET", "/v1/admin/slots/rebalance", nil, nil)
 
 	admin := a.admin()
-	want := []protocol.SlotMove{{Slot: "b.4miz.ir", From: "ir1", To: "ir2"}, {Slot: "c.4miz.ir", From: "ir1", To: "ir3"}}
+	want := []protocol.SlotMove{{Slot: "b.wayfinder.ir", From: "ir1", To: "ir2"}, {Slot: "c.wayfinder.ir", From: "ir1", To: "ir3"}}
 	var plan protocol.SlotRebalance
 	admin.must(200, "GET", "/v1/admin/slots/rebalance", nil, &plan)
 	if !slices.Equal(plan.Moves, want) || plan.Note == "" {
@@ -248,7 +248,7 @@ func TestAdminSlotRebalance(t *testing.T) {
 		t.Errorf("moved after = %+v", moved)
 	}
 	slots, _ := a.s.EndpointSlots(ctx)
-	if i := slices.IndexFunc(slots, func(e store.EndpointSlot) bool { return e.Repoints != 0 && e.Name == "a.4miz.ir" }); i >= 0 {
+	if i := slices.IndexFunc(slots, func(e store.EndpointSlot) bool { return e.Repoints != 0 && e.Name == "a.wayfinder.ir" }); i >= 0 {
 		t.Errorf("slot a was re-pointed: %+v", slots[i])
 	}
 }

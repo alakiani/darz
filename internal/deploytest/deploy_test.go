@@ -4,7 +4,7 @@
 // scripts/build-release.sh.
 //
 // It needs Docker, ansible-playbook, the wireguard module loaded on the host,
-// 4miz.ir resolving to coordIP, and two releases under WAYS_DEPLOY_RELEASES
+// wayfinder.ir resolving to coordIP, and two releases under WAYS_DEPLOY_RELEASES
 // named ci-1 and ci-2. CI's deploy job sets all of that up; elsewhere the
 // test skips unless WAYS_DEPLOY_TEST=1.
 package deploytest
@@ -71,15 +71,15 @@ func TestDeploy(t *testing.T) {
 			t.Fatalf("no release %s under WAYS_DEPLOY_RELEASES=%q", v, releases)
 		}
 	}
-	if addrs, _ := net.LookupHost("4miz.ir"); len(addrs) != 1 || addrs[0] != coordIP {
-		t.Fatalf("4miz.ir resolves to %v; point it at %s in /etc/hosts", addrs, coordIP)
+	if addrs, _ := net.LookupHost("wayfinder.ir"); len(addrs) != 1 || addrs[0] != coordIP {
+		t.Fatalf("wayfinder.ir resolves to %v; point it at %s in /etc/hosts", addrs, coordIP)
 	}
 
 	f := newFleet(t, releases)
 
 	// A fresh Coordinator VM.
 	out := f.ansible(t, "ci-1", "coordinator.yml")
-	invite := regexp.MustCompile(`https://4miz\.ir/#/invite/([A-Za-z0-9_-]+)`).FindStringSubmatch(out)
+	invite := regexp.MustCompile(`https://wayfinder\.ir/#/invite/([A-Za-z0-9_-]+)`).FindStringSubmatch(out)
 	if invite == nil {
 		t.Fatalf("coordinator.yml printed no first Admin Invite")
 	}
@@ -194,13 +194,13 @@ func newFleet(t *testing.T, releases string) *fleet {
 	pub, err := os.ReadFile(f.key + ".pub")
 	must(t, err)
 
-	// The public certificate for 4miz.ir, from a CA the laptop trusts here.
+	// The public certificate for wayfinder.ir, from a CA the laptop trusts here.
 	f.apiCA = filepath.Join(dir, "api-ca.crt")
 	certFile, keyFile := filepath.Join(dir, "tls.crt"), filepath.Join(dir, "tls.key")
 	caPEM := writeTLS(t, f.apiCA, certFile, keyFile)
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(caPEM)
-	f.admin = &testutil.AdminClient{URL: "https://4miz.ir", Client: &http.Client{
+	f.admin = &testutil.AdminClient{URL: "https://wayfinder.ir", Client: &http.Client{
 		Timeout: 10 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}}}
 
 	backupKey, err := age.GenerateX25519Identity()
@@ -218,7 +218,7 @@ func newFleet(t *testing.T, releases string) *fleet {
 		name := "ways-" + h.name
 		exec.Command("docker", "rm", "-f", name).Run()
 		run(t, "docker", "run", "-d", "--privileged", "--name", name, "--hostname", h.name,
-			"--network", network, "--ip", h.ip, "--add-host", "4miz.ir:"+coordIP,
+			"--network", network, "--ip", h.ip, "--add-host", "wayfinder.ir:"+coordIP,
 			"--tmpfs", "/run", "--tmpfs", "/run/lock", image)
 		t.Cleanup(func() {
 			if t.Failed() {
@@ -364,7 +364,7 @@ func (f *fleet) eventually(t *testing.T, h host, script, what string) {
 	})
 }
 
-// writeTLS issues a certificate for 4miz.ir from a fresh CA and returns the
+// writeTLS issues a certificate for wayfinder.ir from a fresh CA and returns the
 // CA's PEM.
 func writeTLS(t *testing.T, caFile, certFile, keyFile string) []byte {
 	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -378,8 +378,8 @@ func writeTLS(t *testing.T, caFile, certFile, keyFile string) []byte {
 	must(t, err)
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	must(t, err)
-	tmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: "4miz.ir"},
-		DNSNames: []string{"4miz.ir"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour),
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: "wayfinder.ir"},
+		DNSNames: []string{"wayfinder.ir"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour),
 		KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, caCert, &key.PublicKey, caKey)
 	must(t, err)
@@ -407,7 +407,7 @@ func must(t *testing.T, err error) {
 }
 
 // grafanaThroughThePanel redeems the first Admin's Invite, turns TOTP on,
-// and opens the Mesh dashboard at https://4miz.ir/grafana/ as that Admin
+// and opens the Mesh dashboard at https://wayfinder.ir/grafana/ as that Admin
 // (ADR 0006); signed out, /grafana/ sends the browser to the panel.
 func (f *fleet) grafanaThroughThePanel(t *testing.T, invite string) {
 	t.Helper()

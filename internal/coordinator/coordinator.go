@@ -87,7 +87,7 @@ type Coordinator struct {
 func New(s *store.Store, c *ca.CA, log *slog.Logger) *Coordinator {
 	return &Coordinator{store: s, ca: c, log: log, LongPoll: 60 * time.Second,
 		LinkTiming: protocol.DefaultLinkTiming, Egress: DefaultEgressTargets, Upstreams: DefaultUpstreams, Scoring: protocol.DefaultScoring,
-		PanelURL: "https://4miz.ir", EndpointSlots: DefaultEndpointSlots, Slots: DefaultSlotSettings, SecureCookies: true,
+		PanelURL: "https://wayfinder.ir", EndpointSlots: DefaultEndpointSlots, Slots: DefaultSlotSettings, SecureCookies: true,
 		Monitor: DefaultMonitorSettings, Backup: DefaultBackupSettings, mon: monitorState{poke: make(chan struct{}, 1)},
 		FeedURL: irfeed.DefaultURL, RIPEstatURL: irfeed.DefaultRIPEstatURL, HTTPClient: http.DefaultClient,
 		slots:   slotState{probes: map[string]protocol.ProbeResult{}, inelSince: map[string]time.Time{}, reasons: map[string][]string{}},

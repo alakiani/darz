@@ -8,9 +8,9 @@ const cfg = {
   bridge_public_key: "BRIDGEKEY=",
   allowed_ips: ["0.0.0.0/0", "::/0"],
   endpoints: [
-    { label: "Main", host: "b.4miz.ir", port: 61873 },
-    { label: "Backup 1", host: "c.4miz.ir", port: 61873 },
-    { label: "Backup 2", host: "a.4miz.ir", port: 61873 },
+    { label: "Main", host: "b.wayfinder.ir", port: 61873 },
+    { label: "Backup 1", host: "c.wayfinder.ir", port: 61873 },
+    { label: "Backup 2", host: "a.wayfinder.ir", port: 61873 },
   ],
 };
 
@@ -27,10 +27,10 @@ describe("config files", () => {
         "[Peer]\n" +
         "PublicKey = BRIDGEKEY=\n" +
         "AllowedIPs = 0.0.0.0/0, ::/0\n" +
-        "Endpoint = b.4miz.ir:61873\n" +
+        "Endpoint = b.wayfinder.ir:61873\n" +
         "PersistentKeepalive = 25\n",
     );
-    expect(files[2].text).toContain("Endpoint = a.4miz.ir:61873\n");
+    expect(files[2].text).toContain("Endpoint = a.wayfinder.ir:61873\n");
   });
 
   it("names tunnels within the Android app's 15 characters", () => {

@@ -118,7 +118,7 @@ jobs:
         run: |
           sudo modprobe wireguard
           sudo modprobe ip_gre
-          echo "172.30.0.10 4miz.ir" | sudo tee -a /etc/hosts
+          echo "172.30.0.10 wayfinder.ir" | sudo tee -a /etc/hosts
 
       - name: Test the playbooks
         env:

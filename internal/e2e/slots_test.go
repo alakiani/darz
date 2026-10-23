@@ -193,7 +193,7 @@ func TestRebalanceSlots(t *testing.T) {
 	if got := admin.Do(t, "GET", "/v1/admin/slots/rebalance", nil, &plan); got != 200 {
 		t.Fatalf("GET rebalance: %d", got)
 	}
-	want := []protocol.SlotMove{{Slot: "b.4miz.ir", From: "ir1", To: "ir2"}, {Slot: "c.4miz.ir", From: "ir1", To: "ir3"}}
+	want := []protocol.SlotMove{{Slot: "b.wayfinder.ir", From: "ir1", To: "ir2"}, {Slot: "c.wayfinder.ir", From: "ir1", To: "ir3"}}
 	if !slices.Equal(plan.Moves, want) {
 		t.Fatalf("plan = %+v", plan)
 	}
@@ -299,13 +299,13 @@ func startSlotLab(t *testing.T, ctx context.Context, bridges ...string) *slotLab
 	dumpNetOnFailure(t, l, bridges...)
 
 	// ArvanCloud, faked, with the zone's records still on placeholders.
-	dns := arvan.NewFake("lab-key", "4miz.ir")
+	dns := arvan.NewFake("lab-key", "wayfinder.ir")
 	for _, s := range []string{"a", "b", "c"} {
 		dns.Put(s, "192.0.2.1")
 	}
 	api := httptest.NewServer(dns)
 	t.Cleanup(api.Close)
-	co.c.DNS = &arvan.Client{BaseURL: api.URL, APIKey: "lab-key", Zone: "4miz.ir", TTL: 120}
+	co.c.DNS = &arvan.Client{BaseURL: api.URL, APIKey: "lab-key", Zone: "wayfinder.ir", TTL: 120}
 	co.c.Slots.ProbeEvery = 2 * time.Second // ADR 0005's 15 s, shortened; the 60 s stays
 	co.c.Slots.ProbeHostname = "check.abroad"
 	co.c.Slots.Enter = l.Node("coord").Do // the probe dials from the Coordinator host

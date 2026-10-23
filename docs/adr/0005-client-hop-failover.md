@@ -16,7 +16,7 @@ Failures of a Bridge's Links or Exits that the mesh can route around (ADR 0004) 
 
 ## Endpoint Slots
 
-- **Three slots, all domestic:** `a.4miz.ir`, `b.4miz.ir`, `c.4miz.ir`. No abroad Bridge ever faces Devices; abroad Nodes holding the Bridge Role serve only as transit inside the mesh. **Accepted cost:** if every domestic Bridge is unreachable, Devices have no fallback.
+- **Three slots, all domestic:** `a.wayfinder.ir`, `b.wayfinder.ir`, `c.wayfinder.ir`. No abroad Bridge ever faces Devices; abroad Nodes holding the Bridge Role serve only as transit inside the mesh. **Accepted cost:** if every domestic Bridge is unreachable, Devices have no fallback.
 - **Slots are global, not per Device.** Each Device resolves the same three names before its tunnel is up, through the ISP's plaintext DNS. Per-Device names would tag a Device to the filter on every connect.
 - **Rotation balances load.** At issuance, a Device's configs are labelled Main, Backup 1, and Backup 2, rotated across the slots by Device id (Main is slot `id mod 3`, followed by the next two). Labels are fixed once issued; rebalancing later is done by re-pointing slots.
 - **Assignment:** the slots point at different domestic Bridges whenever enough are eligible. With two domestic Bridges, `c` shares one with `a` or `b` until a third exists. When a Bridge fails, its slots move to surviving Bridges, so several slots may share one.

@@ -87,7 +87,7 @@ func TestServerCertCoversItsHosts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tc, err := c.ServerCert([]string{"4miz.ir", "10.200.1.2"}, time.Now())
+	tc, err := c.ServerCert([]string{"wayfinder.ir", "10.200.1.2"}, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestServerCertCoversItsHosts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, host := range []string{"4miz.ir", "10.200.1.2"} {
+	for _, host := range []string{"wayfinder.ir", "10.200.1.2"} {
 		if _, err := cert.Verify(x509.VerifyOptions{DNSName: host, Roots: c.Pool()}); err != nil {
 			t.Errorf("server cert for %s: %v", host, err)
 		}

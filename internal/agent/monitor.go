@@ -146,7 +146,7 @@ func only(name string, next http.HandlerFunc) http.Handler {
 func (a *agent) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	var h protocol.Health
 	if rep, ok := a.cfg.Applier.(Reporter); ok {
-		rep.Report(&h)
+		rep.Report(r.Context(), &h)
 	}
 	a.mu.Lock()
 	st, current, lastContact, failures := a.state, a.current, a.lastContact, a.applyFailures

@@ -459,7 +459,7 @@ func LinkTable(linkID uint64) string { return linkTable(linkID) }
 
 // Report adds the Link key, the listener's choices and Link health to a
 // health report.
-func (m *Manager) Report(h *protocol.Health) {
+func (m *Manager) Report(_ context.Context, h *protocol.Health) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := time.Now()

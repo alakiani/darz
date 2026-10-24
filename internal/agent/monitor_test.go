@@ -27,7 +27,7 @@ import (
 // writes a data plane metric, like the real Link layer and data plane.
 type reporting struct{ applier }
 
-func (r *reporting) Report(h *protocol.Health) {
+func (r *reporting) Report(_ context.Context, h *protocol.Health) {
 	h.Links = append(h.Links, protocol.LinkHealth{LinkID: 7, Up: true, Transport: protocol.TransportAmneziaWG, RTTMillis: 42, Loss: 0.1})
 	h.Paths = append(h.Paths, protocol.RuleHealth{RuleID: 2, Mode: "direct", Shares: map[string]int{"link:7": 64}, Eligible: 1})
 	hour := time.Now().Add(-5 * time.Hour).Truncate(time.Hour).Unix()

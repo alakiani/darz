@@ -110,7 +110,7 @@ func TestMeterKeepsBucketsOnDiskUntilAcked(t *testing.T) {
 		t.Fatal(err)
 	}
 	sent := m2.report(100)
-	if len(sent) != 2 || sent[0].Up != 100 || sent[1].Up != 60 {
+	if len(sent) != 2 || sent[0].Up != 60 || sent[1].Up != 100 {
 		t.Fatalf("after restart: %+v", sent)
 	}
 	// Acknowledged closed hours go; the open hour stays, to be resent as it grows.
@@ -144,6 +144,35 @@ func TestMeterCapsReportsAndForgetsAfterThirtyDays(t *testing.T) {
 	}
 	if got[0].Hour > got[1].Hour {
 		t.Error("oldest buckets should go first")
+	}
+}
+
+func TestMeterSendsTheOpenHourBeforeTheBacklog(t *testing.T) {
+	now := time.Date(2026, 10, 1, 0, 30, 0, 0, time.UTC)
+	m := newMeter(t, &now)
+	c := &fakeCounters{}
+	for h := 0; h < 30; h++ {
+		c.up = []counterElem{{"10.77.0.2", linkMark(4), uint64(10 * (h + 1))}, {"10.77.0.3", linkMark(4), uint64(5 * (h + 1))}}
+		m.collect(c.read, exitOf)
+		now = now.Add(time.Hour)
+	}
+	open := now.Add(-time.Hour).Truncate(time.Hour).Unix() // the last collection's hour
+	now = now.Add(-time.Hour)                              // still in it
+
+	got := m.report(10)
+	if len(got) != 10 {
+		t.Fatalf("report of %d buckets, want the cap of 10", len(got))
+	}
+	if got[0].Hour != open || got[1].Hour != open {
+		t.Fatalf("report starts with hours %d and %d, want the open hour %d for both Devices", got[0].Hour, got[1].Hour, open)
+	}
+	if first := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC).Unix(); got[2].Hour != first {
+		t.Errorf("the backlog starts at hour %d, want the oldest, %d", got[2].Hour, first)
+	}
+	for i := 3; i < len(got); i++ {
+		if got[i].Hour < got[i-1].Hour {
+			t.Fatalf("the backlog is not oldest first: %d after %d", got[i].Hour, got[i-1].Hour)
+		}
 	}
 }
 

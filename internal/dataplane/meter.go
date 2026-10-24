@@ -1,6 +1,7 @@
 package dataplane
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -165,15 +166,26 @@ func (m *meter) save() error {
 	return os.Rename(tmp, m.path)
 }
 
-// report returns up to max buckets, oldest first, the open hour included.
+// report returns up to max buckets: the open hour first, so current usage
+// is never stuck behind a backlog (ADR 0010), then the backlog, oldest
+// first.
 func (m *meter) report(max int) []protocol.UsageBucket {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	open := m.now().UTC().Truncate(time.Hour).Unix()
 	hours := make([]int64, 0, len(m.state.Buckets))
 	for h := range m.state.Buckets {
 		hours = append(hours, h)
 	}
-	slices.Sort(hours)
+	slices.SortFunc(hours, func(a, b int64) int {
+		if (a == open) != (b == open) {
+			if a == open {
+				return -1
+			}
+			return 1
+		}
+		return cmp.Compare(a, b)
+	})
 	var out []protocol.UsageBucket
 	for _, h := range hours {
 		keys := make([]string, 0, len(m.state.Buckets[h]))

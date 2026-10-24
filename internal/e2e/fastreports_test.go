@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -109,6 +110,15 @@ func (tp *healthTap) from(addr string) []tappedReport {
 		}
 	}
 	return out
+}
+
+// logged counts the lines in the Agent's log that contain msg.
+func (a *agentProc) logged(msg string) int {
+	b, err := os.ReadFile(a.log.Name())
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	return strings.Count(string(b), msg)
 }
 
 // stateDir is where a lab Agent keeps its state.
@@ -301,7 +311,14 @@ func TestFastUsageReports(t *testing.T) {
 		if err := os.WriteFile(path, b, 0o600); err != nil {
 			t.Fatal(err)
 		}
+		reapplied := ag.logged("re-applied persisted snapshot")
 		ag.start()
+		// Bytes sent while the restarted Agent rebuilds its tunnels and
+		// ruleset may never be forwarded, or be counted under the ruleset
+		// it is replacing; send once it is back.
+		testutil.Eventually(t, 30*time.Second, "the restarted Bridge re-applies its snapshot", func() bool {
+			return ag.logged("re-applied persisted snapshot") > reapplied
+		})
 
 		p.send("93.184.215.14:9", count, size)
 		sentHour := time.Now().UTC().Truncate(time.Hour).Unix()
@@ -355,7 +372,6 @@ func TestFastUsageReports(t *testing.T) {
 					r.at.Format("15:04:05.000"), r.status, r.failed, len(r.health.Usage), old, oldBytes, openBytes)
 			}
 			if u, err := co.store.Usage(ctx, dev.ID); err == nil {
-				t.Logf("Coordinator: hourly %+v", u.Hourly)
 				t.Logf("Coordinator: monthly %+v", u.Monthly)
 			}
 			t.Logf("open hour before the outage: %+v", openBefore)

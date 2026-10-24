@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { InviteRecord } from "./api";
-import { parseGB, rateOf } from "./quota";
+import { parseGB, presetsText, rateOf } from "./quota";
 
 // Invites: create with a cap, list, withdraw (issue #14). A new User's
 // Invite may preset their Quota, running-out setting and Refills (ADR 0010).
@@ -82,6 +82,7 @@ export function InvitesScreen() {
             <th>Created</th>
             <th>Kind</th>
             <th>For</th>
+            <th>Presets</th>
             <th>Status</th>
             <th />
           </tr>
@@ -96,6 +97,7 @@ export function InvitesScreen() {
                 {i.device_cap ? `, cap ${i.device_cap}` : ""}
               </td>
               <td>{i.handle}</td>
+              <td className="presets">{presetsText(i)}</td>
               <td className="status">{i.status}</td>
               <td>
                 {i.status === "open" && (

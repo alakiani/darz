@@ -69,20 +69,20 @@ export const fa = {
     "اگر تونل «وصل» است ولی چیزی باز نمی‌شود، تونل را یک بار خاموش و روشن کنید (حدود ۱ تا ۳ دقیقه). اگر نشد، به «پشتیبان ۱» و سپس «پشتیبان ۲» بروید؛ معمولاً در چند ثانیه درست می‌شود.",
 
   // Usage and Quota (ADR 0010). A Reset and a redeemed Refill both read as
-  // «شارژ»; a Top-up as «افزوده».
+  // «ریست»; a Top-up as «افزوده».
   quotaTitle: "سهمیهٔ این دوره",
   usedOf: (used: string, quota: string) => `${used} از ${quota} مصرف شده`,
   usedUnlimited: (used: string) => `${used} مصرف شده · سهمیهٔ نامحدود`,
-  remedy: { "top-up": "افزوده", reset: "شارژ" } as Record<string, string>,
+  remedy: { "top-up": "افزوده", reset: "ریست" } as Record<string, string>,
   renewsOn: (date: string) => `دورهٔ بعد ${date} شروع می‌شود`,
   quotaWarning: "دست‌کم ۸۰٪ سهمیهٔ این دوره را مصرف کرده‌اید.",
   quotaOutBlock: (date: string) => `سهمیهٔ این دوره تمام شده و دستگاه‌هایتان تا ${date} وصل نمی‌شوند.`,
   quotaOutSlow: (date: string) => `سهمیهٔ این دوره تمام شده و تا ${date} سرعت دستگاه‌هایتان کم شده است.`,
-  refillsHeld: (n: number, date: string) => `${n.toLocaleString("fa-IR")} شارژ دارید؛ نزدیک‌ترین انقضا ${date}.`,
-  redeem: "استفاده از یک شارژ",
-  redeemConfirm: (adds: string) => `این شارژ همین حالا ${adds} به سهمیهٔ این دوره اضافه می‌کند. استفاده می‌کنید؟`,
-  redeemNothing: "سهمیهٔ این دوره هنوز پر است و این شارژ چیزی اضافه نمی‌کند. باز هم استفاده می‌کنید؟",
-  refillGone: "این شارژ منقضی شده یا دیگر در دسترس نیست.",
+  refillsHeld: (n: number, date: string) => `${n.toLocaleString("fa-IR")} ریست دارید؛ نزدیک‌ترین انقضا ${date}.`,
+  redeem: "استفاده از یک ریست",
+  redeemConfirm: (adds: string) => `این ریست همین حالا ${adds} به سهمیهٔ این دوره اضافه می‌کند. استفاده می‌کنید؟`,
+  redeemNothing: "سهمیهٔ این دوره هنوز پر است و این ریست چیزی اضافه نمی‌کند. باز هم استفاده می‌کنید؟",
+  refillGone: "این ریست منقضی شده یا دیگر در دسترس نیست.",
   usageDetails: "جزئیات مصرف",
   usageTitle: "مصرف در هر دوره",
   dates: "تاریخ",

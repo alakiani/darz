@@ -591,7 +591,7 @@ func (c *Coordinator) userInfo(r *http.Request, a store.Account) (protocol.UserI
 	q, err := c.store.QuotaStanding(r.Context(), a.ID)
 	u := protocol.UserInfo{Refills: refills, ID: a.ID, Handle: a.Handle, Admin: a.Admin, Suspended: a.Suspended,
 		TOTPEnabled: a.TOTPSecret != "", DeviceCap: a.DeviceCap, DeviceCount: activeCount(devs),
-		PeriodBytes: q.Usage, Quota: a.Quota, RenewalDay: q.RenewalDay, RenewsAt: q.Period.End, RunningOut: protocol.RunningOutBlock}
+		PeriodBytes: q.Usage, PeriodRemedies: q.Remedies, Quota: a.Quota, RenewalDay: q.RenewalDay, RenewsAt: q.Period.End, RunningOut: protocol.RunningOutBlock}
 	if a.SlowRate > 0 {
 		u.RunningOut, u.Rate = protocol.RunningOutSlow, a.SlowRate
 	}

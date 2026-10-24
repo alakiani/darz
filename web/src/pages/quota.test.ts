@@ -40,6 +40,6 @@ describe("remediesText", () => {
       { kind: "reset", bytes: 2e9, at: "2026-10-16T00:00:00Z" },
       { kind: "top-up", bytes: 1e9, at: "2026-10-17T00:00:00Z" },
     ]).current;
-    expect(remediesText(p)).toBe("+ ۲ GB افزوده، + ۲ GB شارژ");
+    expect(remediesText(p)).toBe("+ ۲ GB افزوده، + ۲ GB ریست");
   });
 });

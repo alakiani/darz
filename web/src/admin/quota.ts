@@ -6,21 +6,43 @@ const GB = 1e9;
 /** Bytes per second in one Mbit/s. */
 const MBIT = 125_000;
 
-type Usage = { period_bytes: number; quota?: number | null };
+/** period_remedies is the bytes this period's Top-ups and Resets added. */
+type Usage = { period_bytes: number; quota?: number | null; period_remedies?: number };
 
-/** "3.2 / 5 GB", or "3.2 GB · ∞" when the Quota is unlimited. */
+/** "3.2 / 5 GB", "3.2 / 5 + 2 GB" with this period's Top-ups and Resets,
+ * or "3.2 GB · ∞" when the Quota is unlimited. */
 export function periodText(u: Usage): string {
   if (u.quota == null) return `${bytes(u.period_bytes)} · ∞`;
-  return `${(u.period_bytes / GB).toFixed(1)} / ${gbField(u.quota)} GB`;
+  const remedies = gbField(u.period_remedies ?? 0);
+  return `${(u.period_bytes / GB).toFixed(1)} / ${gbField(u.quota)}${remedies === "0" ? "" : ` + ${remedies}`} GB`;
 }
 
-/** Highest share of Quota used first; unlimited Users last, by bytes used. */
+/** Highest share of Quota used first, against the Quota plus this period's
+ * Top-ups and Resets; nothing to use counts as fully used. Unlimited Users
+ * last, by bytes used; ties by handle. */
 export function byQuotaShare(a: Usage & { handle: string }, b: Usage & { handle: string }): number {
-  const share = (u: Usage) => (u.quota == null ? -1 : u.quota > 0 ? u.period_bytes / u.quota : Infinity);
+  const share = (u: Usage) => {
+    if (u.quota == null) return -1;
+    const may = u.quota + (u.period_remedies ?? 0);
+    return may > 0 ? u.period_bytes / may : Infinity;
+  };
   const [x, y] = [share(a), share(b)];
   if (x !== y) return y - x;
   if (x === -1 && a.period_bytes !== b.period_bytes) return b.period_bytes - a.period_bytes;
   return a.handle.localeCompare(b.handle);
+}
+
+type Presets = { kind: string; quota?: number | null; running_out?: string; rate?: number; refills?: number; refill_days?: number };
+
+/** What a new-User Invite presets: "5 GB · Slow 2 Mbit/s · 2 Refills / 60 d",
+ * or "Unlimited". A recovery Invite presets nothing. */
+export function presetsText(i: Presets): string {
+  if (i.kind !== "new") return "";
+  const parts = [];
+  if (i.quota == null) parts.push("Unlimited");
+  else parts.push(`${gbField(i.quota)} GB`, i.running_out === "slow" ? `Slow ${mbits(i.rate ?? 0)} Mbit/s` : "Block");
+  if (i.refills) parts.push(`${i.refills} ${i.refills === 1 ? "Refill" : "Refills"} / ${i.refill_days} d`);
+  return parts.join(" · ");
 }
 
 /** A Quota as a GB field's value; empty is unlimited. */

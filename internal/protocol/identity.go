@@ -158,16 +158,15 @@ type UserInfo struct {
 	TOTPEnabled bool   `json:"totp_enabled"`
 	DeviceCap   int    `json:"device_cap"`
 	DeviceCount int    `json:"device_count"`
-	// MonthBytes is the User's total this calendar month: Admins see
-	// totals per User, not per Device.
-	MonthBytes uint64 `json:"month_bytes"`
 	// PeriodBytes is the User's Usage in their current Quota Period, revoked
-	// Devices included (ADR 0010).
+	// Devices included (ADR 0010): Admins see totals per User, not per
+	// Device.
 	PeriodBytes uint64 `json:"period_bytes"`
 	// Quota is the bytes, up and down together, the User may move in one
 	// Quota Period; null is unlimited.
 	Quota      *uint64    `json:"quota"`
 	RenewalDay int        `json:"renewal_day"` // the day of the month their Quota Periods start, 1–31
+	RenewsAt   time.Time  `json:"renews_at"`   // when the current Quota Period ends and the next starts
 	RunningOut RunningOut `json:"running_out"`
 	Rate       uint64     `json:"rate,omitempty"` // when slow: bytes per second
 	Refills    int        `json:"refills"`        // Refills held: not redeemed and not expired

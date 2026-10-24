@@ -10,11 +10,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/alakiani/ways/internal/auth"
 	"github.com/alakiani/ways/internal/lab"
@@ -24,7 +27,8 @@ import (
 
 // TestAdminPanel is session 9's "proves in the lab" test: a browser walks
 // every admin screen against a live lab mesh, and every change it makes
-// shows in the Coordinator.
+// shows in the Coordinator. Quota session 7 added the Users table's Quota
+// columns, remedies and order, and the Invite form's presets (ADR 0010).
 func TestAdminPanel(t *testing.T) {
 	binDir(t)
 	script, _ := filepath.Abs("../../web/e2e/admin.mjs")
@@ -84,6 +88,36 @@ func TestAdminPanel(t *testing.T) {
 		}
 	}
 
+	// Three more Users with Usage this Quota Period (ADR 0010): sara has
+	// used 80% of her Quota, omid 50%, and nima has no Quota.
+	for _, u := range []struct {
+		handle string
+		quota  uint64
+		used   uint64
+	}{{"sara", 10e9, 8e9}, {"omid", 2e9, 1e9}, {"nima", 0, 3e9}} {
+		tok, _, _ := co.store.CreateInvite(ctx, store.Invite{Kind: "new"}, time.Hour)
+		acct, err := co.store.AcceptNewInvite(ctx, tok, u.handle, hash)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if u.quota > 0 {
+			if err := co.store.SetQuota(ctx, acct.ID, store.QuotaSetting{Quota: &u.quota}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		key, _ := wgtypes.GeneratePrivateKey()
+		dev, err := co.store.AddDevice(ctx, acct.ID, "phone", key.PublicKey().String(), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		hour := time.Now().UTC().Truncate(time.Hour).Unix()
+		if _, err := co.store.PutUsage(ctx, "nd_report", []protocol.UsageBucket{
+			{Hour: hour, Device: dev.Address.String(), Exit: "nd_exit", Up: u.used / 4, Down: u.used - u.used/4},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	m := &mesh{t: t, l: l, co: co, ids: map[string]string{}, agents: map[string]*agentProc{}}
 	m.startAgent("ir1", []protocol.Role{protocol.RoleBridge}, []string{"IR"})
 	m.startAgent("ab1", []protocol.Role{protocol.RoleExit}, nil)
@@ -108,6 +142,37 @@ func TestAdminPanel(t *testing.T) {
 	}
 	if _, err := co.store.AccountByHandle(ctx, "reza"); err == nil {
 		t.Error("reza was not deleted")
+	}
+
+	// The Quota set inline, and the remedies.
+	if maryam.Quota == nil || *maryam.Quota != 2.5e9 || maryam.SlowRate != 500_000 {
+		t.Errorf("maryam's Quota = %v, slow rate %d; want 2.5 GB, slowed to 4 Mbit/s", maryam.Quota, maryam.SlowRate)
+	}
+	if rs, _ := co.store.Remedies(ctx, maryam.ID); len(rs) != 1 || rs[0].Kind != store.TopUp || rs[0].Bytes != 1.5e9 {
+		t.Errorf("maryam's remedies = %+v, want a 1.5 GB Top-up", rs)
+	}
+	refills, _ := co.store.HeldRefills(ctx, maryam.ID)
+	if len(refills) != 2 {
+		t.Errorf("maryam holds %d Refills, want 2", len(refills))
+	}
+	for _, r := range refills {
+		if d := time.Until(r.ExpiresAt); d < 44*24*time.Hour || d > 45*24*time.Hour {
+			t.Errorf("a Refill expires in %v, want 45 days", d)
+		}
+	}
+	sara, _ := co.store.AccountByHandle(ctx, "sara")
+	if rs, _ := co.store.Remedies(ctx, sara.ID); len(rs) != 1 || rs[0].Kind != store.Reset || rs[0].Bytes != 8e9 {
+		t.Errorf("sara's remedies = %+v, want a Reset of 8 GB", rs)
+	}
+
+	// The Invite made with presets.
+	match := regexp.MustCompile(`preset invite: \S*/#/invite/(\S+)`).FindStringSubmatch(string(out))
+	if match == nil {
+		t.Fatal("the browser printed no preset Invite")
+	}
+	inv, err := co.store.LookupInvite(ctx, match[1])
+	if err != nil || inv.Quota == nil || *inv.Quota != 5e9 || inv.SlowRate != 250_000 || inv.Refills != 2 || inv.RefillTTL != 60*24*time.Hour {
+		t.Errorf("preset Invite = %+v, %v; want 5 GB, slow to 2 Mbit/s, 2 Refills for 60 days", inv, err)
 	}
 	invites, _ := co.store.Invites(ctx)
 	withdrawn, recovery := 0, 0

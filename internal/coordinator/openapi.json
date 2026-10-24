@@ -1692,9 +1692,6 @@
           "id": {
             "type": "string"
           },
-          "month_bytes": {
-            "type": "integer"
-          },
           "period_bytes": {
             "type": "integer"
           },
@@ -1709,6 +1706,10 @@
           },
           "renewal_day": {
             "type": "integer"
+          },
+          "renews_at": {
+            "format": "date-time",
+            "type": "string"
           },
           "running_out": {
             "type": "string"
@@ -1726,10 +1727,10 @@
           "device_count",
           "handle",
           "id",
-          "month_bytes",
           "period_bytes",
           "refills",
           "renewal_day",
+          "renews_at",
           "running_out",
           "suspended",
           "totp_enabled"

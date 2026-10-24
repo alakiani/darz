@@ -15,8 +15,10 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage();
   page.setDefaultTimeout(30_000);
-  // Typed confirmations answer with the name asked for.
-  page.on("dialog", (d) => d.accept(d.message().match(/Type "([^"]+)"/)?.[1]));
+  // Prompts answer from this queue first; typed confirmations answer with
+  // the name asked for.
+  const answers = [];
+  page.on("dialog", (d) => d.accept(answers.length ? answers.shift() : d.message().match(/Type "([^"]+)"/)?.[1]));
   const screen = async (path, heading) => {
     await page.goto(`${PANEL_URL}/#${path}`);
     await page.getByRole("heading", { name: heading, exact: true }).waitFor();
@@ -45,8 +47,20 @@ try {
   await page.locator("[data-testid=undelivered-alerts]", { hasText: "NodeUnreachable: Node ab9 is unreachable" }).waitFor();
   await page.locator("[data-testid=backup]", { hasText: "off: no age recipient configured" }).waitFor();
 
-  step("users: suspend, resume, cap, recovery Invite, delete");
+  step("users: by share of Quota used, then unlimited Users by bytes used");
   await screen("/admin/users", "Users");
+  await page.locator("[data-testid=user-sara] td.period", { hasText: "8.0 / 10 GB" }).waitFor();
+  await page.locator("[data-testid=user-nima] td.period", { hasText: "3.0 GB · ∞" }).waitFor();
+  const order = await page.locator("tbody tr").evaluateAll((rows) => rows.map((r) => r.dataset.testid));
+  const want = ["sara", "omid", "nima", "admin", "maryam", "reza"].map((h) => `user-${h}`);
+  if (order.join() !== want.join()) throw new Error(`users in the order ${order}, want ${want}`);
+  // Renews is a Gregorian date, not a day number or a Solar Hijri date.
+  const renews = await page.locator("[data-testid=user-sara] td.renews").textContent();
+  if (!/^\d{1,2} [A-Z][a-z]{2} 20\d\d$/.test(renews)) throw new Error(`Renews shows ${renews}`);
+  if (await page.locator("[data-testid=user-nima]").getByRole("button", { name: "Reset now" }).count())
+    throw new Error("an unlimited User offers Reset now");
+
+  step("users: suspend, resume, cap, recovery Invite, delete");
   const user = page.locator("[data-testid=user-maryam]");
   await user.getByRole("button", { name: "Suspend" }).click();
   await user.locator(".status", { hasText: "Suspended" }).waitFor();
@@ -60,6 +74,33 @@ try {
   await page.locator("[data-testid=user-reza]").getByRole("button", { name: "Delete" }).click();
   await page.locator("[data-testid=user-reza]").waitFor({ state: "detached" });
 
+  step("users: set a Quota inline and slow when out");
+  const quota = (r) => r.url().endsWith("/quota") && r.request().method() === "POST";
+  await user.getByLabel("Quota").fill("2.5");
+  let saved = page.waitForResponse(quota);
+  await user.getByLabel("Quota").blur();
+  await saved;
+  await user.locator("td.period", { hasText: "0.0 / 2.5 GB" }).waitFor();
+  saved = page.waitForResponse(quota);
+  await user.getByLabel("Running out").selectOption("slow");
+  await saved;
+  await user.getByLabel("Mbit/s").fill("4");
+  saved = page.waitForResponse(quota);
+  await user.getByLabel("Mbit/s").blur();
+  await saved;
+
+  step("users: Top-up, Reset now, Give Refill");
+  answers.push("1.5");
+  saved = page.waitForResponse((r) => r.url().endsWith("/top-up") && r.status() === 200);
+  await user.getByRole("button", { name: "Top-up" }).click();
+  await saved;
+  saved = page.waitForResponse((r) => r.url().endsWith("/reset") && r.status() === 200);
+  await page.locator("[data-testid=user-sara]").getByRole("button", { name: "Reset now" }).click();
+  await saved;
+  answers.push("2", "45");
+  await user.getByRole("button", { name: "Give Refill" }).click();
+  await user.locator("td.refills", { hasText: /^2$/ }).waitFor();
+
   step("invites: create and withdraw");
   await screen("/admin/invites", "Invites");
   await page.fill("input[name=cap]", "2");
@@ -68,6 +109,20 @@ try {
   const before = await page.locator("[data-testid=invite-withdrawn]").count();
   await page.locator("[data-testid=invite-open]").first().getByRole("button", { name: "Withdraw" }).click();
   await page.waitForFunction((n) => document.querySelectorAll("[data-testid=invite-withdrawn]").length > n, before);
+
+  step("invites: create one with a Quota, slow when out, and Refills");
+  if ((await page.inputValue("input[name=quota]")) !== "" || (await page.inputValue("select[name=running_out]")) !== "block" ||
+    (await page.inputValue("input[name=refills]")) !== "0" || (await page.inputValue("input[name=refill_days]")) !== "30")
+    throw new Error("the Invite form's Quota defaults are not Unlimited, Block, 0 Refills and 30 days");
+  await page.fill("input[name=quota]", "5");
+  await page.selectOption("select[name=running_out]", "slow");
+  await page.fill("input[name=mbits]", "2");
+  await page.fill("input[name=refills]", "2");
+  await page.fill("input[name=refill_days]", "60");
+  const created = page.waitForResponse((r) => r.url().endsWith("/v1/admin/invites") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Create Invite" }).click();
+  // The Go test looks the Invite up by its token.
+  console.log(`preset invite: ${(await (await created).json()).url}`);
 
   step("nodes: add with the enroll command, open a Bridge's Paths, edit, delete");
   await screen("/admin/nodes", "Nodes");

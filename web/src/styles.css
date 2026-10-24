@@ -76,6 +76,8 @@ table.matrix td.up { color: #1a7f37; }
 table.matrix td.down { color: var(--danger); }
 .actions button { margin-inline-end: 0.4rem; }
 input.cap { display: inline-block; width: 4.5rem; padding: 0.2rem 0.4rem; margin: 0; }
+select.cap { display: inline-block; width: auto; padding: 0.2rem 0.4rem; margin: 0; }
+table.list td.period, table.list td.renews { white-space: nowrap; }
 form.inline { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; }
 form.inline label { margin: 0; }
 label.check { display: inline-flex; align-items: center; gap: 0.3rem; margin-inline-end: 1rem; }

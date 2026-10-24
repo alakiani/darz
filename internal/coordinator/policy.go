@@ -152,12 +152,16 @@ func (c *Coordinator) bridgeState(ctx context.Context, quota map[string]quotaSta
 		return nil, err
 	}
 	for _, d := range devices {
-		// A throttled Device stays in; its rate reaches Bridges with the
-		// throttle itself (ADR 0010).
-		if st, _ := effectiveState(d.Revoked || d.PublicKey == "", d.UserSuspended, quota[d.UserID]); st == StateBlocked {
+		// A throttled Device stays in and carries its rate (ADR 0010).
+		st, _ := effectiveState(d.Revoked || d.PublicKey == "", d.UserSuspended, quota[d.UserID])
+		if st == StateBlocked {
 			continue
 		}
-		b.Devices = append(b.Devices, protocol.Device{PublicKey: d.PublicKey, Address: netip.PrefixFrom(d.Address, 32).String()})
+		dev := protocol.Device{PublicKey: d.PublicKey, Address: netip.PrefixFrom(d.Address, 32).String()}
+		if st == StateThrottled {
+			dev.Rate = quota[d.UserID].rate
+		}
+		b.Devices = append(b.Devices, dev)
 	}
 
 	sets, err := c.store.DestinationSets(ctx)

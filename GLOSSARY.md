@@ -67,7 +67,7 @@ A person with a WAYS account. A User owns one or more Devices.
 _Avoid_: Account, client, member
 
 **Device**:
-One WireGuard keypair and the configs that carry it, one per Endpoint Slot, issued to exactly one User. A User with three keypairs has three Devices, even on one phone. Identity and usage are tracked per Device.
+One WireGuard keypair and the configs that carry it, one per Endpoint Slot, issued to exactly one User. A User with three keypairs has three Devices, even on one phone. Usage is recorded per Device and always belongs to its User, even after the Device is revoked.
 _Avoid_: Peer, client, profile, machine
 
 **Admin**:
@@ -81,3 +81,31 @@ _Avoid_: Signup link, registration token, voucher
 **Suspended**:
 The state of a User whose Devices are cut off but not revoked, so resuming the User restores them without new configs.
 _Avoid_: Disabled, banned, frozen
+
+**Usage**:
+The bytes a Device moved, up and down, as the Coordinator records them. A User's usage is the sum over all their Devices, revoked ones included; only deleting the User erases it.
+_Avoid_: Traffic, bandwidth, consumption
+
+**Quota**:
+The bytes, up and down together, a User may move in one Quota Period, shared across all their Devices. A Quota is either a number or unlimited. A User who has used up their Quota is blocked, or slowed to a set rate if an Admin chose that for them, until the next Quota Period or until a Top-up or Reset raises what they may still use.
+_Avoid_: Limit, cap, plan, allowance
+
+**Quota Period**:
+The recurring window a Quota is counted over, one month long, starting on the User's Renewal Day. Usage counts from zero when a new one starts. Every User has Quota Periods, even with an unlimited Quota.
+_Avoid_: Billing cycle, month
+
+**Renewal Day**:
+The day of the month a User's Quota Periods start, taken from the day the User registered. In a month too short for it, the period starts on that month's last day. Changing a User's Quota never moves it.
+_Avoid_: Anchor, billing date, reset day
+
+**Top-up**:
+A fixed number of bytes an Admin adds to what a User may use in the current Quota Period only. It never changes recorded Usage.
+_Avoid_: Bonus, extra data, credit
+
+**Reset**:
+An addition to the current Quota Period equal to what the User has used so far, bringing them back to a full Quota. Recorded Usage stays as it was; only what the User may still use changes.
+_Avoid_: Clear, zero, wipe
+
+**Refill**:
+A Reset an Admin gives a User to hold and redeem themselves, until it expires. A User may hold several, and they carry across Quota Periods until redeemed or expired.
+_Avoid_: Voucher, token, coupon, reset button

@@ -162,6 +162,9 @@ type UserInfo struct {
 	// Devices included (ADR 0010): Admins see totals per User, not per
 	// Device.
 	PeriodBytes uint64 `json:"period_bytes"`
+	// PeriodRemedies is the bytes this period's Top-ups and Resets added,
+	// redeemed Refills included: the User may use Quota + PeriodRemedies.
+	PeriodRemedies uint64 `json:"period_remedies"`
 	// Quota is the bytes, up and down together, the User may move in one
 	// Quota Period; null is unlimited.
 	Quota      *uint64    `json:"quota"`

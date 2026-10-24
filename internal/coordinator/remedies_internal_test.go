@@ -50,8 +50,8 @@ func TestATopUpAndAResetUnblockWithoutChangingUsage(t *testing.T) {
 	// A Top-up brings them back at once and leaves Usage as it was.
 	var u protocol.UserInfo
 	admin.must(200, "POST", user+"/top-up", protocol.TopUp{Bytes: 500}, &u)
-	if !onBridge() || u.PeriodBytes != 1000 {
-		t.Errorf("after a Top-up: on the Bridge %v, period bytes %d", onBridge(), u.PeriodBytes)
+	if !onBridge() || u.PeriodBytes != 1000 || u.PeriodRemedies != 500 {
+		t.Errorf("after a Top-up: on the Bridge %v, period bytes %d, remedies %d", onBridge(), u.PeriodBytes, u.PeriodRemedies)
 	}
 	if got := maryam.usage(); left(got) != 500 || got.Current.Bytes != 1000 || len(got.Current.Remedies) != 1 ||
 		got.Current.Remedies[0].Kind != "top-up" || got.Current.Remedies[0].Bytes != 500 {
@@ -65,8 +65,11 @@ func TestATopUpAndAResetUnblockWithoutChangingUsage(t *testing.T) {
 
 	// Reset now brings them back to a full Quota, again without changing Usage.
 	admin.must(200, "POST", user+"/reset", nil, &u)
-	if !onBridge() || u.PeriodBytes != 1500 {
-		t.Errorf("after a Reset: on the Bridge %v, period bytes %d", onBridge(), u.PeriodBytes)
+	if !onBridge() || u.PeriodBytes != 1500 || u.PeriodRemedies != 1500 {
+		t.Errorf("after a Reset: on the Bridge %v, period bytes %d, remedies %d", onBridge(), u.PeriodBytes, u.PeriodRemedies)
+	}
+	if got := admin.userInfo(me.ID); got.PeriodRemedies != 1500 {
+		t.Errorf("the Users list shows remedies %d, want 1500", got.PeriodRemedies)
 	}
 	got := maryam.usage()
 	if left(got) != 1000 || got.Current.Bytes != 1500 || len(got.Current.Remedies) != 2 || got.Current.Remedies[1].Kind != "reset" || got.Current.Remedies[1].Bytes != 1000 {

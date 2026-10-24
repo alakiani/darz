@@ -1695,6 +1695,9 @@
           "period_bytes": {
             "type": "integer"
           },
+          "period_remedies": {
+            "type": "integer"
+          },
           "quota": {
             "type": "integer"
           },
@@ -1728,6 +1731,7 @@
           "handle",
           "id",
           "period_bytes",
+          "period_remedies",
           "refills",
           "renewal_day",
           "renews_at",

@@ -38,9 +38,9 @@ _Avoid_: Protocol, carrier, tunnel type
 An ordered chain of Links from a Bridge to an Exit that a Device's traffic follows. A Path may pass through more than one Bridge.
 _Avoid_: Route, circuit, chain
 
-**Endpoint Slot**:
-A stable hostname carried in Devices' configs that the Coordinator points at a healthy Bridge. Every Device has one config per Endpoint Slot.
-_Avoid_: Server, entry, gateway, endpoint
+**Bridge Address**:
+The one hostname in every Device's config. Each lookup of it answers with one eligible domestic Bridge, taking turns among them.
+_Avoid_: Endpoint Slot, pool, entry, gateway, endpoint
 
 **Coordinator**:
 The central service that Users, Devices, and Nodes all coordinate with. It holds identity, topology, policy, and metering, and never touches a packet on the data path.
@@ -67,7 +67,7 @@ A person with a WAYS account. A User owns one or more Devices.
 _Avoid_: Account, client, member
 
 **Device**:
-One WireGuard keypair and the configs that carry it, one per Endpoint Slot, issued to exactly one User. A User with three keypairs has three Devices, even on one phone. Usage is recorded per Device and always belongs to its User, even after the Device is revoked.
+One WireGuard keypair and the config that carries it, issued to exactly one User. A User with three keypairs has three Devices, even on one phone. Usage is recorded per Device and always belongs to its User, even after the Device is revoked.
 _Avoid_: Peer, client, profile, machine
 
 **Admin**:

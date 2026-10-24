@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { Alert, Badge, Code, Group, Paper, Stack, Table, Text, Title } from "@mantine/core";
+import { IconAlertTriangle, IconDatabaseExport, IconRss } from "@tabler/icons-react";
 import { api } from "../api/client";
 import { ago, bytes, type Overview } from "./api";
+import { ListTable, Screen } from "./ui";
 
 // The status board (variant A in the prototype): Node tiles, a Link
 // latency matrix, and the Coordinator card.
@@ -15,123 +18,185 @@ export function OverviewScreen() {
   if (!o) return null;
   const names = o.nodes.map((n) => n.name);
   const link = (a: string, b: string) => o.links.find((l) => (l.a === a && l.b === b) || (l.a === b && l.b === a));
+  const ba = o.bridge_address;
 
   return (
-    <section>
-      <h1>Overview</h1>
+    <Screen title="Overview" about="Refreshes every 5 seconds.">
       {o.undelivered_alerts.length > 0 && (
         // Alerts no Exit could relay to Telegram (ADR 0006): seen here even
         // during an international outage.
-        <div className="warning" role="alert" data-testid="undelivered-alerts">
-          <strong>
-            {o.undelivered_alerts.length} alert{o.undelivered_alerts.length > 1 && "s"} could not reach Telegram
-          </strong>
-          {o.undelivered_alerts.map((a) => (
-            <div key={a.id}>
-              <pre>{a.text}</pre>
-              <span className="muted">
-                received {ago(a.received_at)}, {a.attempts} attempt{a.attempts > 1 && "s"}: {a.last_error}
-              </span>
-            </div>
-          ))}
-        </div>
+        <Alert
+          color="red"
+          icon={<IconAlertTriangle />}
+          data-testid="undelivered-alerts"
+          title={`${o.undelivered_alerts.length} alert${o.undelivered_alerts.length > 1 ? "s" : ""} could not reach Telegram`}
+        >
+          <Stack gap="sm">
+            {o.undelivered_alerts.map((a) => (
+              <div key={a.id}>
+                <Code block>{a.text}</Code>
+                <Text fz="xs" c="dimmed" mt={4}>
+                  received {ago(a.received_at)}, {a.attempts} attempt{a.attempts > 1 && "s"}: {a.last_error}
+                </Text>
+              </div>
+            ))}
+          </Stack>
+        </Alert>
       )}
+
       <div className="tiles">
-        {o.nodes.map((n) => (
-          <a key={n.id} className="tile" href={`#/admin/nodes/${n.id}`} data-testid={`node-${n.name}`}>
-            <strong>{n.name}</strong>
-            <span>{n.roles.join(" + ")}</span>
-            <span>{n.tags.length ? n.tags.join(", ") : "no tags"}</span>
-            <span className={n.last_contact ? "" : "error"}>contact {ago(n.last_contact)}</span>
-            <span>
-              snapshot {n.applied_version}/{n.latest_version}
-              {n.applied_version !== n.latest_version && " (behind)"}
-            </span>
-            {n.agent_version && <span>agent {n.agent_version}</span>}
-            {n.addr && n.seen_addr && n.addr !== n.seen_addr && (
-              <span className="error">
-                says {n.addr}, seen as {n.seen_addr}
-              </span>
-            )}
-          </a>
-        ))}
+        {o.nodes.map((n) => {
+          const behind = n.applied_version !== n.latest_version;
+          return (
+            <Paper key={n.id} component="a" className="tile" href={`#/admin/nodes/${n.id}`} data-testid={`node-${n.name}`}>
+              <Group justify="space-between" wrap="nowrap">
+                <Text fw={700}>{n.name}</Text>
+                <Group gap={4} wrap="nowrap">
+                  {n.roles.map((r) => (
+                    <Badge key={r} size="xs" variant="light" color={r === "bridge" ? "violet" : "cyan"}>
+                      {r}
+                    </Badge>
+                  ))}
+                </Group>
+              </Group>
+              <Text fz="xs" c="dimmed">
+                {n.tags.length ? n.tags.join(", ") : "no tags"}
+              </Text>
+              <Text fz="sm" c={n.last_contact ? undefined : "red"}>
+                contact {ago(n.last_contact)}
+              </Text>
+              <Text fz="sm" c={behind ? "orange" : undefined}>
+                snapshot {n.applied_version}/{n.latest_version}
+                {behind && " (behind)"}
+              </Text>
+              {n.agent_version && (
+                <Text fz="xs" c="dimmed">
+                  agent {n.agent_version}
+                </Text>
+              )}
+              {n.addr && n.seen_addr && n.addr !== n.seen_addr && (
+                <Text fz="xs" c="red">
+                  says {n.addr}, seen as {n.seen_addr}
+                </Text>
+              )}
+            </Paper>
+          );
+        })}
       </div>
 
-      <h2>Link latency</h2>
-      <table className="matrix" data-testid="link-matrix">
-        <thead>
-          <tr>
-            <th />
+      <Title order={2} size="h4">
+        Link latency
+      </Title>
+      <ListTable className="matrix" data-testid="link-matrix" minWidth={names.length * 96 + 96} highlightOnHover={false} withColumnBorders>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th />
             {names.map((n) => (
-              <th key={n}>{n}</th>
+              <Table.Th key={n}>{n}</Table.Th>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
           {names.map((a) => (
-            <tr key={a}>
-              <th>{a}</th>
+            <Table.Tr key={a}>
+              <Table.Th>{a}</Table.Th>
               {names.map((b) => {
                 const l = a === b ? undefined : link(a, b);
-                if (!l) return <td key={b} />;
+                if (!l) return <Table.Td key={b} />;
                 const up = l.up_a || l.up_b;
                 return (
-                  <td key={b} className={up ? "up" : "down"} title={l.transport}>
+                  <Table.Td key={b} className={up ? "up" : "down"} title={l.transport}>
                     {up ? `${l.rtt_ms.toFixed(0)} ms` : "down"}
-                  </td>
+                  </Table.Td>
                 );
               })}
-            </tr>
+            </Table.Tr>
           ))}
-        </tbody>
-      </table>
+        </Table.Tbody>
+      </ListTable>
 
-      <h2>
-        Bridge Address <span dir="ltr">{o.bridge_address.host}</span>
-      </h2>
-      {!o.bridge_address.published && <p className="error">The record has not been updated since the Coordinator started.</p>}
-      <table data-testid="bridge-address">
-        <tbody>
-          {o.bridge_address.bridges.map((b) => (
-            <tr key={b.name}>
-              <th>{b.name}</th>
-              <td>{b.addr ?? "no address yet"}</td>
-              <td className={b.in_record ? "up" : "down"}>{b.in_record ? `in the record since ${ago(b.joined)}` : "out of the record"}</td>
-              <td className={b.eligible ? "up" : "down"}>{b.eligible ? "eligible" : (b.reasons ?? ["not probed yet"]).join(", ")}</td>
-              <td>
+      <Group gap="xs">
+        <Title order={2} size="h4">
+          Bridge Address
+        </Title>
+        <Code dir="ltr">{ba.host}</Code>
+      </Group>
+      {!ba.published && (
+        <Alert color="orange" variant="light">
+          The record has not been updated since the Coordinator started.
+        </Alert>
+      )}
+      <ListTable data-testid="bridge-address">
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Bridge</Table.Th>
+            <Table.Th>Address</Table.Th>
+            <Table.Th>Record</Table.Th>
+            <Table.Th>Eligible</Table.Th>
+            <Table.Th>Probe</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {ba.bridges.map((b) => (
+            <Table.Tr key={b.name}>
+              <Table.Th>{b.name}</Table.Th>
+              <Table.Td>{b.addr ?? "no address yet"}</Table.Td>
+              <Table.Td>
+                <Badge variant="light" color={b.in_record ? "green" : "gray"} tt="none">
+                  {b.in_record ? `in the record since ${ago(b.joined)}` : "out of the record"}
+                </Badge>
+              </Table.Td>
+              <Table.Td>
+                <Badge variant="light" color={b.eligible ? "green" : "red"} tt="none">
+                  {b.eligible ? "eligible" : (b.reasons ?? ["not probed yet"]).join(", ")}
+                </Badge>
+              </Table.Td>
+              <Table.Td>
                 probe {b.probe ? (b.probe.ok ? "passing" : "failing") : "pending"} {b.probe && ago(b.probe.at)}
-              </td>
-            </tr>
+              </Table.Td>
+            </Table.Tr>
           ))}
-        </tbody>
-      </table>
-      <p>
-        Since the Coordinator started: {o.bridge_address.joins} joined, {o.bridge_address.removals} removed.
-      </p>
+        </Table.Tbody>
+      </ListTable>
+      <Text fz="sm" c="dimmed">
+        Since the Coordinator started: {ba.joins} joined, {ba.removals} removed.
+      </Text>
 
-      <h2>Coordinator</h2>
-      <div className="card">
-        {o.sets
-          .filter((s) => s.feed)
-          .map((s) => (
-            <p key={s.id}>
-              {s.name} feed: {s.prefixes} prefixes, updated {ago(s.updated_at)}
-              {s.last_error && <span className="error"> — last update rejected: {s.last_error}</span>}
-            </p>
-          ))}
-        <p data-testid="backup">
-          Nightly backup:{" "}
-          {!o.backup.configured ? (
-            <span className="error">off: no age recipient configured</span>
-          ) : (
-            <>
-              last good {ago(o.backup.last_success)}
-              {o.backup.last_success && `, ${bytes(o.backup.size_bytes)}`}
-              {o.backup.last_error && <span className="error"> — last attempt failed: {o.backup.last_error}</span>}
-            </>
-          )}
-        </p>
-      </div>
-    </section>
+      <Title order={2} size="h4">
+        Coordinator
+      </Title>
+      <Paper p="md">
+        <Stack gap="xs">
+          {o.sets
+            .filter((s) => s.feed)
+            .map((s) => (
+              <Group key={s.id} gap="xs" fz="sm" wrap="nowrap" align="flex-start">
+                <IconRss size={16} />
+                <span>
+                  {s.name} feed: {s.prefixes} prefixes, updated {ago(s.updated_at)}
+                  {s.last_error && <Text span c="red"> — last update rejected: {s.last_error}</Text>}
+                </span>
+              </Group>
+            ))}
+          <Group gap="xs" fz="sm" wrap="nowrap" align="flex-start">
+            <IconDatabaseExport size={16} />
+            <span data-testid="backup">
+              Nightly backup:{" "}
+              {!o.backup.configured ? (
+                <Text span c="red">
+                  off: no age recipient configured
+                </Text>
+              ) : (
+                <>
+                  last good {ago(o.backup.last_success)}
+                  {o.backup.last_success && `, ${bytes(o.backup.size_bytes)}`}
+                  {o.backup.last_error && <Text span c="red"> — last attempt failed: {o.backup.last_error}</Text>}
+                </>
+              )}
+            </span>
+          </Group>
+        </Stack>
+      </Paper>
+    </Screen>
   );
 }

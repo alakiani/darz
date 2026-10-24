@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
+import { Alert, Button, Paper, Stack, Text, Title } from "@mantine/core";
+import { IconAlertTriangle, IconCheck, IconDownload } from "@tabler/icons-react";
 import type { IssuedDevice } from "../api/client";
 import { configFile } from "../lib/config";
 import { fa } from "../fa";
@@ -23,22 +25,35 @@ export function Configs({ issued, privateKey, onSaved }: { issued: IssuedDevice;
   }, [file]);
 
   return (
-    <section className="configs">
-      <h1>
+    <Stack>
+      <Title order={1} size="h2">
         {fa.configsTitle}: {issued.device.name}
-      </h1>
-      <p className="warning">{fa.configsOnce}</p>
-      <figure>
-        {qr && <img src={qr} alt={file.name} />}
-        <button type="button" data-testid="download-conf" onClick={() => download(file.name, file.text, "text/plain")}>
-          {fa.download} <span dir="ltr">{file.name}</span>
-        </button>
-      </figure>
-      <p className="hint">{fa.iphoneHint}</p>
-      <p className="hint">{fa.stuckHint}</p>
-      <button type="button" onClick={onSaved}>
+      </Title>
+      <Alert color="yellow" icon={<IconAlertTriangle />}>
+        {fa.configsOnce}
+      </Alert>
+      <Paper p="lg">
+        <figure className="qr">
+          {qr && <img src={qr} alt={file.name} />}
+          <Button
+            variant="light"
+            leftSection={<IconDownload size={18} />}
+            data-testid="download-conf"
+            onClick={() => download(file.name, file.text, "text/plain")}
+          >
+            {fa.download}&nbsp;<span dir="ltr">{file.name}</span>
+          </Button>
+        </figure>
+      </Paper>
+      <Text c="dimmed" fz="sm">
+        {fa.iphoneHint}
+      </Text>
+      <Text c="dimmed" fz="sm">
+        {fa.stuckHint}
+      </Text>
+      <Button size="md" leftSection={<IconCheck size={18} />} onClick={onSaved}>
         {fa.saved}
-      </button>
-    </section>
+      </Button>
+    </Stack>
   );
 }

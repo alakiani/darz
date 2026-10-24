@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { Badge, Checkbox, Group, Paper, Stack, Table, Text, Title } from "@mantine/core";
 import { api } from "../api/client";
 import type { LinkTile, TransportList } from "./api";
+import { ListTable, Problem, Screen, Status } from "./ui";
 
 // Links: read-only health, plus the editable candidate Transport list
 // (ADR 0007).
@@ -24,42 +26,57 @@ export function LinksScreen() {
   };
 
   return (
-    <section>
-      <h1>Links</h1>
-      <table className="list" data-testid="links">
-        <thead>
-          <tr>
-            <th>Link</th>
-            <th>Crosses the filter</th>
-            <th>Health</th>
-            <th>Instances</th>
-          </tr>
-        </thead>
-        <tbody>
+    <Screen title="Links" about="Every pair of Nodes, and how it is carried.">
+      <ListTable data-testid="links">
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Link</Table.Th>
+            <Table.Th>Crosses the filter</Table.Th>
+            <Table.Th>Health</Table.Th>
+            <Table.Th>Instances</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
           {links.map((l) => (
-            <tr key={l.id}>
-              <td>
+            <Table.Tr key={l.id}>
+              <Table.Td fw={600}>
                 {l.a} – {l.b}
-              </td>
-              <td>{l.crosses ? "yes" : "no"}</td>
-              <td className="status">{l.up_a || l.up_b ? `up, ${l.transport}, ${l.rtt_ms.toFixed(0)} ms` : "down"}</td>
-              <td>{l.instances.map((i) => `${i.transport}${i.transport === "gre" ? "" : `:${i.listen_port || "?"}`}${i.up ? " ✓" : ""}`).join(", ")}</td>
-            </tr>
+              </Table.Td>
+              <Table.Td>{l.crosses ? "yes" : "no"}</Table.Td>
+              <Table.Td>
+                <Status>{l.up_a || l.up_b ? `up, ${l.transport}, ${l.rtt_ms.toFixed(0)} ms` : "down"}</Status>
+              </Table.Td>
+              <Table.Td>
+                <Group gap={4}>
+                  {l.instances.map((i) => (
+                    <Badge key={`${i.transport}:${i.listen_port}`} size="sm" variant={i.up ? "light" : "outline"} color={i.up ? "green" : "gray"} tt="none">
+                      {`${i.transport}${i.transport === "gre" ? "" : `:${i.listen_port || "?"}`}${i.up ? " ✓" : ""}`}
+                    </Badge>
+                  ))}
+                </Group>
+              </Table.Td>
+            </Table.Tr>
           ))}
-        </tbody>
-      </table>
+        </Table.Tbody>
+      </ListTable>
       {tl && (
-        <div className="card">
-          <h2>Candidate Transports</h2>
-          <p className="muted">Off means no Link uses it. AmneziaWG is the only Transport across the filter and stays on.</p>
-          {tl.known.map((t) => (
-            <label key={t} className="check">
-              <input type="checkbox" name={`transport-${t}`} checked={tl.enabled.includes(t)} onChange={(e) => toggle(t, e.target.checked)} /> {t}
-            </label>
-          ))}
-          {error && <p className="error">{error}</p>}
-        </div>
+        <Paper p="lg">
+          <Stack gap="sm">
+            <Title order={2} size="h5">
+              Candidate Transports
+            </Title>
+            <Text c="dimmed" fz="sm">
+              Off means no Link uses it. AmneziaWG is the only Transport across the filter and stays on.
+            </Text>
+            <Group>
+              {tl.known.map((t) => (
+                <Checkbox key={t} name={`transport-${t}`} label={t} checked={tl.enabled.includes(t)} onChange={(e) => toggle(t, e.target.checked)} />
+              ))}
+            </Group>
+            <Problem>{error}</Problem>
+          </Stack>
+        </Paper>
       )}
-    </section>
+    </Screen>
   );
 }

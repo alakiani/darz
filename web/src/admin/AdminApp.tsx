@@ -1,4 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
+import { Alert, Anchor, Button, NavLink, Paper, PasswordInput, Stack, Text, TextInput, Title } from "@mantine/core";
+import {
+  IconArrowsShuffle,
+  IconChartLine,
+  IconExternalLink,
+  IconGauge,
+  IconKey,
+  IconListDetails,
+  IconLogout,
+  IconMail,
+  IconRoute,
+  IconServer2,
+  IconUsers,
+  IconWorld,
+  type Icon,
+} from "@tabler/icons-react";
 import { api, type Me } from "../api/client";
 import { go } from "../router";
 import { OverviewScreen } from "./Overview";
@@ -11,15 +27,15 @@ import { SetsScreen } from "./Sets";
 import { TokensScreen } from "./Tokens";
 
 // The admin panel is in English, left to right (issue #14).
-const screens: [string, string][] = [
-  ["/admin", "Overview"],
-  ["/admin/users", "Users"],
-  ["/admin/invites", "Invites"],
-  ["/admin/nodes", "Nodes"],
-  ["/admin/links", "Links"],
-  ["/admin/rules", "Rules"],
-  ["/admin/sets", "Destination Sets"],
-  ["/admin/tokens", "API tokens"],
+const screens: [string, string, Icon][] = [
+  ["/admin", "Overview", IconGauge],
+  ["/admin/users", "Users", IconUsers],
+  ["/admin/invites", "Invites", IconMail],
+  ["/admin/nodes", "Nodes", IconServer2],
+  ["/admin/links", "Links", IconArrowsShuffle],
+  ["/admin/rules", "Rules", IconListDetails],
+  ["/admin/sets", "Destination Sets", IconWorld],
+  ["/admin/tokens", "API tokens", IconKey],
 ];
 
 export function AdminApp({ route }: { route: string }) {
@@ -73,28 +89,43 @@ export function AdminApp({ route }: { route: string }) {
 
   return (
     <div className="admin">
-      <nav className="admin-nav">
-        <strong>WAYS admin</strong>
-        {screens.map(([path, label]) => (
-          <a key={path} href={`#${path}`} className={route === path ? "current" : ""}>
-            {label}
-          </a>
-        ))}
-        <a href="/grafana/" target="_blank" rel="noopener">
-          Grafana
+      <nav className="admin-side">
+        <a href="#/admin" className="brand">
+          <span className="brand-mark">
+            <IconRoute size={18} stroke={1.8} />
+          </span>
+          <strong>WAYS admin</strong>
         </a>
-        <button
-          type="button"
-          className="link"
+        {screens.map(([path, label, I]) => (
+          <NavLink
+            key={path}
+            href={`#${path}`}
+            label={label}
+            leftSection={<I size={18} />}
+            active={route === path || (path === "/admin/nodes" && route.startsWith("/admin/nodes/"))}
+            variant="light"
+          />
+        ))}
+        <div className="spacer" />
+        <NavLink
+          href="/grafana/"
+          target="_blank"
+          rel="noopener"
+          label="Grafana"
+          leftSection={<IconChartLine size={18} />}
+          rightSection={<IconExternalLink size={14} />}
+        />
+        <NavLink
+          component="button"
+          label="Sign out"
+          leftSection={<IconLogout size={18} />}
           onClick={async () => {
             await api.POST("/v1/logout");
             setMe(null);
           }}
-        >
-          Sign out
-        </button>
+        />
       </nav>
-      <main>{screen}</main>
+      <main className="admin-main">{screen}</main>
     </div>
   );
 }
@@ -107,9 +138,9 @@ function AdminLogin({ me, onSignedIn }: { me: Me | null; onSignedIn: (m: Me) => 
   const [error, setError] = useState("");
   if (me && !me.admin) {
     return (
-      <p className="notice">
+      <Alert className="narrow" color="yellow">
         This account is not an Admin. <a href="#/">Back to the panel</a>
-      </p>
+      </Alert>
     );
   }
   const submit = async (e: React.FormEvent) => {
@@ -124,29 +155,35 @@ function AdminLogin({ me, onSignedIn }: { me: Me | null; onSignedIn: (m: Me) => 
     setError(response.status === 429 ? "Too many failed sign-ins; try later." : "Wrong handle, password or code.");
   };
   return (
-    <form className="card admin-login" onSubmit={submit}>
-      <h1>WAYS admin</h1>
-      <label>
-        Handle
-        <input name="handle" autoComplete="username" value={handle} onChange={(e) => setHandle(e.target.value)} />
-      </label>
-      <label>
-        Password
-        <input name="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      </label>
-      {needCode && (
-        <label>
-          TOTP code
-          <input name="code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
-        </label>
-      )}
-      {error && <p className="error">{error}</p>}
-      <button type="submit">Sign in</button>
-      <p className="muted">
-        <a href="#/" onClick={() => go("/")}>
-          User panel
-        </a>
-      </p>
-    </form>
+    <Paper component="form" className="narrow" p="xl" shadow="sm" onSubmit={submit}>
+      <Stack>
+        <div className="brand">
+          <span className="brand-mark">
+            <IconRoute size={22} stroke={1.8} />
+          </span>
+          <Title order={1} size="h3">
+            WAYS admin
+          </Title>
+        </div>
+        <TextInput label="Handle" name="handle" autoComplete="username" value={handle} onChange={(e) => setHandle(e.target.value)} />
+        <PasswordInput label="Password" name="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        {needCode && (
+          <TextInput label="TOTP code" name="code" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value)} />
+        )}
+        {error && (
+          <Alert color="red" variant="light">
+            {error}
+          </Alert>
+        )}
+        <Button type="submit" fullWidth>
+          Sign in
+        </Button>
+        <Text fz="sm" ta="center">
+          <Anchor href="#/" onClick={() => go("/")}>
+            User panel
+          </Anchor>
+        </Text>
+      </Stack>
+    </Paper>
   );
 }

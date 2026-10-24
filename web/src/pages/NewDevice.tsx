@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Alert, Button, Paper, Stack, TextInput, Title } from "@mantine/core";
 import { api, errorOf, type IssuedDevice } from "../api/client";
 import { generateKeyPair } from "../lib/keys";
 import { fa } from "../fa";
@@ -37,16 +38,21 @@ export function NewDevicePage({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <form className="card" onSubmit={submit}>
-      <h1>{fa.newDevice}</h1>
-      <label>
-        {fa.deviceName}
-        <input name="name" required maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
-      </label>
-      {error && <p className="error">{error}</p>}
-      <button type="submit" disabled={busy}>
-        {busy ? fa.creating : fa.create}
-      </button>
-    </form>
+    <Paper component="form" p="xl" onSubmit={submit}>
+      <Stack>
+        <Title order={1} size="h2">
+          {fa.newDevice}
+        </Title>
+        <TextInput label={fa.deviceName} name="name" required maxLength={64} autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+        {error && (
+          <Alert color="red" variant="light">
+            {error}
+          </Alert>
+        )}
+        <Button type="submit" size="md" loading={busy}>
+          {busy ? fa.creating : fa.create}
+        </Button>
+      </Stack>
+    </Paper>
   );
 }

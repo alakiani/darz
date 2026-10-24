@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { Badge, Button, Group, NativeSelect, Table, Text, TextInput } from "@mantine/core";
 import { api, type Me } from "../api/client";
 import { typedConfirm, type UserInfo } from "./api";
 import { byQuotaShare, gbField, mbits, parseGB, periodText, rateOf, renews } from "./quota";
+import { ListTable, Screen, Shown, Status } from "./ui";
 
 // Users: Suspend/Resume, Device cap, recovery Invite, Delete with typed
 // confirmation. Admins see totals per User, not Devices (issue #14). Each
@@ -27,40 +29,50 @@ export function UsersScreen({ self }: { self: Me }) {
   };
 
   return (
-    <section>
-      <h1>Users</h1>
-      {link && (
-        <p className="notice" data-testid="recovery-link">
-          Recovery Invite (send it out of band): <code>{link}</code>
-        </p>
-      )}
-      <table className="list">
-        <thead>
-          <tr>
-            <th>Handle</th>
-            <th>Status</th>
-            <th>Devices</th>
-            <th>This period</th>
-            <th>Quota</th>
-            <th>Running out</th>
-            <th>Renews</th>
-            <th>Refills held</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
+    <Screen title="Users" about="Most of their Quota used first. Fields save when you leave them.">
+      {link && <Shown label="Recovery Invite; send it out of band:" value={link} testid="recovery-link" />}
+      <ListTable minWidth={1000}>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Handle</Table.Th>
+            <Table.Th>Status</Table.Th>
+            <Table.Th>Devices</Table.Th>
+            <Table.Th>This period</Table.Th>
+            <Table.Th>Quota</Table.Th>
+            <Table.Th>Running out</Table.Th>
+            <Table.Th>Renews</Table.Th>
+            <Table.Th>Refills held</Table.Th>
+            <Table.Th className="actions">Actions</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
           {users.map((u) => (
-            <tr key={u.id} data-testid={`user-${u.handle}`}>
-              <td>
-                {u.handle}
-                {u.admin && " (Admin)"}
-                {u.totp_enabled && " · TOTP"}
-              </td>
-              <td className="status">{u.suspended ? "Suspended" : "Active"}</td>
-              <td>
+            <Table.Tr key={u.id} data-testid={`user-${u.handle}`}>
+              <Table.Td>
+                <Group gap={4}>
+                  <Text fw={600} fz="sm">
+                    {u.handle}
+                  </Text>
+                  {u.admin && (
+                    <Badge size="xs" color="violet" variant="light">
+                      Admin
+                    </Badge>
+                  )}
+                  {u.totp_enabled && (
+                    <Badge size="xs" color="gray" variant="light">
+                      TOTP
+                    </Badge>
+                  )}
+                </Group>
+              </Table.Td>
+              <Table.Td>
+                <Status>{u.suspended ? "Suspended" : "Active"}</Status>
+              </Table.Td>
+              <Table.Td className="nowrap">
                 {u.device_count} of{" "}
-                <input
-                  className="cap"
+                <TextInput
+                  className="cell-input"
+                  size="xs"
                   type="number"
                   min={0}
                   max={100}
@@ -74,11 +86,12 @@ export function UsersScreen({ self }: { self: Me }) {
                     }
                   }}
                 />
-              </td>
-              <td className="period">{periodText(u)}</td>
-              <td>
-                <input
-                  className="cap"
+              </Table.Td>
+              <Table.Td className="period">{periodText(u)}</Table.Td>
+              <Table.Td className="nowrap">
+                <TextInput
+                  className="cell-input"
+                  size="xs"
                   type="number"
                   min={0}
                   step={0.1}
@@ -93,23 +106,25 @@ export function UsersScreen({ self }: { self: Me }) {
                   }}
                 />{" "}
                 GB
-              </td>
-              <td>
-                <select
-                  className="cap"
+              </Table.Td>
+              <Table.Td>
+                <NativeSelect
+                  className="cell-select"
+                  size="xs"
                   defaultValue={u.running_out}
                   aria-label="Running out"
+                  data={[
+                    { value: "block", label: "Block" },
+                    { value: "slow", label: "Slow" },
+                  ]}
                   onChange={(e) => setQuota(u, { running_out: e.target.value })}
-                >
-                  <option value="block">Block</option>
-                  <option value="slow">Slow</option>
-                </select>
+                />
                 {u.running_out === "slow" && (
-                  <>
-                    {" "}
+                  <div className="nowrap">
                     to{" "}
-                    <input
-                      className="cap"
+                    <TextInput
+                      className="cell-input"
+                      size="xs"
                       type="number"
                       min={0.1}
                       step={0.1}
@@ -122,86 +137,96 @@ export function UsersScreen({ self }: { self: Me }) {
                       }}
                     />{" "}
                     Mbit/s
-                  </>
+                  </div>
                 )}
-              </td>
-              <td className="renews">{renews(u.renews_at)}</td>
-              <td className="refills">{u.refills}</td>
-              <td className="actions">
-                {u.id !== self.id && (
-                  <button
-                    type="button"
+              </Table.Td>
+              <Table.Td className="renews">{renews(u.renews_at)}</Table.Td>
+              <Table.Td className="refills">{u.refills}</Table.Td>
+              <Table.Td>
+                <Group gap={4}>
+                  {u.id !== self.id && (
+                    <Button
+                      size="compact-xs"
+                      variant="light"
+                      color={u.suspended ? "green" : "orange"}
+                      onClick={async () => {
+                        await api.POST(u.suspended ? "/v1/admin/users/{id}/resume" : "/v1/admin/users/{id}/suspend", p(u.id));
+                        load();
+                      }}
+                    >
+                      {u.suspended ? "Resume" : "Suspend"}
+                    </Button>
+                  )}
+                  <Button
+                    size="compact-xs"
+                    variant="light"
                     onClick={async () => {
-                      await api.POST(u.suspended ? "/v1/admin/users/{id}/resume" : "/v1/admin/users/{id}/suspend", p(u.id));
+                      const count = Number(prompt(`How many Refills to give ${u.handle}?`, "1"));
+                      if (!Number.isInteger(count) || count < 1) return;
+                      const days = Number(prompt("Each Refill expires in how many days?", "30"));
+                      if (!Number.isInteger(days) || days < 1) return;
+                      await api.POST("/v1/admin/users/{id}/refills", { ...p(u.id), body: { count, days } });
                       load();
                     }}
                   >
-                    {u.suspended ? "Resume" : "Suspend"}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const count = Number(prompt(`How many Refills to give ${u.handle}?`, "1"));
-                    if (!Number.isInteger(count) || count < 1) return;
-                    const days = Number(prompt("Each Refill expires in how many days?", "30"));
-                    if (!Number.isInteger(days) || days < 1) return;
-                    await api.POST("/v1/admin/users/{id}/refills", { ...p(u.id), body: { count, days } });
-                    load();
-                  }}
-                >
-                  Give Refill
-                </button>
-                {u.quota != null && (
-                  <button
-                    type="button"
+                    Give Refill
+                  </Button>
+                  {u.quota != null && (
+                    <Button
+                      size="compact-xs"
+                      variant="light"
+                      onClick={async () => {
+                        if (!confirm(`Reset ${u.handle} to a full Quota now? Their Usage stays as it is.`)) return;
+                        await api.POST("/v1/admin/users/{id}/reset", p(u.id));
+                        load();
+                      }}
+                    >
+                      Reset now
+                    </Button>
+                  )}
+                  <Button
+                    size="compact-xs"
+                    variant="light"
                     onClick={async () => {
-                      if (!confirm(`Reset ${u.handle} to a full Quota now? Their Usage stays as it is.`)) return;
-                      await api.POST("/v1/admin/users/{id}/reset", p(u.id));
+                      const n = parseGB(prompt(`GB to add to ${u.handle}'s Quota, for this Quota Period only`) ?? "");
+                      if (!n) return;
+                      await api.POST("/v1/admin/users/{id}/top-up", { ...p(u.id), body: { bytes: n } });
                       load();
                     }}
                   >
-                    Reset now
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const n = parseGB(prompt(`GB to add to ${u.handle}'s Quota, for this Quota Period only`) ?? "");
-                    if (!n) return;
-                    await api.POST("/v1/admin/users/{id}/top-up", { ...p(u.id), body: { bytes: n } });
-                    load();
-                  }}
-                >
-                  Top-up
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const { data } = await api.POST("/v1/admin/users/{id}/recovery-invite", p(u.id));
-                    if (data) setLink(data.url);
-                  }}
-                >
-                  Recovery Invite
-                </button>
-                {u.id !== self.id && (
-                  <button
-                    type="button"
-                    className="danger"
+                    Top-up
+                  </Button>
+                  <Button
+                    size="compact-xs"
+                    variant="light"
+                    color="gray"
                     onClick={async () => {
-                      if (!typedConfirm("delete this User, their Devices and their usage", u.handle)) return;
-                      await api.DELETE("/v1/admin/users/{id}", p(u.id));
-                      load();
+                      const { data } = await api.POST("/v1/admin/users/{id}/recovery-invite", p(u.id));
+                      if (data) setLink(data.url);
                     }}
                   >
-                    Delete
-                  </button>
-                )}
-              </td>
-            </tr>
+                    Recovery Invite
+                  </Button>
+                  {u.id !== self.id && (
+                    <Button
+                      size="compact-xs"
+                      variant="subtle"
+                      color="red"
+                      onClick={async () => {
+                        if (!typedConfirm("delete this User, their Devices and their usage", u.handle)) return;
+                        await api.DELETE("/v1/admin/users/{id}", p(u.id));
+                        load();
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </Group>
+              </Table.Td>
+            </Table.Tr>
           ))}
-        </tbody>
-      </table>
-    </section>
+        </Table.Tbody>
+      </ListTable>
+    </Screen>
   );
 }

@@ -1,8 +1,11 @@
 package dataplane
 
 import (
+	"net/netip"
 	"strings"
 	"testing"
+
+	"github.com/alakiani/ways/internal/protocol"
 )
 
 func allOn(key string) (a [buckets]string) {
@@ -177,5 +180,54 @@ func TestGREPeerWithoutAddressIsLeftOut(t *testing.T) {
 		GREIfaces: []string{"ways3l"}, GREPeers: []string{"", "203.0.113.9"}})
 	if !strings.Contains(got, "meta l4proto gre ip saddr { 203.0.113.9 } accept") {
 		t.Errorf("the valid peer was lost:\n%s", got)
+	}
+}
+
+func TestThrottledDevicesArePolicedAheadOfMetering(t *testing.T) {
+	rs := bridgeRuleset()
+	rs.Throttles = throttles([]protocol.Device{
+		{PublicKey: "a", Address: "10.77.0.9/32", Rate: 500_000},
+		{PublicKey: "b", Address: "10.77.0.5/32", Rate: 250_000},
+		{PublicKey: "c", Address: "10.77.0.6/32"}, // active
+		{PublicKey: "d", Address: "bogus", Rate: 1},
+		{PublicKey: "e", Address: "fd00::1/128", Rate: 1},
+	})
+	got := render(rs)
+	for _, want := range []string{
+		"limit up_10_77_0_5 { rate over 250000 bytes/second }",
+		"limit down_10_77_0_5 { rate over 250000 bytes/second }",
+		"limit up_10_77_0_9 { rate over 500000 bytes/second }",
+		"limit down_10_77_0_9 { rate over 500000 bytes/second }",
+		`map throttle_up { type ipv4_addr : limit; elements = { 10.77.0.5 : "up_10_77_0_5", 10.77.0.9 : "up_10_77_0_9" } }`,
+		`map throttle_down { type ipv4_addr : limit; elements = { 10.77.0.5 : "down_10_77_0_5", 10.77.0.9 : "down_10_77_0_9" } }`,
+		"\t\ttype filter hook forward priority mangle; policy accept;\n" +
+			"\t\tiifname \"ways0\" limit name ip saddr map @throttle_up drop\n" +
+			"\t\toifname \"ways0\" limit name ip daddr map @throttle_down drop\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ruleset lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "10_77_0_6") || strings.Contains(got, "bogus") || strings.Contains(got, "fd00") {
+		t.Errorf("an active Device or a bad address is throttled:\n%s", got)
+	}
+	// Throttled traffic is still metered: the policer drops only what is
+	// over the rate, and accepts nothing past metering.
+	if strings.Index(got, "@throttle_down drop") > strings.Index(got, "update @usage_up") {
+		t.Error("throttling comes after metering")
+	}
+	if strings.Contains(got, "@throttle_up accept") || strings.Contains(got, "@throttle_down accept") {
+		t.Error("a throttle rule accepts, which would skip metering")
+	}
+}
+
+func TestNoThrottlesRenderNoPolicers(t *testing.T) {
+	got := render(bridgeRuleset())
+	if strings.Contains(got, "limit") || strings.Contains(got, "throttle") {
+		t.Errorf("a Bridge with no throttled Device renders policers:\n%s", got)
+	}
+	got = render(ruleset{Exit: true, Throttles: []throttle{{Addr: netip.MustParseAddr("10.77.0.5"), Rate: 1}}, Uplink: "eth0"})
+	if strings.Contains(got, "throttle") {
+		t.Errorf("a Node that is no Bridge renders policers:\n%s", got)
 	}
 }

@@ -43,6 +43,8 @@ Nothing finer is stored. There are no session records and no connection start or
 
 ## Quota hooks
 
+_[ADR 0010](0010-per-user-usage-and-quota.md) fills these hooks with a per-User Quota and adds a per-User period total to the retention table above._
+
 - **Every Device has an effective state:** `active`, `blocked`, or `throttled(rate)`, plus a `reason`. Snapshots carry it, and Bridges enforce it.
 - **A pure policy function in the Coordinator** derives that state from User status, Device status, and the per-User daily and monthly usage totals.
 - **Phase one ships a single policy:** a suspended User or a revoked Device is `blocked`, and everything else is `active`.

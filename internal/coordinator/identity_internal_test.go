@@ -589,8 +589,8 @@ func TestDeviceUsage(t *testing.T) {
 	if len(u.Hourly) != 1 || u.Hourly[0].Exit != "ab1" || u.Hourly[0].Up != 1000 || u.Hourly[0].Down != 5000 {
 		t.Errorf("hourly = %+v", u.Hourly)
 	}
-	if len(u.Daily) != 1 || len(u.Monthly) != 1 || u.Monthly[0].Exit != "" {
-		t.Errorf("daily %+v, monthly %+v", u.Daily, u.Monthly)
+	if len(u.Daily) != 1 || u.Period.Up != 1000 || u.Period.Down != 5000 || u.Period.Exit != "" {
+		t.Errorf("daily %+v, period %+v", u.Daily, u.Period)
 	}
 	var list []protocol.DeviceInfo
 	cl.must(200, "GET", "/v1/me/devices", nil, &list)

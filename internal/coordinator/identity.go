@@ -411,7 +411,7 @@ func (c *Coordinator) deviceUsage(w http.ResponseWriter, r *http.Request) {
 		}
 		return out
 	}
-	writeJSON(w, http.StatusOK, protocol.DeviceUsage{Hourly: conv(u.Hourly), Daily: conv(u.Daily), Monthly: conv(u.Monthly)})
+	writeJSON(w, http.StatusOK, protocol.DeviceUsage{Hourly: conv(u.Hourly), Daily: conv(u.Daily)})
 }
 
 // nodeNames maps Node ids to names, which usage shows Exits by.

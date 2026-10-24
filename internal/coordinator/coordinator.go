@@ -76,6 +76,8 @@ type Coordinator struct {
 	HTTPClient           *http.Client
 
 	reconcileMu sync.Mutex // one Reconcile at a time
+	quotaMu     sync.Mutex
+	quotaSeen   map[string]quotaState // the Users out of Quota in the latest snapshots
 	slots       slotState
 	mon         monitorState
 
@@ -111,7 +113,11 @@ func (c *Coordinator) Reconcile(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if mesh.bridge, err = c.bridgeState(ctx); err != nil {
+	quota, err := c.quotaStates(ctx)
+	if err != nil {
+		return fmt.Errorf("quota states: %w", err)
+	}
+	if mesh.bridge, err = c.bridgeState(ctx, quota); err != nil {
 		return fmt.Errorf("bridge state: %w", err)
 	}
 	changed := false
@@ -129,6 +135,9 @@ func (c *Coordinator) Reconcile(ctx context.Context) error {
 			changed = true
 		}
 	}
+	c.quotaMu.Lock()
+	c.quotaSeen = quota
+	c.quotaMu.Unlock()
 	if changed {
 		c.mu.Lock()
 		close(c.changed)
@@ -413,15 +422,22 @@ func (c *Coordinator) health(w http.ResponseWriter, r *http.Request) {
 		c.internalError(w, err)
 		return
 	}
-	// Metering comes from Bridges only (ADR 0002).
+	// A new public address changes the endpoint the Node's peers dial.
+	changed := prev == nil || prev.SeenAddr != seen
+	// Metering comes from Bridges only (ADR 0002). The Quota is checked as
+	// usage arrives (ADR 0010).
 	if len(h.Usage) > 0 && isBridge(n) {
 		if _, err := c.store.PutUsage(r.Context(), n.ID, h.Usage); err != nil {
 			c.internalError(w, err)
 			return
 		}
+		quotaChanged, err := c.quotaChanged(r.Context())
+		if err != nil {
+			c.internalError(w, err)
+			return
+		}
+		changed = changed || quotaChanged
 	}
-	// A new public address changes the endpoint the Node's peers dial.
-	changed := prev == nil || prev.SeenAddr != seen
 	linksChanged, err := c.takeLinkHealth(r.Context(), n, h)
 	if err != nil {
 		c.internalError(w, err)

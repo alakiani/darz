@@ -65,6 +65,7 @@ func (c *Coordinator) routes() []route {
 		{"POST", "/v1/admin/users/{id}/suspend", authAdmin, "Suspend a User: their Devices leave the Bridges", nil, protocol.UserInfo{}, c.adminSuspend},
 		{"POST", "/v1/admin/users/{id}/resume", authAdmin, "Resume a suspended User", nil, protocol.UserInfo{}, c.adminResume},
 		{"POST", "/v1/admin/users/{id}/device-cap", authAdmin, "Set a User's Device cap", protocol.SetDeviceCap{}, protocol.UserInfo{}, c.adminSetCap},
+		{"POST", "/v1/admin/users/{id}/quota", authAdmin, "Set a User's Quota (bytes per Quota Period, or null for unlimited) and what happens when they run out", protocol.SetQuota{}, protocol.UserInfo{}, c.adminSetQuota},
 		{"DELETE", "/v1/admin/users/{id}", authAdmin, "Delete a User with their Devices and usage", nil, nil, c.adminDelete},
 		{"GET", "/v1/admin/overview", authAdmin, "The status board: Nodes, Links, the feed", nil, protocol.Overview{}, c.adminOverview},
 		{"GET", "/v1/admin/slots/rebalance", authAdmin, "Plan a rebalance of the Endpoint Slots over the eligible Bridges", nil, protocol.SlotRebalance{}, c.adminSlotRebalance},

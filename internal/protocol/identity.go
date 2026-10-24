@@ -80,6 +80,7 @@ type DeviceInfo struct {
 	// State is the effective state: active, blocked or throttled.
 	State  string `json:"state"`
 	Reason string `json:"reason,omitempty"`
+	Rate   uint64 `json:"rate,omitempty"` // when throttled: bytes per second
 	// RecentBytes is what the Device moved in this hour and the last: the
 	// "used in the last hour" mark. Never connection times (ADR 0003).
 	RecentBytes uint64 `json:"recent_bytes"`

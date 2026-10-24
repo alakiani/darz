@@ -508,10 +508,14 @@ func (p *Plane) syncPaths(ctx context.Context) {
 }
 
 // Report adds bucket shares per candidate per Rule, and usage, to a
-// health report.
-func (p *Plane) Report(h *protocol.Health) {
+// health report. A Bridge reads its counters first, so the report carries
+// every byte moved until now, not as of the last 10 s reading (ADR 0010).
+func (p *Plane) Report(ctx context.Context, h *protocol.Health) {
 	p.mu.Lock()
 	h.Paths = slices.Clone(p.paths)
+	if p.st != nil && p.st.Bridge != nil {
+		p.collectUsage(ctx, p.st)
+	}
 	p.mu.Unlock()
 	h.Usage = p.meter.report(maxUsagePerReport)
 }

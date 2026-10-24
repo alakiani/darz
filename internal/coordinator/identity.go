@@ -3,7 +3,6 @@ package coordinator
 import (
 	"context"
 	"errors"
-	"math"
 	"net/http"
 	"net/netip"
 	"regexp"
@@ -411,7 +410,8 @@ func (c *Coordinator) deviceUsage(w http.ResponseWriter, r *http.Request) {
 		}
 		return out
 	}
-	writeJSON(w, http.StatusOK, protocol.DeviceUsage{Hourly: conv(u.Hourly), Daily: conv(u.Daily)})
+	writeJSON(w, http.StatusOK, protocol.DeviceUsage{Hourly: conv(u.Hourly), Daily: conv(u.Daily),
+		Period: protocol.UsageRow{Period: u.Period.Period, Up: u.Period.Up, Down: u.Period.Down}})
 }
 
 // nodeNames maps Node ids to names, which usage shows Exits by.
@@ -565,7 +565,18 @@ func (c *Coordinator) adminCreateInvite(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "device_cap must be 0 to 100")
 		return
 	}
-	c.issueInvite(w, r, store.Invite{Kind: "new", Admin: req.Admin, DeviceCap: req.DeviceCap})
+	q, msg := quotaSettingOf(req.Quota, req.RunningOut, req.Rate, true)
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
+	ttl, ok := refillTTL(req.RefillDays)
+	if req.Refills < 0 || req.Refills > maxRefills || !ok {
+		writeError(w, http.StatusBadRequest, "refills must be 0 to 100, and refill_days 1 to 3650")
+		return
+	}
+	c.issueInvite(w, r, store.Invite{Kind: "new", Admin: req.Admin, DeviceCap: req.DeviceCap,
+		QuotaSetting: q, Refills: req.Refills, RefillTTL: ttl})
 }
 
 func (c *Coordinator) userInfo(r *http.Request, a store.Account) (protocol.UserInfo, error) {
@@ -577,8 +588,12 @@ func (c *Coordinator) userInfo(r *http.Request, a store.Account) (protocol.UserI
 	if err != nil {
 		return protocol.UserInfo{}, err
 	}
+	refills, err := c.store.HeldRefillCount(r.Context(), a.ID)
+	if err != nil {
+		return protocol.UserInfo{}, err
+	}
 	q, err := c.store.QuotaStanding(r.Context(), a.ID)
-	u := protocol.UserInfo{ID: a.ID, Handle: a.Handle, Admin: a.Admin, Suspended: a.Suspended,
+	u := protocol.UserInfo{Refills: refills, ID: a.ID, Handle: a.Handle, Admin: a.Admin, Suspended: a.Suspended,
 		TOTPEnabled: a.TOTPSecret != "", DeviceCap: a.DeviceCap, DeviceCount: activeCount(devs), MonthBytes: month,
 		PeriodBytes: q.Usage, Quota: a.Quota, RenewalDay: q.RenewalDay, RunningOut: protocol.RunningOutBlock}
 	if a.SlowRate > 0 {
@@ -674,16 +689,9 @@ func (c *Coordinator) adminSetQuota(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	q := store.QuotaSetting{Quota: req.Quota}
-	switch {
-	case req.Quota != nil && *req.Quota > math.MaxInt64:
-		writeError(w, http.StatusBadRequest, "quota is too large")
-		return
-	case req.RunningOut == protocol.RunningOutBlock && req.Rate == 0:
-	case req.RunningOut == protocol.RunningOutSlow && req.Rate > 0 && req.Rate <= math.MaxInt64:
-		q.SlowRate = req.Rate
-	default:
-		writeError(w, http.StatusBadRequest, "running_out is block, or slow with a rate in bytes per second")
+	q, msg := quotaSettingOf(req.Quota, req.RunningOut, req.Rate, false)
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
 		return
 	}
 	// Every Quota edit takes effect on the next snapshot (ADR 0010).

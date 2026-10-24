@@ -266,6 +266,7 @@ func TestMyUsageShowsHistoryAndTheDeviceSplit(t *testing.T) {
 	if err := a.s.ClosePeriods(t.Context()); err != nil {
 		t.Fatal(err)
 	}
+	maryam.must(200, "POST", "/v1/login", protocol.Login{Handle: "maryam", Password: password}, nil) // a month outlives the session
 	got = maryam.usage()
 	if got.Current.Bytes != 0 || left(got) != 1000 || len(got.History) != 1 || got.History[0].Bytes != 330 || !got.History[0].Start.Equal(c.Start) {
 		t.Errorf("next period: %+v", got)

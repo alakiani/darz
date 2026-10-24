@@ -10,5 +10,5 @@ export default defineConfig({
     target: "es2020",
   },
   server: { proxy: { "/v1": "http://127.0.0.1:8080" } },
-  test: { include: ["src/**/*.test.ts"] },
+  test: { include: ["src/**/*.test.ts", "src/**/*.test.tsx"] },
 });

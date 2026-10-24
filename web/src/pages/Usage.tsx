@@ -3,6 +3,8 @@
 // Devices row; older ones have only their stored total, so period totals
 // and calendar months are never mixed.
 import { Fragment, useEffect, useState } from "react";
+import { Anchor, Badge, Button, Group, Paper, Stack, Table, Text, Title } from "@mantine/core";
+import { IconArrowRight, IconChevronDown } from "@tabler/icons-react";
 import { api, type MyUsage, type PeriodUsage } from "../api/client";
 import { fa } from "../fa";
 import { bytes } from "./Device";
@@ -17,27 +19,42 @@ export function UsagePage() {
 
   const periods = [usage.current, ...usage.history];
   return (
-    <section>
-      <h1>{fa.usageTitle}</h1>
-      <table className="usage periods">
-        <thead>
-          <tr>
-            <th>{fa.dates}</th>
-            <th>{fa.used}</th>
-            <th>{fa.quota}</th>
-            <th>{fa.remedies}</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {periods.map((p, i) => (
-            <Period key={p.start} period={p} quota={i === 0 ? quotaText(usage) : ""} current={i === 0} />
-          ))}
-        </tbody>
-      </table>
-      {usage.history.some((p) => !p.detailed) && <p className="hint">{fa.olderPeriods}</p>}
-      <a href="#/">{fa.back}</a>
-    </section>
+    <Stack>
+      <Anchor href="#/" fz="sm">
+        <Group gap={4}>
+          <IconArrowRight size={14} />
+          {fa.back}
+        </Group>
+      </Anchor>
+      <Title order={1} size="h2">
+        {fa.usageTitle}
+      </Title>
+      <Paper>
+        <Table.ScrollContainer minWidth={30 * 16} type="native">
+          <Table>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{fa.dates}</Table.Th>
+                <Table.Th>{fa.used}</Table.Th>
+                <Table.Th>{fa.quota}</Table.Th>
+                <Table.Th>{fa.remedies}</Table.Th>
+                <Table.Th />
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {periods.map((p, i) => (
+                <Period key={p.start} period={p} quota={i === 0 ? quotaText(usage) : ""} current={i === 0} />
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+      </Paper>
+      {usage.history.some((p) => !p.detailed) && (
+        <Text c="dimmed" fz="sm">
+          {fa.olderPeriods}
+        </Text>
+      )}
+    </Stack>
   );
 }
 
@@ -53,36 +70,46 @@ function Period({ period: p, quota, current }: { period: PeriodUsage; quota: str
   const last = Date.parse(p.end) - 1;
   return (
     <Fragment>
-      <tr data-testid="period" className={current ? "current" : undefined}>
-        <td>
+      <Table.Tr data-testid="period" fw={current ? 600 : undefined}>
+        <Table.Td>
           {fa.periodRange(periodDay(p.start), periodDay(last))}
-          {current && <small className="hint"> · {fa.currentPeriod}</small>}
-        </td>
-        <td>{bytes(p.bytes)}</td>
-        <td>{quota}</td>
-        <td>{remediesText(p)}</td>
-        <td>
-          {p.detailed && (
-            <button type="button" className="link" aria-expanded={open} onClick={() => setOpen(!open)}>
-              {fa.byDevice}
-            </button>
+          {current && (
+            <Badge size="xs" variant="light" ms={6}>
+              {fa.currentPeriod}
+            </Badge>
           )}
-        </td>
-      </tr>
+        </Table.Td>
+        <Table.Td>{bytes(p.bytes)}</Table.Td>
+        <Table.Td>{quota}</Table.Td>
+        <Table.Td>{remediesText(p)}</Table.Td>
+        <Table.Td>
+          {p.detailed && (
+            <Button
+              variant="subtle"
+              size="compact-xs"
+              aria-expanded={open}
+              rightSection={<IconChevronDown size={14} className="chevron" />}
+              onClick={() => setOpen(!open)}
+            >
+              {fa.byDevice}
+            </Button>
+          )}
+        </Table.Td>
+      </Table.Tr>
       {open &&
         (p.devices ?? []).map((d) => (
-          <tr key={d.id} className="sub" data-testid="period-device">
-            <td>{d.name}</td>
-            <td>{bytes(d.bytes)}</td>
-            <td colSpan={3} />
-          </tr>
+          <Table.Tr key={d.id} className="sub" data-testid="period-device">
+            <Table.Td>{d.name}</Table.Td>
+            <Table.Td>{bytes(d.bytes)}</Table.Td>
+            <Table.Td colSpan={3} />
+          </Table.Tr>
         ))}
       {open && p.revoked > 0 && (
-        <tr className="sub" data-testid="period-revoked">
-          <td>{fa.revokedDevices}</td>
-          <td>{bytes(p.revoked)}</td>
-          <td colSpan={3} />
-        </tr>
+        <Table.Tr className="sub" data-testid="period-revoked">
+          <Table.Td>{fa.revokedDevices}</Table.Td>
+          <Table.Td>{bytes(p.revoked)}</Table.Td>
+          <Table.Td colSpan={3} />
+        </Table.Tr>
       )}
     </Fragment>
   );

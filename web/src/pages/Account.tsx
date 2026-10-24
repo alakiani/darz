@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { Alert, Badge, Button, Group, Paper, PasswordInput, Stack, Text, TextInput, Title } from "@mantine/core";
+import { IconLogout, IconShieldLock } from "@tabler/icons-react";
 import { api, type Me, type TOTPOffer } from "../api/client";
 import { fa } from "../fa";
 
@@ -40,61 +42,82 @@ export function AccountPage({ me, onChange, onSignedOut }: { me: Me; onChange: (
   };
 
   return (
-    <section>
-      <h1>
+    <Stack gap="lg">
+      <Title order={1} size="h2">
         {fa.account}: <span dir="ltr">{me.handle}</span>
-      </h1>
-      <form className="card" onSubmit={changePassword}>
-        <h2>{fa.changePassword}</h2>
-        <label>
-          {fa.currentPassword}
-          <input type="password" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} />
-        </label>
-        <label>
-          {fa.newPassword} <small>({fa.passwordHint})</small>
-          <input type="password" autoComplete="new-password" required minLength={10} value={next} onChange={(e) => setNext(e.target.value)} />
-        </label>
-        <button type="submit">{fa.save}</button>
-      </form>
+      </Title>
+      <Paper component="form" p="lg" onSubmit={changePassword}>
+        <Stack>
+          <Title order={2} size="h4">
+            {fa.changePassword}
+          </Title>
+          <PasswordInput label={fa.currentPassword} autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} />
+          <PasswordInput
+            label={fa.newPassword}
+            description={fa.passwordHint}
+            autoComplete="new-password"
+            required
+            minLength={10}
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+          />
+          <Group>
+            <Button type="submit">{fa.save}</Button>
+          </Group>
+        </Stack>
+      </Paper>
 
-      <div className="card">
-        <h2>
-          {fa.totp}: {me.totp_enabled ? fa.totpOn : fa.totpOff}
-        </h2>
-        {!me.totp_enabled && !offer && (
-          <button type="button" onClick={startTOTP}>
-            {fa.totpEnable}
-          </button>
-        )}
-        {(offer || (me.totp_enabled && !me.admin)) && (
-          <form onSubmit={confirmTOTP}>
-            {offer && (
-              <>
-                <p>{fa.totpScan}</p>
-                {qr && <img src={qr} alt="TOTP" />}
-                <p dir="ltr" className="secret">
-                  {offer.secret}
-                </p>
-              </>
-            )}
-            <label>
-              {fa.totpCode}
-              <input dir="ltr" inputMode="numeric" autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value)} />
-            </label>
-            <button type="submit">{me.totp_enabled ? fa.totpDisable : fa.confirm}</button>
-          </form>
-        )}
-      </div>
+      <Paper p="lg">
+        <Stack>
+          <Group justify="space-between">
+            <Group gap="xs">
+              <IconShieldLock size={20} />
+              <Title order={2} size="h4">
+                {fa.totp}
+              </Title>
+            </Group>
+            <Badge color={me.totp_enabled ? "green" : "gray"} variant="light">
+              {me.totp_enabled ? fa.totpOn : fa.totpOff}
+            </Badge>
+          </Group>
+          {!me.totp_enabled && !offer && (
+            <Group>
+              <Button variant="light" onClick={startTOTP}>
+                {fa.totpEnable}
+              </Button>
+            </Group>
+          )}
+          {(offer || (me.totp_enabled && !me.admin)) && (
+            <Stack component="form" onSubmit={confirmTOTP}>
+              {offer && (
+                <>
+                  <Text fz="sm">{fa.totpScan}</Text>
+                  <figure className="qr">{qr && <img src={qr} alt="TOTP" />}</figure>
+                  <Text dir="ltr" ta="center" fz="sm" className="secret">
+                    {offer.secret}
+                  </Text>
+                </>
+              )}
+              <TextInput label={fa.totpCode} dir="ltr" inputMode="numeric" autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value)} />
+              <Group>
+                <Button type="submit" color={me.totp_enabled ? "red" : undefined} variant={me.totp_enabled ? "light" : "filled"}>
+                  {me.totp_enabled ? fa.totpDisable : fa.confirm}
+                </Button>
+              </Group>
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
 
-      {msg && <p className="notice">{msg}</p>}
-      <div className="actions">
-        <button type="button" onClick={() => signOut(false)}>
+      {msg && <Alert variant="light">{msg}</Alert>}
+      <Group>
+        <Button variant="default" leftSection={<IconLogout size={18} />} onClick={() => signOut(false)}>
           {fa.signOut}
-        </button>
-        <button type="button" className="danger" onClick={() => signOut(true)}>
+        </Button>
+        <Button color="red" variant="light" onClick={() => signOut(true)}>
           {fa.signOutEverywhere}
-        </button>
-      </div>
-    </section>
+        </Button>
+      </Group>
+    </Stack>
   );
 }

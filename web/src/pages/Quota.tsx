@@ -2,6 +2,8 @@
 // their Quota this period, its Top-ups and Resets, when it renews, the
 // 80% and 100% banners, and the Refills they hold.
 import { useState } from "react";
+import { Alert, Anchor, Button, Group, Paper, Progress, Stack, Text, Title } from "@mantine/core";
+import { IconAlertTriangle, IconArrowLeft, IconCalendar, IconTicket } from "@tabler/icons-react";
 import { api, type MyUsage, type PeriodUsage } from "../api/client";
 import { fa } from "../fa";
 import { bytes } from "./Device";
@@ -36,6 +38,8 @@ export function standing(u: MyUsage): Standing {
   return { state: out ? "out" : percent >= 80 ? "warn" : "ok", used, may, percent };
 }
 
+const barColor = { unlimited: undefined, ok: undefined, warn: "yellow", out: "red" } as const;
+
 export function QuotaCard({ usage, onChange }: { usage: MyUsage; onChange: (u: MyUsage) => void }) {
   const [error, setError] = useState("");
   const s = standing(usage);
@@ -55,49 +59,75 @@ export function QuotaCard({ usage, onChange }: { usage: MyUsage; onChange: (u: M
     if (fresh.data) onChange(fresh.data);
   };
   const redeemButton = canRedeem && (
-    <button type="button" onClick={redeem}>
+    <Button size="xs" variant={s.state === "out" ? "filled" : "light"} onClick={redeem}>
       {fa.redeem}
-    </button>
+    </Button>
   );
 
   return (
-    <section className="card quota" data-testid="quota-card" data-state={s.state} data-percent={s.percent}>
-      <div className="row">
-        <h2>{fa.quotaTitle}</h2>
-        <a href="#/usage">{fa.usageDetails}</a>
-      </div>
-      {s.state === "out" && (
-        <div className="warning" data-testid="quota-out">
-          <p>{usage.running_out === "slow" ? fa.quotaOutSlow(renews) : fa.quotaOutBlock(renews)}</p>
-          {redeemButton}
-        </div>
-      )}
-      {s.state === "warn" && (
-        <p className="warning" data-testid="quota-warning">
-          {fa.quotaWarning}
-        </p>
-      )}
-      {s.state === "unlimited" ? (
-        <p data-testid="quota-used">{fa.usedUnlimited(bytes(s.used))}</p>
-      ) : (
-        <>
-          <p data-testid="quota-used">
-            {fa.usedOf(bytes(s.used), bytes(usage.quota ?? 0))}
-            {remedies && <span data-testid="quota-remedies"> {remedies}</span>}
-          </p>
-          <progress max={100} value={s.percent} aria-label={fa.quotaTitle} />
-        </>
-      )}
-      <p className="hint" data-testid="quota-renews">
-        {fa.renewsOn(renews)}
-      </p>
-      {refill && (
-        <div className="actions" data-testid="refills">
-          <span>{fa.refillsHeld(usage.refills.length, hijri(refill.expires_at))}</span>
-          {s.state !== "out" && redeemButton}
-        </div>
-      )}
-      {error && <p className="error">{error}</p>}
-    </section>
+    <Paper p="lg" shadow="xs" data-testid="quota-card" data-state={s.state} data-percent={s.percent}>
+      <Stack gap="sm">
+        <Group justify="space-between">
+          <Title order={2} size="h4">
+            {fa.quotaTitle}
+          </Title>
+          <Anchor href="#/usage" fz="sm">
+            <Group gap={4}>
+              {fa.usageDetails}
+              <IconArrowLeft size={14} />
+            </Group>
+          </Anchor>
+        </Group>
+        {s.state === "out" && (
+          <Alert color="red" icon={<IconAlertTriangle />} data-testid="quota-out">
+            <Stack gap="xs" align="flex-start">
+              <Text fz="sm">{usage.running_out === "slow" ? fa.quotaOutSlow(renews) : fa.quotaOutBlock(renews)}</Text>
+              {redeemButton}
+            </Stack>
+          </Alert>
+        )}
+        {s.state === "warn" && (
+          <Alert color="yellow" icon={<IconAlertTriangle />} data-testid="quota-warning">
+            {fa.quotaWarning}
+          </Alert>
+        )}
+        {s.state === "unlimited" ? (
+          <Text fw={600} data-testid="quota-used">
+            {fa.usedUnlimited(bytes(s.used))}
+          </Text>
+        ) : (
+          <>
+            <Text fw={600} data-testid="quota-used">
+              {fa.usedOf(bytes(s.used), bytes(usage.quota ?? 0))}
+              {remedies && (
+                <Text span c="dimmed" fw={400} data-testid="quota-remedies">
+                  {" "}
+                  {remedies}
+                </Text>
+              )}
+            </Text>
+            <Progress value={s.percent} size="lg" radius="xl" color={barColor[s.state]} aria-label={fa.quotaTitle} />
+          </>
+        )}
+        <Group gap={6} c="dimmed" fz="sm" data-testid="quota-renews">
+          <IconCalendar size={16} />
+          {fa.renewsOn(renews)}
+        </Group>
+        {refill && (
+          <Group justify="space-between" gap="xs" data-testid="refills">
+            <Group gap={6} fz="sm">
+              <IconTicket size={16} />
+              <span>{fa.refillsHeld(usage.refills.length, hijri(refill.expires_at))}</span>
+            </Group>
+            {s.state !== "out" && redeemButton}
+          </Group>
+        )}
+        {error && (
+          <Text c="red" fz="sm">
+            {error}
+          </Text>
+        )}
+      </Stack>
+    </Paper>
   );
 }

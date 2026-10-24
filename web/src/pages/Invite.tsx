@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Alert, Button, Paper, PasswordInput, Stack, Text, TextInput, Title } from "@mantine/core";
+import { IconAlertTriangle } from "@tabler/icons-react";
 import { api, errorOf, type InviteInfo, type Me } from "../api/client";
 import { fa } from "../fa";
 
@@ -14,7 +16,12 @@ export function InvitePage({ token, onSignedIn }: { token: string; onSignedIn: (
   }, [token]);
 
   if (info === undefined) return null;
-  if (info === null) return <p className="notice">{fa.inviteInvalid}</p>;
+  if (info === null)
+    return (
+      <Alert className="narrow" color="yellow" icon={<IconAlertTriangle />}>
+        {fa.inviteInvalid}
+      </Alert>
+    );
   const recovery = info.kind === "recovery";
 
   const submit = async (e: React.FormEvent) => {
@@ -27,25 +34,35 @@ export function InvitePage({ token, onSignedIn }: { token: string; onSignedIn: (
   };
 
   return (
-    <form className="card" onSubmit={submit}>
-      <h1>{fa.inviteTitle}</h1>
-      <p>{recovery ? fa.inviteRecovery(info.handle ?? "") : fa.inviteNew}</p>
-      {!recovery && (
-        <label>
-          {fa.handle}
-          <input name="handle" dir="ltr" autoComplete="username" required value={handle} onChange={(e) => setHandle(e.target.value.toLowerCase())} />
-        </label>
-      )}
-      <label>
-        {fa.password} <small>({fa.passwordHint})</small>
-        <input name="password" type="password" autoComplete="new-password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} />
-      </label>
-      <label>
-        {fa.passwordAgain}
-        <input name="password-again" type="password" autoComplete="new-password" required value={again} onChange={(e) => setAgain(e.target.value)} />
-      </label>
-      {error && <p className="error">{error}</p>}
-      <button type="submit">{recovery ? fa.recoveryAccept : fa.inviteAccept}</button>
-    </form>
+    <Paper component="form" className="narrow" p="xl" shadow="sm" onSubmit={submit}>
+      <Stack>
+        <Title order={1} size="h2">
+          {fa.inviteTitle}
+        </Title>
+        <Text c="dimmed">{recovery ? fa.inviteRecovery(info.handle ?? "") : fa.inviteNew}</Text>
+        {!recovery && (
+          <TextInput label={fa.handle} name="handle" dir="ltr" autoComplete="username" required value={handle} onChange={(e) => setHandle(e.target.value.toLowerCase())} />
+        )}
+        <PasswordInput
+          label={fa.password}
+          description={fa.passwordHint}
+          name="password"
+          autoComplete="new-password"
+          required
+          minLength={10}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <PasswordInput label={fa.passwordAgain} name="password-again" autoComplete="new-password" required value={again} onChange={(e) => setAgain(e.target.value)} />
+        {error && (
+          <Alert color="red" variant="light">
+            {error}
+          </Alert>
+        )}
+        <Button type="submit" size="md" fullWidth>
+          {recovery ? fa.recoveryAccept : fa.inviteAccept}
+        </Button>
+      </Stack>
+    </Paper>
   );
 }

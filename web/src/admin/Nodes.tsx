@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import { Anchor, Badge, Button, Checkbox, Group, Paper, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { IconArrowLeft, IconPlus, IconTrash } from "@tabler/icons-react";
 import { api } from "../api/client";
 import { go } from "../router";
 import { ago, typedConfirm, type NodeDetail, type NodeTile } from "./api";
+import { ListTable, Problem, Screen, Shown, Status } from "./ui";
 
 type Role = "bridge" | "exit";
 const roleList: Role[] = ["bridge", "exit"];
@@ -13,19 +16,29 @@ const splitTags = (s: string) =>
 
 function RoleBoxes({ roles, setRoles }: { roles: Role[]; setRoles: (r: Role[]) => void }) {
   return (
-    <>
+    <Group gap="md">
       {roleList.map((r) => (
-        <label key={r} className="check">
-          <input
-            type="checkbox"
-            name={`role-${r}`}
-            checked={roles.includes(r)}
-            onChange={(e) => setRoles(e.target.checked ? [...roles, r] : roles.filter((x) => x !== r))}
-          />{" "}
-          {r}
-        </label>
+        <Checkbox
+          key={r}
+          name={`role-${r}`}
+          label={r}
+          checked={roles.includes(r)}
+          onChange={(e) => setRoles(e.target.checked ? [...roles, r] : roles.filter((x) => x !== r))}
+        />
       ))}
-    </>
+    </Group>
+  );
+}
+
+function Roles({ roles }: { roles: string[] }) {
+  return (
+    <Group gap={4}>
+      {roles.map((r) => (
+        <Badge key={r} size="sm" variant="light" color={r === "bridge" ? "violet" : "cyan"}>
+          {r}
+        </Badge>
+      ))}
+    </Group>
   );
 }
 
@@ -53,59 +66,61 @@ export function NodesScreen() {
   };
 
   return (
-    <section>
-      <h1>Nodes</h1>
-      <table className="list">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Roles</th>
-            <th>Tags</th>
-            <th>Contact</th>
-            <th>Snapshot</th>
-          </tr>
-        </thead>
-        <tbody>
+    <Screen title="Nodes" about="Bridges inside Iran and Exits abroad.">
+      <ListTable>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Name</Table.Th>
+            <Table.Th>Roles</Table.Th>
+            <Table.Th>Tags</Table.Th>
+            <Table.Th>Contact</Table.Th>
+            <Table.Th>Snapshot</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
           {nodes.map((n) => (
-            <tr key={n.id} data-testid={`node-row-${n.name}`}>
-              <td>
-                <a href={`#/admin/nodes/${n.id}`}>{n.name}</a>
-              </td>
-              <td>{n.roles.join(" + ")}</td>
-              <td>{n.tags.join(", ")}</td>
-              <td>{n.enrolled ? ago(n.last_contact) : "not enrolled"}</td>
-              <td>
+            <Table.Tr key={n.id} data-testid={`node-row-${n.name}`}>
+              <Table.Td>
+                <Anchor href={`#/admin/nodes/${n.id}`} fw={600} fz="sm">
+                  {n.name}
+                </Anchor>
+              </Table.Td>
+              <Table.Td>
+                <Roles roles={n.roles} />
+              </Table.Td>
+              <Table.Td>{n.tags.join(", ")}</Table.Td>
+              <Table.Td c={n.enrolled ? undefined : "dimmed"}>{n.enrolled ? ago(n.last_contact) : "not enrolled"}</Table.Td>
+              <Table.Td>
                 {n.applied_version}/{n.latest_version}
-              </td>
-            </tr>
+              </Table.Td>
+            </Table.Tr>
           ))}
-        </tbody>
-      </table>
+        </Table.Tbody>
+      </ListTable>
 
-      <h2>Add a Node</h2>
-      <form className="card" onSubmit={add}>
-        <label>
-          Name <input name="name" required value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <div>
-          Roles <RoleBoxes roles={roles} setRoles={setRoles} />
-        </div>
-        <label>
-          Tags (such as IR) <input name="tags" value={tags} onChange={(e) => setTags(e.target.value)} />
-        </label>
-        <label>
-          SSH host, for the command only <input name="host" required value={host} onChange={(e) => setHost(e.target.value)} />
-        </label>
-        {error && <p className="error">{error}</p>}
-        <button type="submit">Add Node</button>
-      </form>
+      <Paper component="form" p="lg" onSubmit={add}>
+        <Stack>
+          <Title order={2} size="h5">
+            Add a Node
+          </Title>
+          <Group align="flex-end">
+            <TextInput label="Name" name="name" required value={name} onChange={(e) => setName(e.target.value)} />
+            <TextInput label="Tags" placeholder="such as IR" name="tags" value={tags} onChange={(e) => setTags(e.target.value)} />
+            <TextInput label="SSH host" description="for the command only" name="host" required value={host} onChange={(e) => setHost(e.target.value)} />
+          </Group>
+          <RoleBoxes roles={roles} setRoles={setRoles} />
+          <Problem>{error}</Problem>
+          <Group>
+            <Button type="submit" leftSection={<IconPlus size={16} />}>
+              Add Node
+            </Button>
+          </Group>
+        </Stack>
+      </Paper>
       {command && (
-        <div className="notice">
-          <p>Run this from the operator's laptop within the hour; the token works once:</p>
-          <pre data-testid="enroll-command">{command}</pre>
-        </div>
+        <Shown label="Run this from the operator's laptop within the hour; the token works once:" value={command} testid="enroll-command" block />
       )}
-    </section>
+    </Screen>
   );
 }
 
@@ -142,64 +157,97 @@ export function NodeScreen({ id }: { id: string }) {
   };
 
   return (
-    <section>
-      <h1 data-testid="node-name">{n.name}</h1>
-      <p>
-        {n.enrolled ? `contact ${ago(n.last_contact)}` : "not enrolled"} · snapshot {n.applied_version}/{n.latest_version}
-        {n.agent_version && ` · agent ${n.agent_version}`}
-      </p>
-      <form className="card inline" onSubmit={save}>
-        <RoleBoxes roles={roles} setRoles={setRoles} />
-        <label>
-          Tags <input name="tags" value={tags} onChange={(e) => setTags(e.target.value)} />
-        </label>
-        <button type="submit">Save</button>
-      </form>
+    <Stack gap="lg">
+      <Anchor href="#/admin/nodes" fz="sm">
+        <Group gap={4}>
+          <IconArrowLeft size={14} />
+          All Nodes
+        </Group>
+      </Anchor>
+      <div>
+        <Group gap="sm">
+          <Title order={1} size="h2" data-testid="node-name">
+            {n.name}
+          </Title>
+          <Roles roles={n.roles} />
+        </Group>
+        <Text c="dimmed" fz="sm">
+          {n.enrolled ? `contact ${ago(n.last_contact)}` : "not enrolled"} · snapshot {n.applied_version}/{n.latest_version}
+          {n.agent_version && ` · agent ${n.agent_version}`}
+        </Text>
+      </div>
+      <Paper component="form" p="lg" onSubmit={save}>
+        <Group align="flex-end">
+          <TextInput label="Tags" name="tags" value={tags} onChange={(e) => setTags(e.target.value)} />
+          <Stack gap={6} pb={8}>
+            <Text fz="sm" fw={500}>
+              Roles
+            </Text>
+            <RoleBoxes roles={roles} setRoles={setRoles} />
+          </Stack>
+          <Button type="submit">Save</Button>
+        </Group>
+      </Paper>
 
       {d.paths.length > 0 && (
         <>
-          <h2>Paths</h2>
-          <table className="list" data-testid="paths">
-            <thead>
-              <tr>
-                <th>Rule</th>
-                <th>Mode</th>
-                <th>Eligible</th>
-                <th>Buckets</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Title order={2} size="h4">
+            Paths
+          </Title>
+          <ListTable data-testid="paths">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Rule</Table.Th>
+                <Table.Th>Mode</Table.Th>
+                <Table.Th>Eligible</Table.Th>
+                <Table.Th>Buckets</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
               {d.paths.map((p) => (
-                <tr key={p.rule}>
-                  <td>{p.rule}</td>
-                  <td>{p.mode}</td>
-                  <td>{p.eligible}</td>
-                  <td>
-                    {p.shares.map((s) => `${s.candidate}${s.transit ? " (transit)" : ""}: ${s.buckets}`).join(", ")}
-                  </td>
-                </tr>
+                <Table.Tr key={p.rule}>
+                  <Table.Td fw={600}>{p.rule}</Table.Td>
+                  <Table.Td>{p.mode}</Table.Td>
+                  <Table.Td>{p.eligible}</Table.Td>
+                  <Table.Td>{p.shares.map((s) => `${s.candidate}${s.transit ? " (transit)" : ""}: ${s.buckets}`).join(", ")}</Table.Td>
+                </Table.Tr>
               ))}
-            </tbody>
-          </table>
+            </Table.Tbody>
+          </ListTable>
         </>
       )}
 
-      <h2>Links</h2>
-      <table className="list">
-        <tbody>
+      <Title order={2} size="h4">
+        Links
+      </Title>
+      <ListTable minWidth={360}>
+        <Table.Tbody>
           {d.links.map((l) => (
-            <tr key={l.id}>
-              <td>
+            <Table.Tr key={l.id}>
+              <Table.Td fw={600}>
                 {l.a} – {l.b}
-              </td>
-              <td>{l.up_a || l.up_b ? `up, ${l.transport}, ${l.rtt_ms.toFixed(0)} ms` : "down"}</td>
-            </tr>
+              </Table.Td>
+              <Table.Td>
+                <Status>{l.up_a || l.up_b ? `up, ${l.transport}, ${l.rtt_ms.toFixed(0)} ms` : "down"}</Status>
+              </Table.Td>
+            </Table.Tr>
           ))}
-        </tbody>
-      </table>
-      <button type="button" className="danger" onClick={remove}>
-        Delete Node
-      </button>
-    </section>
+        </Table.Tbody>
+      </ListTable>
+
+      <Paper p="lg" style={{ borderColor: "var(--mantine-color-red-light-color)" }}>
+        <Group justify="space-between">
+          <div>
+            <Text fw={600}>Delete this Node</Text>
+            <Text c="dimmed" fz="sm">
+              Its certificate stops working at once.
+            </Text>
+          </div>
+          <Button color="red" variant="light" leftSection={<IconTrash size={16} />} onClick={remove}>
+            Delete Node
+          </Button>
+        </Group>
+      </Paper>
+    </Stack>
   );
 }

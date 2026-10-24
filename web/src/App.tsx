@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { Button, Group } from "@mantine/core";
+import { IconChartBar, IconHelpCircle, IconRoute, IconUserCircle, type Icon } from "@tabler/icons-react";
 import { api, type Me } from "./api/client";
 import { fa } from "./fa";
 import { go, useRoute } from "./router";
@@ -10,11 +12,18 @@ import { DevicePage } from "./pages/Device";
 import { AccountPage } from "./pages/Account";
 import { HelpPage } from "./pages/Help";
 import { UsagePage } from "./pages/Usage";
-import { AdminApp } from "./admin/AdminApp";
+
+// Users never load the admin panel's code.
+const AdminApp = lazy(() => import("./admin/AdminApp").then((m) => ({ default: m.AdminApp })));
 
 export function App() {
   const route = useRoute();
-  if (route === "/admin" || route.startsWith("/admin/")) return <AdminApp route={route} />;
+  if (route === "/admin" || route.startsWith("/admin/"))
+    return (
+      <Suspense>
+        <AdminApp route={route} />
+      </Suspense>
+    );
   return <UserApp route={route} />;
 }
 
@@ -57,18 +66,31 @@ function UserApp({ route }: { route: string }) {
 
   return (
     <div className="app">
-      <header>
+      <header className="app-header">
         <a href="#/" className="brand">
-          {fa.appName}
-          <small>{fa.tagline}</small>
+          <span className="brand-mark">
+            <IconRoute size={22} stroke={1.8} />
+          </span>
+          <span>
+            <strong>{fa.appName}</strong>
+            <small>{fa.tagline}</small>
+          </span>
         </a>
-        <nav>
-          <a href="#/help">{fa.help}</a>
-          {me && <a href="#/usage">{fa.usage}</a>}
-          {me && <a href="#/account">{fa.account}</a>}
-        </nav>
+        <Group component="nav" gap={4}>
+          <NavButton href="#/help" icon={IconHelpCircle} label={fa.help} current={route === "/help"} />
+          {me && <NavButton href="#/usage" icon={IconChartBar} label={fa.usage} current={route === "/usage"} />}
+          {me && <NavButton href="#/account" icon={IconUserCircle} label={fa.account} current={route === "/account"} />}
+        </Group>
       </header>
       <main>{page}</main>
     </div>
+  );
+}
+
+function NavButton({ href, icon: I, label, current }: { href: string; icon: Icon; label: string; current: boolean }) {
+  return (
+    <Button component="a" href={href} variant={current ? "light" : "subtle"} color={current ? undefined : "gray"} size="sm" px="xs" leftSection={<I size={18} />} aria-label={label}>
+      <span className="nav-label">{label}</span>
+    </Button>
   );
 }

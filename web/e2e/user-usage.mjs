@@ -40,7 +40,7 @@ try {
   {
     const page = await signIn("sara");
     await expectCard(page, "ok", 0);
-    if ((await card(page).locator("progress").count()) !== 1) fail("sara's card has no progress bar");
+    if ((await card(page).locator("[role=progressbar]").count()) !== 1) fail("sara's card has no progress bar");
     if (!(await text(card(page).locator("[data-testid=quota-used]"))).includes("۱۰ GB")) fail("sara's card does not show her 10 GB Quota");
     if (!hijri.test(await text(card(page).locator("[data-testid=quota-renews]")))) fail("the renewal date is not Solar Hijri");
     if ((await page.locator("[data-testid=quota-warning], [data-testid=quota-out]").count()) !== 0) fail("sara sees a banner at 0%");
@@ -126,7 +126,7 @@ try {
   {
     const page = await signIn("ali");
     await expectCard(page, "unlimited");
-    if ((await card(page).locator("progress").count()) !== 0) fail("an unlimited card has a progress bar");
+    if ((await card(page).locator("[role=progressbar]").count()) !== 0) fail("an unlimited card has a progress bar");
     if (!(await text(card(page).locator("[data-testid=quota-used]"))).includes("۲ GB")) fail("ali's card does not show his 2 GB");
     if ((await page.locator("[data-testid=quota-warning], [data-testid=quota-out]").count()) !== 0) fail("an unlimited User sees a banner");
     await page.context().close();

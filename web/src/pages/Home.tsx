@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Alert, Badge, Button, Group, Paper, Text, ThemeIcon, Title } from "@mantine/core";
+import { IconChevronLeft, IconDeviceMobile, IconInfoCircle, IconPlus } from "@tabler/icons-react";
 import { api, type DeviceInfo, type Me, type MyUsage } from "../api/client";
 import { fa } from "../fa";
 import { QuotaCard } from "./Quota";
@@ -6,6 +8,15 @@ import { QuotaCard } from "./Quota";
 export function stateLabel(d: DeviceInfo): string {
   if (d.revoked) return fa.revoked;
   return d.state === "active" ? fa.active : fa.blocked;
+}
+
+export function StateBadge({ device: d }: { device: DeviceInfo }) {
+  const color = d.revoked ? "gray" : d.state === "active" ? "green" : "red";
+  return (
+    <Badge color={color} variant="light" size="sm">
+      {stateLabel(d)}
+    </Badge>
+  );
 }
 
 export function HomePage({ me }: { me: Me }) {
@@ -21,29 +32,49 @@ export function HomePage({ me }: { me: Me }) {
   return (
     <section>
       {usage && <QuotaCard usage={usage} onChange={setUsage} />}
-      <div className="row">
-        <h1>
-          {fa.devices} <small>{fa.deviceCount(me.device_count, me.device_cap)}</small>
-        </h1>
-        {full ? (
-          <p className="notice">{fa.capReached}</p>
-        ) : (
-          <a className="button" href="#/devices/new">
+      <Group justify="space-between" mt="xl" mb="md">
+        <Title order={1} size="h3">
+          {fa.devices}{" "}
+          <Text span c="dimmed" fz="sm" fw={400}>
+            {fa.deviceCount(me.device_count, me.device_cap)}
+          </Text>
+        </Title>
+        {!full && (
+          <Button component="a" href="#/devices/new" leftSection={<IconPlus size={18} />}>
             {fa.newDevice}
-          </a>
+          </Button>
         )}
-      </div>
-      {live.length === 0 && <p>{fa.noDevices}</p>}
+      </Group>
+      {full && (
+        <Alert color="yellow" variant="light" icon={<IconInfoCircle />} mb="md">
+          {fa.capReached}
+        </Alert>
+      )}
+      {live.length === 0 && (
+        <Paper p="xl" ta="center" c="dimmed">
+          {fa.noDevices}
+        </Paper>
+      )}
       <ul className="devices">
         {live.map((d) => (
           <li key={d.id}>
-            <a href={`#/devices/${d.id}`}>
-              <strong>{d.name}</strong>
-              <span className={`state ${d.state}`}>
-                {stateLabel(d)}
-                {d.recent_bytes > 0 && <small className="recent"> · {fa.usedRecently}</small>}
-              </span>
-            </a>
+            <Paper component="a" href={`#/devices/${d.id}`} className="device-row">
+              <ThemeIcon variant="light" size="lg" radius="md">
+                <IconDeviceMobile size={20} />
+              </ThemeIcon>
+              <div className="grow">
+                <Text fw={600} truncate>
+                  {d.name}
+                </Text>
+                {d.recent_bytes > 0 && (
+                  <Text fz="xs" c="dimmed">
+                    {fa.usedRecently}
+                  </Text>
+                )}
+              </div>
+              <StateBadge device={d} />
+              <IconChevronLeft size={18} color="var(--mantine-color-dimmed)" />
+            </Paper>
           </li>
         ))}
       </ul>

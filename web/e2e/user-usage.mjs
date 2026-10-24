@@ -104,7 +104,7 @@ try {
     await out.waitFor();
     if (!hijri.test(await text(out))) fail(`the 100% banner shows no Solar Hijri renewal date: "${await text(out)}"`);
     const refills = page.locator("[data-testid=refills]");
-    if (!(await text(refills)).includes("۲")) fail(`reza's Refills read "${await text(refills)}"`);
+    if (!(await text(refills)).includes("۲ شارژ")) fail(`reza's Refills read "${await text(refills)}"`);
     if (!hijri.test(await text(refills))) fail("the next Refill expiry is not a Solar Hijri date");
 
     step("reza: redeem a Refill after a confirmation that shows what it adds");
@@ -118,7 +118,7 @@ try {
     if (!asked.includes("۵ GB")) fail(`the confirmation reads "${asked}", want what the Refill adds (5 GB)`);
     if ((await page.locator("[data-testid=quota-out]").count()) !== 0) fail("the 100% banner stays after redeeming");
     if (!(await text(card(page).locator("[data-testid=quota-remedies]"))).includes("۵ GB")) fail("the card does not show the 5 GB reset");
-    if (!(await text(refills)).includes("۱")) fail(`after redeeming, reza's Refills read "${await text(refills)}"`);
+    if (!(await text(refills)).includes("۱ شارژ")) fail(`after redeeming, reza's Refills read "${await text(refills)}"`);
     await page.context().close();
   }
 

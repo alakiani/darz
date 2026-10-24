@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { byQuotaShare, gbField, mbits, parseGB, periodText, rateOf, renews } from "./quota";
+import { byQuotaShare, gbField, mbits, parseGB, periodText, presetsText, rateOf, renews } from "./quota";
 
 const user = (handle: string, period_bytes: number, quota?: number, period_remedies = 0) => ({
   handle,
@@ -66,5 +66,23 @@ describe("the Users table's Quota columns", () => {
   it("shows the renewal as a Gregorian date in UTC", () => {
     expect(renews("2026-11-24T00:00:00Z")).toBe("24 Nov 2026");
     expect(renews("2026-09-01T00:00:00Z")).toBe("1 Sep 2026");
+  });
+});
+
+describe("the Invites table's Presets column", () => {
+  const invite = (p: object) => ({ kind: "new", ...p });
+
+  it("shows the Quota, what happens when it runs out, and the Refills", () => {
+    expect(presetsText(invite({ quota: 5e9, running_out: "slow", rate: 250_000, refills: 2, refill_days: 60 }))).toBe(
+      "5 GB · Slow 2 Mbit/s · 2 Refills / 60 d",
+    );
+    expect(presetsText(invite({ quota: 2.5e9, running_out: "block", refills: 1, refill_days: 30 }))).toBe("2.5 GB · Block · 1 Refill / 30 d");
+    expect(presetsText(invite({ quota: 5e9, running_out: "block" }))).toBe("5 GB · Block");
+  });
+
+  it("shows Unlimited without a Quota, and nothing for a recovery Invite", () => {
+    expect(presetsText(invite({ running_out: "block" }))).toBe("Unlimited");
+    expect(presetsText(invite({ running_out: "block", refills: 3, refill_days: 10 }))).toBe("Unlimited · 3 Refills / 10 d");
+    expect(presetsText({ kind: "recovery" })).toBe("");
   });
 });

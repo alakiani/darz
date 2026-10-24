@@ -113,7 +113,7 @@ try {
   await page.locator("[data-testid=invite-open]").first().getByRole("button", { name: "Withdraw" }).click();
   await page.waitForFunction((n) => document.querySelectorAll("[data-testid=invite-withdrawn]").length > n, before);
 
-  step("invites: create one with a Quota, slow when out, and Refills");
+  step("invites: create one with a Quota, slow when out, and Refills; its row shows them");
   if ((await page.inputValue("input[name=quota]")) !== "" || (await page.inputValue("select[name=running_out]")) !== "block" ||
     (await page.inputValue("input[name=refills]")) !== "0" || (await page.inputValue("input[name=refill_days]")) !== "30")
     throw new Error("the Invite form's Quota defaults are not Unlimited, Block, 0 Refills and 30 days");
@@ -126,6 +126,7 @@ try {
   await page.getByRole("button", { name: "Create Invite" }).click();
   // The Go test looks the Invite up by its token.
   console.log(`preset invite: ${(await (await created).json()).url}`);
+  await page.locator("[data-testid=invite-open] td.presets", { hasText: "5 GB · Slow 2 Mbit/s · 2 Refills / 60 d" }).waitFor();
 
   step("nodes: add with the enroll command, open a Bridge's Paths, edit, delete");
   await screen("/admin/nodes", "Nodes");

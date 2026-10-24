@@ -43,7 +43,7 @@ Usage is summed per User, revoked Devices included. A User may have a **Quota**:
 Remedies never change recorded Usage; each one adds to what the User may still use in the current period.
 
 - **Top-up:** an Admin adds a number of bytes to the current period only. Unused bytes don't carry over.
-- **Reset:** adds exactly what the User has used so far in the period, bringing them back to a full Quota.
+- **Reset:** brings the User back to a full Quota. It adds the Quota minus what they may still use, and never less than zero, so a second Reset in a period adds only what was used since the first, and an unused Top-up is absorbed. The amount is fixed when the Reset is recorded: Usage that arrives late doesn't change it.
 - **Refill:** a Reset an Admin gives a User to hold.
   - **Expiry:** each Refill has its own, set when it's given (default 30 days).
   - **Holding:** a User may hold several, and unused ones carry across periods until redeemed or expired.

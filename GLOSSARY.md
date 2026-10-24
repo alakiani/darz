@@ -103,7 +103,7 @@ A fixed number of bytes an Admin adds to what a User may use in the current Quot
 _Avoid_: Bonus, extra data, credit
 
 **Reset**:
-An addition to the current Quota Period equal to what the User has used so far, bringing them back to a full Quota. Recorded Usage stays as it was; only what the User may still use changes.
+An addition to the current Quota Period that brings the User back to a full Quota: the Quota minus what they may still use, never less than zero, fixed when it is recorded. Recorded Usage stays as it was; only what the User may still use changes.
 _Avoid_: Clear, zero, wipe
 
 **Refill**:

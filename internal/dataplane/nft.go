@@ -55,6 +55,8 @@ type ruleset struct {
 	ResolverAddr string
 	Rules        []nftRule // in priority order
 	DefaultRule  uint64
+	// Throttles are the throttled Devices, by address (ADR 0010).
+	Throttles []throttle
 	// TransitIfaces are the instances of Links to neighbouring Bridges,
 	// whose traffic this Bridge carries on as transit.
 	TransitIfaces []string
@@ -74,6 +76,19 @@ type ruleset struct {
 	// only (ADR 0006).
 	MonitorPort  uint16
 	MonitorAllow []string
+}
+
+// throttle holds one Device to a rate, in bytes per second of inner
+// traffic each way.
+type throttle struct {
+	Addr netip.Addr
+	Rate uint64
+}
+
+// limitName is the name of a throttled Device's limit object in one
+// direction, such as up_10_77_0_5.
+func limitName(dir string, addr netip.Addr) string {
+	return dir + "_" + strings.ReplaceAll(addr.String(), ".", "_")
 }
 
 type nftRule struct {
@@ -105,6 +120,21 @@ func render(r ruleset) string {
 		// Metering: bytes per Device address per candidate mark.
 		w("\tset usage_up { type ipv4_addr . mark; flags dynamic; size 65536; }")
 		w("\tset usage_down { type ipv4_addr . mark; flags dynamic; size 65536; }")
+		// Throttling: a policer per throttled Device each way, its bucket
+		// one second of its rate, found by the Device's address. A reload
+		// refills the buckets (ADR 0010).
+		if len(r.Throttles) > 0 {
+			var up, down []string
+			for _, th := range r.Throttles {
+				for _, dir := range []string{"up", "down"} {
+					w("\tlimit %s { rate over %d bytes/second }", limitName(dir, th.Addr), th.Rate)
+				}
+				up = append(up, fmt.Sprintf("%s : %q", th.Addr, limitName("up", th.Addr)))
+				down = append(down, fmt.Sprintf("%s : %q", th.Addr, limitName("down", th.Addr)))
+			}
+			w("\tmap throttle_up { type ipv4_addr : limit; elements = { %s } }", strings.Join(up, ", "))
+			w("\tmap throttle_down { type ipv4_addr : limit; elements = { %s } }", strings.Join(down, ", "))
+		}
 		if len(r.TransitIfaces) > 0 {
 			w("\tset transit_ifaces { type ifname; elements = { %s } }", quoteAll(r.TransitIfaces))
 		} else {
@@ -161,6 +191,12 @@ func render(r ruleset) string {
 	// Links carry less than 1500 bytes; clamp TCP to the path.
 	w("\tchain forward {")
 	w("\t\ttype filter hook forward priority mangle; policy accept;")
+	if r.Bridge && len(r.Throttles) > 0 {
+		// A throttled Device's packets over its rate are dropped ahead of
+		// metering; what passes is counted as Usage (ADR 0010).
+		w("\t\tiifname %q limit name ip saddr map @throttle_up drop", DeviceIface)
+		w("\t\toifname %q limit name ip daddr map @throttle_down drop", DeviceIface)
+	}
 	if len(r.GREIfaces) > 0 {
 		// GRE carries no authentication: new traffic that comes in on it
 		// is forwarded only from a Device or the mesh, so an Exit is no

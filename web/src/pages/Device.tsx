@@ -112,14 +112,13 @@ function Rows({ rows, withExit, label }: { rows: UsageRow[]; withExit: boolean; 
 }
 
 function Usage({ usage }: { usage: DeviceUsage }) {
-  if (usage.monthly.length === 0) return <p className="muted">{fa.noUsage}</p>;
+  if (usage.daily.length === 0) return <p className="muted">{fa.noUsage}</p>;
   const day = (p: string) => new Date(p + "T00:00:00Z").toLocaleDateString("fa-IR");
   const hour = (p: string) => new Date(p).toLocaleString("fa-IR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-  const month = (p: string) => new Date(p + "-01T00:00:00Z").toLocaleDateString("fa-IR", { year: "numeric", month: "long" });
   return (
     <div data-testid="usage">
-      <h3>{fa.monthly}</h3>
-      <Rows rows={[...usage.monthly].reverse()} withExit={false} label={month} />
+      <h3>{fa.thisPeriod}</h3>
+      <Rows rows={[usage.period]} withExit={false} label={(p) => fa.since + " " + day(p)} />
       <h3>{fa.daily}</h3>
       <Rows rows={[...usage.daily].reverse().slice(0, 30)} withExit label={day} />
       <h3>{fa.hourly}</h3>

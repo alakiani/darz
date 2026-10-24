@@ -119,7 +119,7 @@ func TestGRE(t *testing.T) {
 	}
 	for _, in := range m.instances(link) {
 		if in.Transport == protocol.TransportGRE {
-			if mtu := ifaceMTU(t, ir1, fmt.Sprintf("dz%di", in.ID)); mtu != 1500-24 {
+			if mtu := ifaceMTU(t, ir1, fmt.Sprintf("ways%di", in.ID)); mtu != 1500-24 {
 				t.Errorf("GRE interface MTU = %d, want the outer 1500 less 24", mtu)
 			}
 		}

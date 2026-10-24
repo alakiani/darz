@@ -120,15 +120,21 @@ func instanceIfaces(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// isInstanceIface matches the Coordinator's names: dz<id>l or dz<id>i.
+// isInstanceIface matches the Coordinator's names: ways<id>l or ways<id>i.
+// It also matches dz<id>l and dz<id>i, the names before the rename, so an
+// upgraded Agent removes those as strays whichever upgrades first.
 func isInstanceIface(name string) bool {
-	if len(name) < 4 || !strings.HasPrefix(name, "dz") {
+	rest, ok := strings.CutPrefix(name, "ways")
+	if !ok {
+		rest, ok = strings.CutPrefix(name, "dz")
+	}
+	if !ok || len(rest) < 2 {
 		return false
 	}
-	if end := name[len(name)-1]; end != 'l' && end != 'i' {
+	if end := rest[len(rest)-1]; end != 'l' && end != 'i' {
 		return false
 	}
-	for _, r := range name[2 : len(name)-1] {
+	for _, r := range rest[:len(rest)-1] {
 		if r < '0' || r > '9' {
 			return false
 		}

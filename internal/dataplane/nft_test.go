@@ -17,7 +17,7 @@ func bridgeRuleset() ruleset {
 	def := nftRule{ID: 2, Elements: []string{"0.0.0.0/0"}, Device: allOn("link:4"), Transit: allOn(keyDrop)}
 	return ruleset{
 		Bridge: true, ResolverAddr: "10.77.0.1", Rules: []nftRule{ir, def}, DefaultRule: 2,
-		TransitIfaces: []string{"dz9i"}, LinkIfaces: map[string]uint64{"dz9i": 9, "dz3i": 3, "dz4i": 4}, Uplink: "eth0",
+		TransitIfaces: []string{"ways9i"}, LinkIfaces: map[string]uint64{"ways9i": 9, "ways3i": 3, "ways4i": 4}, Uplink: "eth0",
 	}
 }
 
@@ -29,7 +29,7 @@ func TestBridgeRuleset(t *testing.T) {
 		"map dev_1 { type ipv4_addr : mark; elements = { 0.0.0.0 : 0x20003, 0.0.0.1 : 0x20003,",
 		"0.0.0.63 : 0x20003 } }",
 		"map tr_2 { type ipv4_addr : mark; elements = { 0.0.0.0 : 0x40001,",
-		`set transit_ifaces { type ifname; elements = { "dz9i" } }`,
+		`set transit_ifaces { type ifname; elements = { "ways9i" } }`,
 		`iifname "ways0" meta nfproto ipv6 drop`,
 		`iifname "ways0" tcp dport 853 counter meta mark set ip saddr & 0.0.0.63 map @dev_2 accept`,
 		`iifname "ways0" ip daddr @rule_1 counter meta mark set ip saddr & 0.0.0.63 map @dev_1 accept`,
@@ -37,7 +37,7 @@ func TestBridgeRuleset(t *testing.T) {
 		`iifname "ways0" counter drop`,
 		`iifname @transit_ifaces ct direction original ip daddr @rule_1 counter meta mark set ip saddr & 0.0.0.63 map @tr_1 accept`,
 		`iifname "ways0" meta l4proto { tcp, udp } th dport 53 counter dnat ip to 10.77.0.1:53`,
-		`ct state new counter ct mark set iifname map { "dz3i" : 0x20003, "dz4i" : 0x20004, "dz9i" : 0x20009 }`,
+		`ct state new counter ct mark set iifname map { "ways3i" : 0x20003, "ways4i" : 0x20004, "ways9i" : 0x20009 }`,
 		`ct direction reply ct mark & 0xffff0000 == 0x20000 counter meta mark set ct mark`,
 		"tcp option maxseg size set rt mtu",
 		"set usage_up { type ipv4_addr . mark; flags dynamic; size 65536; }",
@@ -62,9 +62,9 @@ func TestBridgeRuleset(t *testing.T) {
 }
 
 func TestExitRuleset(t *testing.T) {
-	got := render(ruleset{Exit: true, LinkIfaces: map[string]uint64{"dz3l": 7, "dz4l": 7, "dz9l": 2}, Uplink: "eth0"})
+	got := render(ruleset{Exit: true, LinkIfaces: map[string]uint64{"ways3l": 7, "ways4l": 7, "ways9l": 2}, Uplink: "eth0"})
 	for _, want := range []string{
-		`ct state new counter ct mark set iifname map { "dz3l" : 0x20007, "dz4l" : 0x20007, "dz9l" : 0x20002 }`,
+		`ct state new counter ct mark set iifname map { "ways3l" : 0x20007, "ways4l" : 0x20007, "ways9l" : 0x20002 }`,
 		`oifname "eth0" ct mark & 0xffff0000 == 0x20000 counter masquerade`,
 		// Replies to masqueraded connections are only translated back while
 		// a nat chain hooks prerouting.
@@ -115,14 +115,14 @@ func TestMonitoringPortIsAllowlisted(t *testing.T) {
 // and on a GRE interface forwards only new traffic from Devices or the mesh
 // (ADR 0009). Replies to this Node's own connections still come back.
 func TestGREIsLimitedToPeersAndOurRanges(t *testing.T) {
-	r := ruleset{Exit: true, LinkIfaces: map[string]uint64{"dz3l": 7, "dz4l": 7}, Uplink: "eth0",
-		GREIfaces: []string{"dz3l"}, GREPeers: []string{"203.0.113.9", "198.51.100.4"}}
+	r := ruleset{Exit: true, LinkIfaces: map[string]uint64{"ways3l": 7, "ways4l": 7}, Uplink: "eth0",
+		GREIfaces: []string{"ways3l"}, GREPeers: []string{"203.0.113.9", "198.51.100.4"}}
 	got := render(r)
 	for _, want := range []string{
 		"\tchain input {\n\t\ttype filter hook input priority filter; policy accept;\n",
 		"\t\tmeta l4proto gre ip saddr { 198.51.100.4, 203.0.113.9 } accept\n",
 		"\t\tmeta l4proto gre drop\n",
-		`iifname { "dz3l" } ct direction original ip saddr != { 10.77.0.0/16, 10.78.0.0/16 } counter drop`,
+		`iifname { "ways3l" } ct direction original ip saddr != { 10.77.0.0/16, 10.78.0.0/16 } counter drop`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("ruleset lacks %q:\n%s", want, got)
@@ -163,8 +163,8 @@ func TestBucketUpdatesTouchOnlyMovedBuckets(t *testing.T) {
 // empty set).
 func TestGREPeerWithoutAddressIsLeftOut(t *testing.T) {
 	for _, peers := range [][]string{{""}, {"", "203.0.113.9"}, {"not-an-ip"}} {
-		r := ruleset{Exit: true, LinkIfaces: map[string]uint64{"dz3l": 7}, Uplink: "eth0",
-			GREIfaces: []string{"dz3l"}, GREPeers: peers}
+		r := ruleset{Exit: true, LinkIfaces: map[string]uint64{"ways3l": 7}, Uplink: "eth0",
+			GREIfaces: []string{"ways3l"}, GREPeers: peers}
 		got := render(r)
 		if strings.Contains(got, "{  }") || strings.Contains(got, "{ ,") || strings.Contains(got, "not-an-ip") {
 			t.Errorf("peers %q render an invalid set:\n%s", peers, got)
@@ -173,8 +173,8 @@ func TestGREPeerWithoutAddressIsLeftOut(t *testing.T) {
 			t.Errorf("peers %q: GRE is no longer dropped by default", peers)
 		}
 	}
-	got := render(ruleset{Exit: true, LinkIfaces: map[string]uint64{"dz3l": 7}, Uplink: "eth0",
-		GREIfaces: []string{"dz3l"}, GREPeers: []string{"", "203.0.113.9"}})
+	got := render(ruleset{Exit: true, LinkIfaces: map[string]uint64{"ways3l": 7}, Uplink: "eth0",
+		GREIfaces: []string{"ways3l"}, GREPeers: []string{"", "203.0.113.9"}})
 	if !strings.Contains(got, "meta l4proto gre ip saddr { 203.0.113.9 } accept") {
 		t.Errorf("the valid peer was lost:\n%s", got)
 	}

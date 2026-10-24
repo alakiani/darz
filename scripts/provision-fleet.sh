@@ -317,7 +317,23 @@ check_crossing() {
   fi
 }
 
-# check_inbound: both abroad Nodes can open TCP 443 and 8443 on the Coordinator.
+# coord_source PREFIX prints the address the Node sees the Coordinator's
+# connections come from on TCP 9443, the monitoring port, or nothing. It
+# watches for the SYN, so nothing needs to listen yet. An HTTPS lookup from
+# the Coordinator can't tell: some networks send HTTPS abroad through other
+# addresses than plain TCP.
+coord_source() {
+  local ip user out pid
+  ip=$(val "$1_IP"); user=$(val "$1_USER"); out=$(mktemp)
+  remote "$user" "$ip" "sudo timeout 15 tcpdump -nl -i any -c 1 'tcp dst port 9443 and tcp[tcpflags] & tcp-syn != 0'" >"$out" 2>/dev/null & pid=$!
+  sleep 3
+  remote "$COORD_USER" "$COORD_IP" "for i in 1 2 3; do nc -z -w2 $ip 9443; sleep 1; done" >/dev/null 2>&1 || true
+  wait "$pid" || true
+  sed -n 's/.* IP \([0-9.]*\)\.[0-9]* > .*/\1/p' "$out" | head -n1
+  rm -f "$out"
+}
+
+# check_inbound: the abroad Nodes can open TCP 443 and 8443 on the Coordinator.
 check_inbound() {
   local cip cuser a aip auser port pid bad=0
   cip=$(val COORD_IP); cuser=$(val COORD_USER)
@@ -371,7 +387,8 @@ stage "Abroad Node 1"
 say "Rent the first abroad VM. It will be an Exit."
 step "Any provider outside Iran; 1–2 vCPU, 1–2 GB RAM, generous traffic, and a public IPv4."
 step "Image: Ubuntu 26.04. Add your SSH key when creating it."
-step "If the provider has a cloud firewall, allow inbound UDP (all ports), IP protocol 47 (GRE) and TCP 22."
+step "If the provider has a cloud firewall, allow inbound UDP (all ports), IP protocol 47 (GRE), TCP 22,"
+step "and TCP 9443 (monitoring; the Coordinator scrapes it)."
 pause "Press Enter once it's running."
 rent_node ABROAD1 "de-1"
 pause
@@ -382,7 +399,7 @@ say "A second abroad Exit, at a different provider from $(val ABROAD1_PROVIDER),
 say "abroad flowing when one is blocked. You can also add it later: list it under abroad in"
 say "the inventory and run enroll.yml for it."
 if confirm "Rent a second abroad Node now?"; then
-  step "Same size, Ubuntu 26.04, your SSH key, inbound UDP, GRE and TCP 22 allowed."
+  step "Same size, Ubuntu 26.04, your SSH key, inbound UDP, GRE, TCP 22 and 9443 allowed."
   pause "Press Enter once it's running."
   rent_node ABROAD2 "nl-1"
   ABROADS+=(ABROAD2)
@@ -400,7 +417,7 @@ pause
 stage "Domestic Node 1"
 say "Rent the first domestic VM in an Iranian datacenter. It will be a Bridge (tagged IR)."
 step "Pick the cheapest hourly or monthly plan first: this stage tests whether it can reach abroad."
-step "Ubuntu 26.04, your SSH key, a public IPv4, inbound UDP allowed."
+step "Ubuntu 26.04, your SSH key, a public IPv4, inbound UDP, GRE, TCP 22 and 9443 allowed."
 pause "Press Enter once it's running."
 rent_node DOM1 "ir-1"
 say "Checking that this VM can reach your abroad Nodes…"
@@ -436,11 +453,23 @@ for p in DOM1 DOM2; do
 done
 say "Checking that Agents abroad can reach it…"
 retry "Coordinator: inbound 443 and 8443 from abroad" check_inbound
-egress=$(remote "$COORD_USER" "$COORD_IP" "curl -4 -fsS -m 10 https://api.ipify.org" 2>/dev/null || true)
-if [[ -n "$egress" && "$egress" != "$COORD_IP" ]]; then
-  warn "it reaches the internet from $egress, not $COORD_IP: Nodes will see that address"
-fi
-write_env COORD_EGRESS_IP "${egress:-$COORD_IP}"
+say "Checking which address each Node sees the Coordinator come from…"
+sources=()
+for p in DOM1 DOM2 "${ABROADS[@]}"; do
+  src=$(coord_source "$p")
+  if [[ -z "$src" ]]; then
+    warn "$(val "${p}_NAME") saw no connection from the Coordinator on TCP 9443: check its firewall"
+    SKIPPED+=("$(val "${p}_NAME"): inbound TCP 9443 from the Coordinator")
+    continue
+  fi
+  ok "$(val "${p}_NAME") sees it as $src"
+  [[ " ${sources[*]} " == *" $src "* ]] || sources+=("$src")
+done
+(( ${#sources[@]} )) || sources=("$COORD_IP")
+for src in "${sources[@]}"; do
+  [[ "$src" == "$COORD_IP" ]] || warn "a Node sees the Coordinator as $src, not $COORD_IP: monitoring lets that address in too"
+done
+write_env COORD_EGRESS_IP "$(IFS=,; printf '%s' "${sources[*]}")"
 pause
 
 # ── 7 ─────────────────────────────────────────────────────────────────────

@@ -17,7 +17,7 @@ export function periodDay(at: string | number): string {
   return new Date(at).toLocaleDateString("fa-IR", { timeZone: "UTC" });
 }
 
-/** A period's Top-ups and Resets, one sum per kind: "+ ۵ GB شارژ". */
+/** A period's Top-ups and Resets, one sum per kind: "+ ۵ GB ریست". */
 export function remediesText(p: PeriodUsage): string {
   const sums = new Map<string, number>();
   for (const r of p.remedies) sums.set(r.kind, (sums.get(r.kind) ?? 0) + r.bytes);

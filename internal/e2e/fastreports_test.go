@@ -37,7 +37,19 @@ type tappedReport struct {
 	at     time.Time
 	from   string // the Agent's source address
 	failed bool   // answered 503 by the tap
+	status int    // the Coordinator's answer
 	health protocol.Health
+}
+
+// statusWriter keeps the status a handler answered with.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
 }
 
 func (tp *healthTap) wrap(next http.Handler) http.Handler {
@@ -60,13 +72,18 @@ func (tp *healthTap) wrap(next http.Handler) http.Handler {
 			tp.fail[rep.from]--
 			rep.failed = true
 		}
+		i := len(tp.reports)
 		tp.reports = append(tp.reports, rep)
 		tp.mu.Unlock()
 		if rep.failed {
 			http.Error(w, "failing on purpose", http.StatusServiceUnavailable)
 			return
 		}
-		next.ServeHTTP(w, r)
+		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(sw, r)
+		tp.mu.Lock()
+		tp.reports[i].status = sw.status
+		tp.mu.Unlock()
 	})
 }
 
@@ -310,9 +327,27 @@ func TestFastUsageReports(t *testing.T) {
 		}
 
 		want := before + backlog*perHour + wire
-		testutil.Eventually(t, 120*time.Second, "the whole backlog reaches the Coordinator", func() bool {
-			return usage() >= want
-		})
+		deadline := time.Now().Add(120 * time.Second)
+		for usage() < want && time.Now().Before(deadline) {
+			time.Sleep(25 * time.Millisecond)
+		}
+		if got := usage(); got < want {
+			for _, r := range co.tap.from(bridge)[n:] {
+				var old, oldBytes int
+				for _, u := range r.health.Usage {
+					if u.Hour < sentHour {
+						old++
+						oldBytes += int(u.Up)
+					}
+				}
+				t.Logf("report at %s: status %d, failed %v, %d buckets, %d before the open hour (%d bytes up)",
+					r.at.Format("15:04:05.000"), r.status, r.failed, len(r.health.Usage), old, oldBytes)
+			}
+			if b, err := os.ReadFile(path); err == nil {
+				t.Logf("the Bridge's usage.json is %d bytes", len(b))
+			}
+			t.Fatalf("timed out waiting for the whole backlog: usage is %d, want %d (before %d)", got, want, before)
+		}
 		time.Sleep(3 * time.Second)
 		if got := usage(); got > want+slack {
 			t.Errorf("usage is %d, want about %d: counted twice?", got, want)

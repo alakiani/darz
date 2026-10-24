@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/alakiani/ways/internal/protocol"
@@ -98,9 +99,12 @@ type UsageRow struct {
 }
 
 // DeviceUsage is a Device's usage at each resolution: hourly for the last
-// 7 days and daily for the last 90, per Exit; monthly in total.
+// 7 days and daily for the last 90, per Exit; monthly in total. Period is
+// its total in its User's current Quota Period, labelled by the period's
+// start day (ADR 0010).
 type DeviceUsage struct {
 	Hourly, Daily, Monthly []UsageRow
+	Period                 UsageRow
 }
 
 // Usage returns a Device's usage. Coarser views include what finer tables
@@ -123,7 +127,30 @@ func (s *Store) Usage(ctx context.Context, deviceID string) (DeviceUsage, error)
 			UNION ALL SELECT strftime('%Y-%m', day, 'unixepoch'), up, down FROM usage_daily WHERE device_id = ?1
 			UNION ALL SELECT strftime('%Y-%m', hour, 'unixepoch'), up, down FROM usage_hourly WHERE device_id = ?1)
 		GROUP BY m ORDER BY m`, deviceID)
+	if err != nil {
+		return u, err
+	}
+	var userID string
+	if err := s.db.QueryRowContext(ctx, `SELECT coalesce(user_id, '') FROM devices WHERE id = ?`, deviceID).Scan(&userID); err != nil || userID == "" {
+		return u, ignoreNoRows(err)
+	}
+	p, err := s.CurrentQuotaPeriod(ctx, userID)
+	if err != nil {
+		return u, err
+	}
+	u.Period.Period = p.Start.Format("2006-01-02")
+	err = s.db.QueryRowContext(ctx, `SELECT coalesce(sum(up), 0), coalesce(sum(down), 0) FROM (
+			SELECT up, down FROM usage_hourly WHERE device_id = ?1 AND hour >= ?2 AND hour < ?3
+			UNION ALL SELECT up, down FROM usage_daily WHERE device_id = ?1 AND day >= ?2 AND day < ?3)`,
+		deviceID, p.Start.Unix(), p.End.Unix()).Scan(&u.Period.Up, &u.Period.Down)
 	return u, err
+}
+
+func ignoreNoRows(err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	return err
 }
 
 func (s *Store) usageRows(ctx context.Context, q, deviceID string) ([]UsageRow, error) {

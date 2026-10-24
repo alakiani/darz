@@ -297,11 +297,26 @@ func (q QuotaStanding) RanOut() bool {
 	return limited && left == 0
 }
 
+// ResetAdds is what a Reset would add now: the Quota minus what the User
+// may still use, never less than zero, which brings them back to a full
+// Quota. limited is false for an unlimited Quota, which takes no Reset.
+func (q QuotaStanding) ResetAdds() (adds uint64, limited bool) {
+	left, limited := q.Left()
+	if !limited || left >= *q.Quota {
+		return 0, limited
+	}
+	return *q.Quota - left, true
+}
+
 // QuotaStanding returns where a User stands in their current Quota Period.
 func (s *Store) QuotaStanding(ctx context.Context, userID string) (QuotaStanding, error) {
+	return s.quotaStanding(ctx, s.db, userID)
+}
+
+func (s *Store) quotaStanding(ctx context.Context, db queryer, userID string) (QuotaStanding, error) {
 	q := QuotaStanding{UserID: userID}
 	var created int64
-	err := s.db.QueryRowContext(ctx, `SELECT created_at, quota, coalesce(slow_rate, 0) FROM users WHERE id = ?`, userID).
+	err := db.QueryRowContext(ctx, `SELECT created_at, quota, coalesce(slow_rate, 0) FROM users WHERE id = ?`, userID).
 		Scan(&created, &q.Quota, &q.SlowRate)
 	if errors.Is(err, sql.ErrNoRows) {
 		return q, ErrNotFound
@@ -311,10 +326,10 @@ func (s *Store) QuotaStanding(ctx context.Context, userID string) (QuotaStanding
 	}
 	q.RenewalDay = time.Unix(created, 0).UTC().Day()
 	q.Period = QuotaPeriodAt(q.RenewalDay, s.Now())
-	if q.Usage, err = periodBytes(ctx, s.db, userID, q.Period); err != nil {
+	if q.Usage, err = periodBytes(ctx, db, userID, q.Period); err != nil {
 		return q, err
 	}
-	err = s.db.QueryRowContext(ctx, `SELECT coalesce(sum(bytes), 0) FROM quota_remedies WHERE user_id = ? AND period_start = ?`,
+	err = db.QueryRowContext(ctx, `SELECT coalesce(sum(bytes), 0) FROM quota_remedies WHERE user_id = ? AND period_start = ?`,
 		userID, q.Period.Start.Unix()).Scan(&q.Remedies)
 	return q, err
 }

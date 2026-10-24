@@ -7,7 +7,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-24.04
+    # The self-hosted runner, except for pull requests from forks: the repo
+    # is public and the lab runs as root, so those stay on GitHub's runners.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'self-hosted' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -80,7 +82,7 @@ jobs:
   # The deployment playbooks against Ubuntu 26.04 containers, with two
   # release bundles built as the Release workflow builds them.
   deploy:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'self-hosted' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -118,7 +120,8 @@ jobs:
         run: |
           sudo modprobe wireguard
           sudo modprobe ip_gre
-          echo "172.30.0.10 wayfinder.ir" | sudo tee -a /etc/hosts
+          # Once only: a self-hosted runner keeps /etc/hosts between runs.
+          grep -q "^172.30.0.10 wayfinder.ir$" /etc/hosts || echo "172.30.0.10 wayfinder.ir" | sudo tee -a /etc/hosts
 
       - name: Test the playbooks
         env:

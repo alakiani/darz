@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: accepted; Endpoint Slots and Backups superseded by ADR 0011
 ---
 
 # Client-hop failover: three domestic Endpoint Slots, one shared Bridge identity, one user action
@@ -15,6 +15,8 @@ Client-hop is needed when a Device's Bridge cannot carry its traffic:
 Failures of a Bridge's Links or Exits that the mesh can route around (ADR 0004) never reach the Device.
 
 ## Endpoint Slots
+
+> Superseded by [ADR 0011](0011-bridge-address.md): one Bridge Address replaces the three slots and the Backup configs.
 
 - **Three slots, all domestic:** `a.wayfinder.ir`, `b.wayfinder.ir`, `c.wayfinder.ir`. No abroad Bridge ever faces Devices; abroad Nodes holding the Bridge Role serve only as transit inside the mesh. **Accepted cost:** if every domestic Bridge is unreachable, Devices have no fallback.
 - **Slots are global, not per Device.** Each Device resolves the same three names before its tunnel is up, through the ISP's plaintext DNS. Per-Device names would tag a Device to the filter on every connect.

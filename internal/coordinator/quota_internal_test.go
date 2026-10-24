@@ -177,3 +177,16 @@ func TestNewQuotaPeriodBringsAUserBackWithoutTraffic(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 }
+
+// The Admin's Users table shows when each User's Quota renews, as a date.
+func TestAdminUsersShowWhenTheQuotaRenews(t *testing.T) {
+	a, admin, me, dev, _ := quotaFixture(t)
+	a.use(dev, 1000, 2000)
+	maryam := a.client()
+	maryam.must(200, "POST", "/v1/login", protocol.Login{Handle: "maryam", Password: password}, nil)
+	var mine protocol.MyUsage
+	maryam.must(200, "GET", "/v1/me/usage", nil, &mine)
+	if u := admin.userInfo(me.ID); !u.RenewsAt.Equal(mine.RenewsAt) || !u.RenewsAt.After(*a.clock) || u.PeriodBytes != 3000 {
+		t.Errorf("renews at %v with %d bytes, want %v with 3000", u.RenewsAt, u.PeriodBytes, mine.RenewsAt)
+	}
+}

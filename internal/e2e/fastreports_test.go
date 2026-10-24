@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -247,6 +248,10 @@ func TestFastUsageReports(t *testing.T) {
 
 	t.Run("after an outage the open hour comes first and nothing is lost", func(t *testing.T) {
 		before := usage()
+		var openBefore []any
+		if u, err := co.store.Usage(ctx, dev.ID); err == nil && len(u.Hourly) > 0 {
+			openBefore = append(openBefore, u.Hourly[len(u.Hourly)-1])
+		}
 		cut := l.Filter(lab.DropAll(l.Node("coord")))
 		defer cut.Remove()
 
@@ -272,6 +277,10 @@ func TestFastUsageReports(t *testing.T) {
 		}
 		open := time.Now().UTC().Truncate(time.Hour)
 		key := dev.Address.String() + "|" + exitID
+		if c := st.Buckets[open.Unix()][key]; c != nil {
+			openBefore = append(openBefore, fmt.Sprintf("bridge file open hour up %d", c.Up))
+		}
+		openBefore = append(openBefore, fmt.Sprintf("bridge file hours %d", len(st.Buckets)))
 		for i := range backlog {
 			// Two days back and older: hours the Coordinator has never seen.
 			h := open.Add(-time.Duration(48+i) * time.Hour).Unix()
@@ -333,16 +342,23 @@ func TestFastUsageReports(t *testing.T) {
 		}
 		if got := usage(); got < want {
 			for _, r := range co.tap.from(bridge)[n:] {
-				var old, oldBytes int
+				var old, oldBytes, openBytes int
 				for _, u := range r.health.Usage {
 					if u.Hour < sentHour {
 						old++
 						oldBytes += int(u.Up)
+					} else {
+						openBytes += int(u.Up)
 					}
 				}
-				t.Logf("report at %s: status %d, failed %v, %d buckets, %d before the open hour (%d bytes up)",
-					r.at.Format("15:04:05.000"), r.status, r.failed, len(r.health.Usage), old, oldBytes)
+				t.Logf("report at %s: status %d, failed %v, %d buckets, %d before the open hour (%d bytes up), open hour %d bytes up",
+					r.at.Format("15:04:05.000"), r.status, r.failed, len(r.health.Usage), old, oldBytes, openBytes)
 			}
+			if u, err := co.store.Usage(ctx, dev.ID); err == nil {
+				t.Logf("Coordinator: hourly %+v", u.Hourly)
+				t.Logf("Coordinator: monthly %+v", u.Monthly)
+			}
+			t.Logf("open hour before the outage: %+v", openBefore)
 			if b, err := os.ReadFile(path); err == nil {
 				t.Logf("the Bridge's usage.json is %d bytes", len(b))
 			}

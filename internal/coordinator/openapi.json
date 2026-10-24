@@ -547,6 +547,21 @@
           "kind": {
             "type": "string"
           },
+          "quota": {
+            "type": "integer"
+          },
+          "rate": {
+            "type": "integer"
+          },
+          "refill_days": {
+            "type": "integer"
+          },
+          "refills": {
+            "type": "integer"
+          },
+          "running_out": {
+            "type": "string"
+          },
           "status": {
             "type": "string"
           }

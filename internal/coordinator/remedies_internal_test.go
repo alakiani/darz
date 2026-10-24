@@ -27,6 +27,18 @@ func (cl *client) userInfo(id string) protocol.UserInfo {
 	return users[i]
 }
 
+// openInvite is the one open Invite in the Admin's list.
+func (cl *client) openInvite() protocol.InviteRecord {
+	cl.a.t.Helper()
+	var list []protocol.InviteRecord
+	cl.must(200, "GET", "/v1/admin/invites", nil, &list)
+	list = slices.DeleteFunc(list, func(r protocol.InviteRecord) bool { return r.Status != "open" })
+	if len(list) != 1 {
+		cl.a.t.Fatalf("open Invites = %+v, want one", list)
+	}
+	return list[0]
+}
+
 func left(u protocol.MyUsage) int64 {
 	if u.Left == nil {
 		return -1
@@ -201,6 +213,9 @@ func TestAnInviteWithPresetsMakesAUserWithThem(t *testing.T) {
 	var inv protocol.IssuedInvite
 	admin.must(200, "POST", "/v1/admin/invites", protocol.CreateInvite{Quota: new(uint64(5e9)), RunningOut: protocol.RunningOutSlow,
 		Rate: 125_000, Refills: 2, RefillDays: 10}, &inv)
+	if r := admin.openInvite(); r.Quota == nil || *r.Quota != 5e9 || r.RunningOut != "slow" || r.Rate != 125_000 || r.Refills != 2 || r.RefillDays != 10 {
+		t.Errorf("the listed Invite = %+v, want its presets", r)
+	}
 	a.tick(3 * 24 * time.Hour) // the Refills' 10 days count from registration
 	sara := a.client()
 	var me protocol.Me
@@ -220,6 +235,9 @@ func TestAnInviteWithPresetsMakesAUserWithThem(t *testing.T) {
 
 	// No presets: unlimited, blocking, no Refills.
 	admin.must(200, "POST", "/v1/admin/invites", protocol.CreateInvite{}, &inv)
+	if r := admin.openInvite(); r.Quota != nil || r.RunningOut != "block" || r.Rate != 0 || r.Refills != 0 || r.RefillDays != 0 {
+		t.Errorf("the listed Invite without presets = %+v", r)
+	}
 	reza := a.client()
 	reza.must(200, "POST", "/v1/invites/accept", protocol.AcceptInvite{Token: inv.Token, Handle: "reza", Password: password}, &me)
 	if u := admin.userInfo(me.ID); u.Quota != nil || u.RunningOut != "block" || u.Refills != 0 {

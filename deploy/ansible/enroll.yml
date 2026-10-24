@@ -74,9 +74,10 @@
             ManageForeignRoutes=no
         - dest: /etc/systemd/network/00-ways-unmanaged.network
           content: |
-            # Managed by enroll.yml: the Agent's Link and Device interfaces.
+            # Managed by enroll.yml: the Agent's Link and Device interfaces
+            # (dz*: Link interfaces named before the rename, removed by the Agent).
             [Match]
-            Name=dz* ways0
+            Name=ways* dz*
 
             [Link]
             Unmanaged=yes

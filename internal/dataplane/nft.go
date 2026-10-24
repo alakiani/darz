@@ -11,7 +11,7 @@ import (
 // The data plane's names and numbers.
 const (
 	// DeviceIface is the Bridge's Device-facing WireGuard interface. It
-	// must not match "dz*", the Link instances' pattern.
+	// must not match ways<id>l or ways<id>i, the Link instances' pattern.
 	DeviceIface = "ways0"
 	devicePool  = "10.77.0.0/16"
 	meshRange   = "10.78.0.0/16" // every instance's /31 (ADR 0007)

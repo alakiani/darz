@@ -156,7 +156,7 @@ func TestPassivePeaksRaiseTheFigure(t *testing.T) {
 	var ok bool
 	// 30 Mbps of real traffic for 4 s.
 	for s := 0; s <= 4; s++ {
-		rate, ok = tp.sample(t0.Add(time.Duration(s)*time.Second), "dz1", rx)
+		rate, ok = tp.sample(t0.Add(time.Duration(s)*time.Second), "ways1", rx)
 		rx += 30 * mbit
 	}
 	if !ok || rate < 29.9 || rate > 30.1 {
@@ -194,22 +194,22 @@ func TestTestSkippedWhileRealTrafficExceedsTheFigure(t *testing.T) {
 
 func TestPassiveRateNeedsAFullWindowAndResetsOnANewInterface(t *testing.T) {
 	var tp throughput
-	tp.sample(t0, "dz1", 0)
-	if _, ok := tp.sample(t0.Add(time.Second), "dz1", mbit); ok {
+	tp.sample(t0, "ways1", 0)
+	if _, ok := tp.sample(t0.Add(time.Second), "ways1", mbit); ok {
 		t.Error("a rate from 1 s of samples, want a full window")
 	}
-	tp.sample(t0.Add(2*time.Second), "dz1", 2*mbit)
-	if r, ok := tp.sample(t0.Add(3*time.Second), "dz1", 3*mbit); !ok || r < 0.99 || r > 1.01 {
+	tp.sample(t0.Add(2*time.Second), "ways1", 2*mbit)
+	if r, ok := tp.sample(t0.Add(3*time.Second), "ways1", 3*mbit); !ok || r < 0.99 || r > 1.01 {
 		t.Errorf("rate = %v (%v), want 1 Mbps", r, ok)
 	}
 	// The active instance changed: its counter is another counter.
-	if _, ok := tp.sample(t0.Add(4*time.Second), "dz2", 100); ok {
+	if _, ok := tp.sample(t0.Add(4*time.Second), "ways2", 100); ok {
 		t.Error("a rate across two interfaces' counters")
 	}
 	// A test's own bytes are not a peak.
-	tp.sample(t0.Add(5*time.Second), "dz2", 100)
+	tp.sample(t0.Add(5*time.Second), "ways2", 100)
 	tp.measured(1, t0, protocol.TransportAmneziaWG)
-	if _, ok := tp.sample(t0.Add(9*time.Second), "dz2", 100+100*mbit); ok {
+	if _, ok := tp.sample(t0.Add(9*time.Second), "ways2", 100+100*mbit); ok {
 		t.Error("the bytes of the test counted as real traffic")
 	}
 }

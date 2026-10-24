@@ -22,13 +22,13 @@ func TestRouteGetGivesTheInterfaceAddress(t *testing.T) {
 }
 
 func TestTunnelEndsOfAGREInterface(t *testing.T) {
-	out := `[{"ifindex":9,"ifname":"dz5i","flags":["POINTOPOINT","NOARP","UP","LOWER_UP"],"mtu":1476,` +
+	out := `[{"ifindex":9,"ifname":"ways5i","flags":["POINTOPOINT","NOARP","UP","LOWER_UP"],"mtu":1476,` +
 		`"linkinfo":{"info_kind":"gre","info_data":{"remote":"18.130.1.2","local":"10.10.10.215","ttl":64,"pmtudisc":true}}}]`
 	e, err := parseTunnelEnds([]byte(out))
 	if err != nil || e.Local != netip.MustParseAddr("10.10.10.215") || e.Remote != netip.MustParseAddr("18.130.1.2") {
 		t.Errorf("ends = %+v, %v", e, err)
 	}
-	wg := `[{"ifindex":7,"ifname":"dz5i","linkinfo":{"info_kind":"wireguard"}}]`
+	wg := `[{"ifindex":7,"ifname":"ways5i","linkinfo":{"info_kind":"wireguard"}}]`
 	if _, err := parseTunnelEnds([]byte(wg)); err == nil {
 		t.Error("a WireGuard interface read as GRE")
 	}
@@ -37,7 +37,7 @@ func TestTunnelEndsOfAGREInterface(t *testing.T) {
 // GRE has no handshake: the first answered probe stands for one, so the
 // instance is Up on the same probe evidence as any other (ADR 0009).
 func TestHandshakelessTransportIsUpOnProbesAlone(t *testing.T) {
-	if _, err := (GRE{}).LastHandshake("dz1i"); !errors.Is(err, ErrNoHandshake) {
+	if _, err := (GRE{}).LastHandshake("ways1i"); !errors.Is(err, ErrNoHandshake) {
 		t.Fatalf("GRE LastHandshake err = %v", err)
 	}
 	m := &meter{}

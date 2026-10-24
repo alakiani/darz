@@ -195,10 +195,10 @@ func linksFor(n store.Node, v meshView) []protocol.Link {
 				}
 				pi.Remote = remote.String()
 				if link.Initiator {
-					pi.Iface = fmt.Sprintf("dz%di", in.ID)
+					pi.Iface = fmt.Sprintf("ways%di", in.ID)
 					pi.Addr, pi.PeerAddr = netip.PrefixFrom(initAddr, 31).String(), listenAddr.String()
 				} else {
-					pi.Iface = fmt.Sprintf("dz%dl", in.ID)
+					pi.Iface = fmt.Sprintf("ways%dl", in.ID)
 					pi.Addr, pi.PeerAddr = netip.PrefixFrom(listenAddr, 31).String(), initAddr.String()
 				}
 				link.Instances = append(link.Instances, pi)
@@ -209,11 +209,11 @@ func linksFor(n store.Node, v meshView) []protocol.Link {
 				if in.ListenPort == 0 || addr == "" || in.Transport == protocol.TransportAmneziaWG && in.AWG == nil {
 					continue // the listener has not chosen yet
 				}
-				pi.Iface = fmt.Sprintf("dz%di", in.ID)
+				pi.Iface = fmt.Sprintf("ways%di", in.ID)
 				pi.Addr, pi.PeerAddr = netip.PrefixFrom(initAddr, 31).String(), listenAddr.String()
 				pi.Endpoint = net.JoinHostPort(addr, fmt.Sprint(in.ListenPort))
 			} else {
-				pi.Iface = fmt.Sprintf("dz%dl", in.ID)
+				pi.Iface = fmt.Sprintf("ways%dl", in.ID)
 				pi.Addr, pi.PeerAddr = netip.PrefixFrom(listenAddr, 31).String(), initAddr.String()
 			}
 			pi.ListenPort, pi.AWG = in.ListenPort, in.AWG

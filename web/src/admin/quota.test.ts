@@ -43,5 +43,6 @@ describe("the Users table's Quota columns", () => {
 
   it("shows the renewal as a Gregorian date in UTC", () => {
     expect(renews("2026-11-24T00:00:00Z")).toBe("24 Nov 2026");
+    expect(renews("2026-09-01T00:00:00Z")).toBe("1 Sep 2026");
   });
 });

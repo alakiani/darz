@@ -179,18 +179,3 @@ func (s *Store) RecentBytes(ctx context.Context, deviceID string) (uint64, error
 		deviceID, since).Scan(&n)
 	return n, err
 }
-
-// UserMonthBytes is a User's total across their Devices this calendar month
-// (UTC): the per-User total Admins see.
-func (s *Store) UserMonthBytes(ctx context.Context, userID string) (uint64, error) {
-	now := s.Now().UTC()
-	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).Unix()
-	month := now.Format("2006-01")
-	var n uint64
-	err := s.db.QueryRowContext(ctx, `SELECT coalesce(sum(b), 0) FROM (
-			SELECT up + down AS b FROM usage_hourly WHERE hour >= ?2 AND device_id IN (SELECT id FROM devices WHERE user_id = ?1)
-			UNION ALL SELECT up + down FROM usage_daily WHERE day >= ?2 AND device_id IN (SELECT id FROM devices WHERE user_id = ?1)
-			UNION ALL SELECT up + down FROM usage_monthly WHERE month = ?3 AND device_id IN (SELECT id FROM devices WHERE user_id = ?1))`,
-		userID, start, month).Scan(&n)
-	return n, err
-}

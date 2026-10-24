@@ -605,8 +605,8 @@ func TestDeviceUsage(t *testing.T) {
 	var users []protocol.UserInfo
 	admin.must(200, "GET", "/v1/admin/users", nil, &users)
 	for _, u := range users {
-		if u.ID == me.ID && u.MonthBytes != 6000 {
-			t.Errorf("month bytes = %d", u.MonthBytes)
+		if u.ID == me.ID && u.PeriodBytes != 6000 {
+			t.Errorf("period bytes = %d", u.PeriodBytes)
 		}
 	}
 }

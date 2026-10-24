@@ -120,6 +120,9 @@ var DefaultScoring = Scoring{
 type Device struct {
 	PublicKey string `json:"public_key"`
 	Address   string `json:"address"` // its /32 in the Device pool
+	// Rate, set only while the Device is throttled, is what the Bridge
+	// holds it to: bytes per second of inner traffic, each way (ADR 0010).
+	Rate uint64 `json:"rate,omitempty"`
 }
 
 // Fallback is what a Rule does when no candidate can carry it.

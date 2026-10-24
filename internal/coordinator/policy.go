@@ -213,12 +213,16 @@ func (c *Coordinator) fetchPrefixes(ctx context.Context, url string, parse func(
 	return parse(io.LimitReader(resp.Body, 32<<20))
 }
 
-// RunRollUps folds usage into coarser totals now and then every interval
-// until ctx ends (ADR 0003).
+// RunRollUps stores ended Quota Periods' totals (ADR 0010) and folds usage
+// into coarser totals (ADR 0003), now and then every interval until ctx ends.
 func (c *Coordinator) RunRollUps(ctx context.Context, interval time.Duration) {
 	t := time.NewTicker(interval)
 	defer t.Stop()
 	for {
+		// Close Quota Periods first, while their daily rows are still there.
+		if err := c.store.ClosePeriods(ctx); err != nil {
+			c.log.Error("close quota periods", "err", err)
+		}
 		if err := c.store.RollUp(ctx); err != nil {
 			c.log.Error("usage roll-up", "err", err)
 		}

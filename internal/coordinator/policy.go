@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -32,25 +33,99 @@ type EffectiveState string
 const (
 	StateActive    EffectiveState = "active"
 	StateBlocked   EffectiveState = "blocked"
-	StateThrottled EffectiveState = "throttled" // in the model, not yet enforced
+	StateThrottled EffectiveState = "throttled" // slowed to a rate (ADR 0010)
 )
 
-// effectiveState is phase one's single policy: a suspended User or a
-// revoked Device is blocked, and everything else is active. Later quotas
-// read usage totals here too.
-func effectiveState(revoked, userSuspended bool) (EffectiveState, string) {
+// quotaState is what a User's Quota does to their Devices: nothing until
+// they run out, then block them, or slow them if an Admin chose that.
+type quotaState struct {
+	ranOut bool
+	rate   uint64 // bytes per second when slowed; 0 blocks
+}
+
+func quotaStateOf(q store.QuotaStanding) quotaState {
+	if !q.RanOut() {
+		return quotaState{}
+	}
+	return quotaState{ranOut: true, rate: q.SlowRate}
+}
+
+// effectiveState is the pure policy function of ADR 0003. Its reasons rank
+// device revoked, then user suspended, then quota used up (ADR 0010), so a
+// resumed User still out of Quota stays blocked.
+func effectiveState(revoked, userSuspended bool, quota quotaState) (EffectiveState, string) {
 	switch {
 	case revoked:
 		return StateBlocked, "device revoked"
 	case userSuspended:
 		return StateBlocked, "user suspended"
+	case quota.ranOut && quota.rate > 0:
+		return StateThrottled, "quota used up"
+	case quota.ranOut:
+		return StateBlocked, "quota used up"
 	}
 	return StateActive, ""
 }
 
+// quotaStates returns the quota state of every User who has run out.
+func (c *Coordinator) quotaStates(ctx context.Context) (map[string]quotaState, error) {
+	standings, err := c.store.QuotaStandings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]quotaState{}
+	for _, q := range standings {
+		if st := quotaStateOf(q); st.ranOut {
+			out[q.UserID] = st
+		}
+	}
+	return out, nil
+}
+
+// quotaChanged re-evaluates every User with a Quota and reports whether
+// anyone's state differs from what the latest snapshots enforce.
+func (c *Coordinator) quotaChanged(ctx context.Context) (bool, error) {
+	now, err := c.quotaStates(ctx)
+	if err != nil {
+		return false, err
+	}
+	c.quotaMu.Lock()
+	defer c.quotaMu.Unlock()
+	return c.quotaSeen == nil || !maps.Equal(now, c.quotaSeen), nil
+}
+
+// CheckQuotas re-evaluates every User's Quota and reconciles if anyone's
+// state changed (ADR 0010).
+func (c *Coordinator) CheckQuotas(ctx context.Context) error {
+	changed, err := c.quotaChanged(ctx)
+	if err != nil || !changed {
+		return err
+	}
+	return c.Reconcile(ctx)
+}
+
+// RunQuotaPeriods re-evaluates every User's Quota every interval until ctx
+// ends, so a new Quota Period brings a User back within interval of its
+// start: their blocked Devices move no bytes that would trigger it.
+func (c *Coordinator) RunQuotaPeriods(ctx context.Context, interval time.Duration) {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		if err := c.CheckQuotas(ctx); err != nil && ctx.Err() == nil {
+			c.log.Error("check quotas", "err", err)
+		}
+	}
+}
+
 // bridgeState is the part of the snapshot every Bridge shares: the Bridge
-// identity, the Devices allowed in, and the Rules.
-func (c *Coordinator) bridgeState(ctx context.Context) (*protocol.BridgeState, error) {
+// identity, the Devices allowed in, and the Rules. quota holds the Users
+// who have run out of Quota.
+func (c *Coordinator) bridgeState(ctx context.Context, quota map[string]quotaState) (*protocol.BridgeState, error) {
 	key, err := c.bridgeKey(ctx)
 	if err != nil {
 		return nil, err
@@ -77,7 +152,9 @@ func (c *Coordinator) bridgeState(ctx context.Context) (*protocol.BridgeState, e
 		return nil, err
 	}
 	for _, d := range devices {
-		if st, _ := effectiveState(d.Revoked || d.PublicKey == "", d.UserSuspended); st == StateBlocked {
+		// A throttled Device stays in; its rate reaches Bridges with the
+		// throttle itself (ADR 0010).
+		if st, _ := effectiveState(d.Revoked || d.PublicKey == "", d.UserSuspended, quota[d.UserID]); st == StateBlocked {
 			continue
 		}
 		b.Devices = append(b.Devices, protocol.Device{PublicKey: d.PublicKey, Address: netip.PrefixFrom(d.Address, 32).String()})
@@ -93,7 +170,7 @@ func (c *Coordinator) bridgeState(ctx context.Context) (*protocol.BridgeState, e
 			if err := c.store.RefreshSetContent(ctx, s.ID); err != nil {
 				return nil, err
 			}
-			return c.bridgeState(ctx)
+			return c.bridgeState(ctx, quota)
 		}
 		hashes[s.ID] = s.ContentHash
 	}

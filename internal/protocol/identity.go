@@ -80,6 +80,7 @@ type DeviceInfo struct {
 	// State is the effective state: active, blocked or throttled.
 	State  string `json:"state"`
 	Reason string `json:"reason,omitempty"`
+	Rate   uint64 `json:"rate,omitempty"` // when throttled: bytes per second
 	// RecentBytes is what the Device moved in this hour and the last: the
 	// "used in the last hour" mark. Never connection times (ADR 0003).
 	RecentBytes uint64 `json:"recent_bytes"`
@@ -150,6 +151,33 @@ type UserInfo struct {
 	// MonthBytes is the User's total this calendar month: Admins see
 	// totals per User, not per Device.
 	MonthBytes uint64 `json:"month_bytes"`
+	// PeriodBytes is the User's Usage in their current Quota Period, revoked
+	// Devices included (ADR 0010).
+	PeriodBytes uint64 `json:"period_bytes"`
+	// Quota is the bytes, up and down together, the User may move in one
+	// Quota Period; null is unlimited.
+	Quota      *uint64    `json:"quota"`
+	RenewalDay int        `json:"renewal_day"` // the day of the month their Quota Periods start, 1–31
+	RunningOut RunningOut `json:"running_out"`
+	Rate       uint64     `json:"rate,omitempty"` // when slow: bytes per second
+}
+
+// RunningOut is what happens to a User's Devices once they have used up
+// their Quota (ADR 0010).
+type RunningOut string
+
+const (
+	RunningOutBlock RunningOut = "block" // the default
+	RunningOutSlow  RunningOut = "slow"  // throttled to a rate
+)
+
+// SetQuota replaces a User's Quota and what happens when they run out.
+type SetQuota struct {
+	Quota      *uint64    `json:"quota"` // bytes per Quota Period; null is unlimited
+	RunningOut RunningOut `json:"running_out"`
+	// Rate is what slow throttles each Device to, in bytes per second of
+	// inner traffic each way, as Bridges enforce it.
+	Rate uint64 `json:"rate,omitempty"`
 }
 
 // SetDeviceCap changes a User's Device cap.

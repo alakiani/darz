@@ -235,6 +235,9 @@
           "name": {
             "type": "string"
           },
+          "rate": {
+            "type": "integer"
+          },
           "reason": {
             "type": "string"
           },
@@ -1194,6 +1197,23 @@
         ],
         "type": "object"
       },
+      "SetQuota": {
+        "properties": {
+          "quota": {
+            "type": "integer"
+          },
+          "rate": {
+            "type": "integer"
+          },
+          "running_out": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "running_out"
+        ],
+        "type": "object"
+      },
       "Share": {
         "properties": {
           "buckets": {
@@ -1495,6 +1515,21 @@
           "month_bytes": {
             "type": "integer"
           },
+          "period_bytes": {
+            "type": "integer"
+          },
+          "quota": {
+            "type": "integer"
+          },
+          "rate": {
+            "type": "integer"
+          },
+          "renewal_day": {
+            "type": "integer"
+          },
+          "running_out": {
+            "type": "string"
+          },
           "suspended": {
             "type": "boolean"
           },
@@ -1509,6 +1544,9 @@
           "handle",
           "id",
           "month_bytes",
+          "period_bytes",
+          "renewal_day",
+          "running_out",
           "suspended",
           "totp_enabled"
         ],
@@ -2688,6 +2726,60 @@
           }
         ],
         "summary": "A User's Devices"
+      }
+    },
+    "/v1/admin/users/{id}/quota": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminUsersIdQuota",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetQuota"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Set a User's Quota (bytes per Quota Period, or null for unlimited) and what happens when they run out"
       }
     },
     "/v1/admin/users/{id}/recovery-invite": {

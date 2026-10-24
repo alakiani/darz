@@ -228,3 +228,127 @@ func periodBytes(ctx context.Context, q queryer, userID string, p QuotaPeriod) (
 		userID, p.Start.Unix(), p.End.Unix()).Scan(&n)
 	return n, err
 }
+
+// QuotaSetting is a User's Quota and what happens when they run out of it
+// (ADR 0010).
+type QuotaSetting struct {
+	Quota    *uint64 // bytes per Quota Period, up and down together; nil is unlimited
+	SlowRate uint64  // bytes per second to slow each Device to once out; 0 blocks
+}
+
+// SetQuota replaces a User's Quota and running-out setting. It never moves
+// their Renewal Day.
+func (s *Store) SetQuota(ctx context.Context, userID string, q QuotaSetting) error {
+	var rate any
+	if q.SlowRate > 0 {
+		rate = q.SlowRate
+	}
+	return s.setUser(ctx, userID, `quota = ?, slow_rate = ?`, q.Quota, rate)
+}
+
+// RemedyKind is a Top-up or a Reset.
+type RemedyKind string
+
+const (
+	TopUp RemedyKind = "top-up"
+	Reset RemedyKind = "reset"
+)
+
+// AddRemedy records a Top-up or a Reset of bytes in the User's current
+// Quota Period. It adds to what they may still use there and never changes
+// recorded Usage.
+func (s *Store) AddRemedy(ctx context.Context, userID string, kind RemedyKind, bytes uint64) error {
+	p, err := s.CurrentQuotaPeriod(ctx, userID)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO quota_remedies (user_id, period_start, kind, bytes, created_at) VALUES (?, ?, ?, ?, ?)`,
+		userID, p.Start.Unix(), string(kind), bytes, s.unix())
+	return err
+}
+
+// QuotaStanding is where a User stands against their Quota in their
+// current Quota Period.
+type QuotaStanding struct {
+	UserID string
+	QuotaSetting
+	RenewalDay int
+	Period     QuotaPeriod
+	Usage      uint64 // this period's, revoked Devices included
+	Remedies   uint64 // this period's Top-ups and Resets
+}
+
+// Left is what the User may still use: the Quota plus this period's
+// Top-ups and Resets, minus this period's Usage, and never below zero.
+// limited is false for an unlimited Quota.
+func (q QuotaStanding) Left() (left uint64, limited bool) {
+	if q.Quota == nil {
+		return 0, false
+	}
+	if may := *q.Quota + q.Remedies; may > q.Usage {
+		return may - q.Usage, true
+	}
+	return 0, true
+}
+
+// RanOut reports whether the User has a Quota and nothing left of it.
+func (q QuotaStanding) RanOut() bool {
+	left, limited := q.Left()
+	return limited && left == 0
+}
+
+// QuotaStanding returns where a User stands in their current Quota Period.
+func (s *Store) QuotaStanding(ctx context.Context, userID string) (QuotaStanding, error) {
+	q := QuotaStanding{UserID: userID}
+	var created int64
+	err := s.db.QueryRowContext(ctx, `SELECT created_at, quota, coalesce(slow_rate, 0) FROM users WHERE id = ?`, userID).
+		Scan(&created, &q.Quota, &q.SlowRate)
+	if errors.Is(err, sql.ErrNoRows) {
+		return q, ErrNotFound
+	}
+	if err != nil {
+		return q, err
+	}
+	q.RenewalDay = time.Unix(created, 0).UTC().Day()
+	q.Period = QuotaPeriodAt(q.RenewalDay, s.Now())
+	if q.Usage, err = periodBytes(ctx, s.db, userID, q.Period); err != nil {
+		return q, err
+	}
+	err = s.db.QueryRowContext(ctx, `SELECT coalesce(sum(bytes), 0) FROM quota_remedies WHERE user_id = ? AND period_start = ?`,
+		userID, q.Period.Start.Unix()).Scan(&q.Remedies)
+	return q, err
+}
+
+// QuotaStandings returns where every User with a Quota stands: those are
+// the Users a Quota can block or slow.
+func (s *Store) QuotaStandings(ctx context.Context) ([]QuotaStanding, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id FROM users WHERE quota IS NOT NULL ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := []QuotaStanding{}
+	for _, id := range ids {
+		q, err := s.QuotaStanding(ctx, id)
+		if errors.Is(err, ErrNotFound) {
+			continue // deleted meanwhile
+		}
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, q)
+	}
+	return out, nil
+}

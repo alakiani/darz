@@ -9,6 +9,7 @@ import { NewDevicePage } from "./pages/NewDevice";
 import { DevicePage } from "./pages/Device";
 import { AccountPage } from "./pages/Account";
 import { HelpPage } from "./pages/Help";
+import { UsagePage } from "./pages/Usage";
 import { AdminApp } from "./admin/AdminApp";
 
 export function App() {
@@ -46,6 +47,8 @@ function UserApp({ route }: { route: string }) {
     page = <NewDevicePage onDone={refresh} />;
   } else if (route.startsWith("/devices/")) {
     page = <DevicePage id={route.slice("/devices/".length)} onChange={refresh} />;
+  } else if (route === "/usage") {
+    page = <UsagePage />;
   } else if (route === "/account") {
     page = <AccountPage me={me} onChange={refresh} onSignedOut={() => setMe(null)} />;
   } else {
@@ -61,6 +64,7 @@ function UserApp({ route }: { route: string }) {
         </a>
         <nav>
           <a href="#/help">{fa.help}</a>
+          {me && <a href="#/usage">{fa.usage}</a>}
           {me && <a href="#/account">{fa.account}</a>}
         </nav>
       </header>

@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -196,5 +197,71 @@ func TestRenewalDayIsTheRegistrationDayInUTC(t *testing.T) {
 	}
 	if !p.Start.Equal(day(2026, 1, 31)) || !p.End.Equal(day(2026, 2, 28)) {
 		t.Errorf("current period = %s..%s", p.Start, p.End)
+	}
+}
+
+func TestQuotaStandingCountsRemediesInTheirPeriodOnly(t *testing.T) {
+	s, c, user, d1, d2 := quotaFixture(t)
+	q, err := s.QuotaStanding(ctx, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if left, limited := q.Left(); limited || left != 0 || q.RanOut() || q.SlowRate != 0 || q.RenewalDay != 16 {
+		t.Errorf("a new User = %+v, want unlimited and blocked on running out", q)
+	}
+	if got, _ := s.QuotaStandings(ctx); len(got) != 0 {
+		t.Errorf("standings without a Quota = %+v", got)
+	}
+
+	if err := s.SetQuota(ctx, user, store.QuotaSetting{Quota: new(uint64(100)), SlowRate: 125_000}); err != nil {
+		t.Fatal(err)
+	}
+	s.PutUsage(ctx, "nd_b1", []protocol.UsageBucket{
+		bucket(day(2026, 10, 16), d1.Address.String(), "nd_x1", 30, 30),
+		bucket(day(2026, 10, 17), d2.Address.String(), "nd_x1", 20, 20),
+	})
+	s.RevokeDevice(ctx, d2.ID) // its Usage still counts
+	q, _ = s.QuotaStanding(ctx, user)
+	if !q.RanOut() || q.Usage != 100 || q.SlowRate != 125_000 {
+		t.Errorf("at 100 of 100 = %+v, want ran out", q)
+	}
+	s.AddRemedy(ctx, user, store.TopUp, 30)
+	s.AddRemedy(ctx, user, store.Reset, 100)
+	q, _ = s.QuotaStanding(ctx, user)
+	if left, _ := q.Left(); q.RanOut() || left != 130 || q.Remedies != 130 || q.Usage != 100 {
+		t.Errorf("after a Top-up and a Reset = %+v, want 130 left and Usage unchanged", q)
+	}
+	if a, _ := s.Account(ctx, user); a.Quota == nil || *a.Quota != 100 || a.SlowRate != 125_000 {
+		t.Errorf("account = %+v", a.QuotaSetting)
+	}
+
+	// The next period starts from zero, without the last one's remedies.
+	c.t = day(2026, 11, 16)
+	q, _ = s.QuotaStanding(ctx, user)
+	if left, _ := q.Left(); left != 100 || q.Remedies != 0 || !q.Period.Start.Equal(day(2026, 11, 16)) {
+		t.Errorf("next period = %+v", q)
+	}
+	s.PutUsage(ctx, "nd_b1", []protocol.UsageBucket{bucket(day(2026, 11, 16), d1.Address.String(), "nd_x1", 200, 0)})
+	q, _ = s.QuotaStanding(ctx, user)
+	if left, _ := q.Left(); left != 0 || !q.RanOut() {
+		t.Errorf("past the Quota = %+v, want nothing left", q)
+	}
+	if got, _ := s.QuotaStandings(ctx); len(got) != 1 || got[0].UserID != user {
+		t.Errorf("standings = %+v", got)
+	}
+
+	// Back to unlimited and blocking.
+	s.SetQuota(ctx, user, store.QuotaSetting{})
+	if a, _ := s.Account(ctx, user); a.Quota != nil || a.SlowRate != 0 {
+		t.Errorf("after unlimited: %+v", a.QuotaSetting)
+	}
+	if err := s.SetQuota(ctx, "us_nope", store.QuotaSetting{}); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("unknown User: %v", err)
+	}
+	if err := s.DeleteUser(ctx, user); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.QuotaStanding(ctx, user); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("deleted User: %v", err)
 	}
 }

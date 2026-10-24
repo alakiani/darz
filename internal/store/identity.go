@@ -25,14 +25,16 @@ type Account struct {
 	PasswordHash string
 	TOTPSecret   string // empty unless TOTP is on
 	TOTPPending  string
+	QuotaSetting
 }
 
 const accountColumns = `id, handle, suspended_at IS NOT NULL, is_admin, device_cap, coalesce(password_hash, ''),
-	coalesce(totp_secret, ''), coalesce(totp_pending, '')`
+	coalesce(totp_secret, ''), coalesce(totp_pending, ''), quota, coalesce(slow_rate, 0)`
 
 func scanAccount(row interface{ Scan(...any) error }) (Account, error) {
 	var a Account
-	err := row.Scan(&a.ID, &a.Handle, &a.Suspended, &a.Admin, &a.DeviceCap, &a.PasswordHash, &a.TOTPSecret, &a.TOTPPending)
+	err := row.Scan(&a.ID, &a.Handle, &a.Suspended, &a.Admin, &a.DeviceCap, &a.PasswordHash, &a.TOTPSecret, &a.TOTPPending,
+		&a.Quota, &a.SlowRate)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Account{}, ErrNotFound
 	}

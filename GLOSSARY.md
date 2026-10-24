@@ -87,7 +87,7 @@ The bytes a Device moved, up and down, as the Coordinator records them. A User's
 _Avoid_: Traffic, bandwidth, consumption
 
 **Quota**:
-The bytes, up and down together, a User may move in one Quota Period, shared across all their Devices. A Quota is either a number or unlimited. A User who has used up their Quota is blocked until the next Quota Period, unless a Top-up or Reset raises what they may still use.
+The bytes, up and down together, a User may move in one Quota Period, shared across all their Devices. A Quota is either a number or unlimited. A User who has used up their Quota is blocked, or slowed to a set rate if an Admin chose that for them, until the next Quota Period or until a Top-up or Reset raises what they may still use.
 _Avoid_: Limit, cap, plan, allowance
 
 **Quota Period**:

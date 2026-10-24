@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -109,6 +110,15 @@ func (tp *healthTap) from(addr string) []tappedReport {
 		}
 	}
 	return out
+}
+
+// logged counts the lines in the Agent's log that contain msg.
+func (a *agentProc) logged(msg string) int {
+	b, err := os.ReadFile(a.log.Name())
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	return strings.Count(string(b), msg)
 }
 
 // stateDir is where a lab Agent keeps its state.
@@ -301,10 +311,16 @@ func TestFastUsageReports(t *testing.T) {
 		if err := os.WriteFile(path, b, 0o600); err != nil {
 			t.Fatal(err)
 		}
+		reapplied := ag.logged("re-applied persisted snapshot")
 		ag.start()
-		// Until the restarted Agent has a path for the phone again, its
-		// packets are dropped before the counters see them; they never
-		// moved, so they are not Usage. Send once the site answers.
+		// The killed Agent's tunnels and ruleset outlive it, so the site
+		// answers at once. The restarted Agent then replaces the ruleset,
+		// and for a moment after has no path for the phone: packets then
+		// are dropped before the counters see them, and never moved. Send
+		// once it has re-applied and the site answers again.
+		testutil.Eventually(t, 30*time.Second, "the restarted Bridge re-applies its snapshot", func() bool {
+			return ag.logged("re-applied persisted snapshot") > reapplied
+		})
 		testutil.Eventually(t, 60*time.Second, "the phone reaches the site through the restarted Bridge", func() bool {
 			_, err := p.ask("93.184.215.14:7")
 			return err == nil

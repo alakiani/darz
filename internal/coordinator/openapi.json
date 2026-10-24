@@ -133,6 +133,21 @@
           },
           "device_cap": {
             "type": "integer"
+          },
+          "quota": {
+            "type": "integer"
+          },
+          "rate": {
+            "type": "integer"
+          },
+          "refill_days": {
+            "type": "integer"
+          },
+          "refills": {
+            "type": "integer"
+          },
+          "running_out": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -235,6 +250,9 @@
           "name": {
             "type": "string"
           },
+          "rate": {
+            "type": "integer"
+          },
           "reason": {
             "type": "string"
           },
@@ -259,6 +277,25 @@
         ],
         "type": "object"
       },
+      "DevicePeriodUsage": {
+        "properties": {
+          "bytes": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bytes",
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
       "DeviceUsage": {
         "properties": {
           "daily": {
@@ -273,17 +310,14 @@
             },
             "type": "array"
           },
-          "monthly": {
-            "items": {
-              "$ref": "#/components/schemas/UsageRow"
-            },
-            "type": "array"
+          "period": {
+            "$ref": "#/components/schemas/UsageRow"
           }
         },
         "required": [
           "daily",
           "hourly",
-          "monthly"
+          "period"
         ],
         "type": "object"
       },
@@ -332,6 +366,20 @@
         },
         "required": [
           "error"
+        ],
+        "type": "object"
+      },
+      "GiveRefills": {
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "days": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
         ],
         "type": "object"
       },
@@ -497,6 +545,21 @@
             "type": "string"
           },
           "kind": {
+            "type": "string"
+          },
+          "quota": {
+            "type": "integer"
+          },
+          "rate": {
+            "type": "integer"
+          },
+          "refill_days": {
+            "type": "integer"
+          },
+          "refills": {
+            "type": "integer"
+          },
+          "running_out": {
             "type": "string"
           },
           "status": {
@@ -740,6 +803,52 @@
           "id",
           "mfa",
           "totp_enabled"
+        ],
+        "type": "object"
+      },
+      "MyUsage": {
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/PeriodUsage"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodUsage"
+            },
+            "type": "array"
+          },
+          "left": {
+            "type": "integer"
+          },
+          "quota": {
+            "type": "integer"
+          },
+          "rate": {
+            "type": "integer"
+          },
+          "refill_adds": {
+            "type": "integer"
+          },
+          "refills": {
+            "items": {
+              "$ref": "#/components/schemas/Refill"
+            },
+            "type": "array"
+          },
+          "renews_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "running_out": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "current",
+          "history",
+          "refills",
+          "renews_at",
+          "running_out"
         ],
         "type": "object"
       },
@@ -1027,6 +1136,48 @@
         ],
         "type": "object"
       },
+      "PeriodUsage": {
+        "properties": {
+          "bytes": {
+            "type": "integer"
+          },
+          "detailed": {
+            "type": "boolean"
+          },
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/DevicePeriodUsage"
+            },
+            "type": "array"
+          },
+          "end": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "remedies": {
+            "items": {
+              "$ref": "#/components/schemas/Remedy"
+            },
+            "type": "array"
+          },
+          "revoked": {
+            "type": "integer"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bytes",
+          "detailed",
+          "end",
+          "remedies",
+          "revoked",
+          "start"
+        ],
+        "type": "object"
+      },
       "ProbeResult": {
         "properties": {
           "at": {
@@ -1043,6 +1194,42 @@
         "required": [
           "at",
           "ok"
+        ],
+        "type": "object"
+      },
+      "Refill": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expires_at",
+          "id"
+        ],
+        "type": "object"
+      },
+      "Remedy": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "bytes",
+          "kind"
         ],
         "type": "object"
       },
@@ -1191,6 +1378,23 @@
           "name",
           "prefixes",
           "removals"
+        ],
+        "type": "object"
+      },
+      "SetQuota": {
+        "properties": {
+          "quota": {
+            "type": "integer"
+          },
+          "rate": {
+            "type": "integer"
+          },
+          "running_out": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "running_out"
         ],
         "type": "object"
       },
@@ -1377,6 +1581,17 @@
         ],
         "type": "object"
       },
+      "TopUp": {
+        "properties": {
+          "bytes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bytes"
+        ],
+        "type": "object"
+      },
       "TransportList": {
         "properties": {
           "enabled": {
@@ -1492,8 +1707,30 @@
           "id": {
             "type": "string"
           },
-          "month_bytes": {
+          "period_bytes": {
             "type": "integer"
+          },
+          "period_remedies": {
+            "type": "integer"
+          },
+          "quota": {
+            "type": "integer"
+          },
+          "rate": {
+            "type": "integer"
+          },
+          "refills": {
+            "type": "integer"
+          },
+          "renewal_day": {
+            "type": "integer"
+          },
+          "renews_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "running_out": {
+            "type": "string"
           },
           "suspended": {
             "type": "boolean"
@@ -1508,7 +1745,12 @@
           "device_count",
           "handle",
           "id",
-          "month_bytes",
+          "period_bytes",
+          "period_remedies",
+          "refills",
+          "renewal_day",
+          "renews_at",
+          "running_out",
           "suspended",
           "totp_enabled"
         ],
@@ -2690,6 +2932,60 @@
         "summary": "A User's Devices"
       }
     },
+    "/v1/admin/users/{id}/quota": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminUsersIdQuota",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetQuota"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Set a User's Quota (bytes per Quota Period, or null for unlimited) and what happens when they run out"
+      }
+    },
     "/v1/admin/users/{id}/recovery-invite": {
       "post": {
         "description": "Admins only, with a session that proved TOTP.",
@@ -2732,6 +3028,104 @@
           }
         ],
         "summary": "Create a recovery Invite: new credentials, same Devices"
+      }
+    },
+    "/v1/admin/users/{id}/refills": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminUsersIdRefills",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiveRefills"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Give a User Refills to hold, each with its expiry"
+      }
+    },
+    "/v1/admin/users/{id}/reset": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminUsersIdReset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Reset now: bring a User back to a full Quota (not for unlimited Quotas)"
       }
     },
     "/v1/admin/users/{id}/resume": {
@@ -2820,6 +3214,60 @@
           }
         ],
         "summary": "Suspend a User: their Devices leave the Bridges"
+      }
+    },
+    "/v1/admin/users/{id}/top-up": {
+      "post": {
+        "description": "Admins only, with a session that proved TOTP.",
+        "operationId": "postAdminUsersIdTopUp",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopUp"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfo"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Add bytes to what a User may use in this Quota Period only"
       }
     },
     "/v1/invites/accept": {
@@ -3211,7 +3659,7 @@
             "session": []
           }
         ],
-        "summary": "One of my Devices' usage: hourly, daily and monthly"
+        "summary": "One of my Devices' usage: hourly, daily, and in this Quota Period"
       }
     },
     "/v1/me/logout-everywhere": {
@@ -3274,6 +3722,49 @@
           }
         ],
         "summary": "Change password; ends every other session"
+      }
+    },
+    "/v1/me/refills/{id}/redeem": {
+      "post": {
+        "operationId": "postMeRefillsIdRedeem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyUsage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Redeem a held Refill: a Reset of this Quota Period. Unlimited Quotas can't"
       }
     },
     "/v1/me/totp": {
@@ -3393,6 +3884,39 @@
           }
         ],
         "summary": "Turn TOTP off (not allowed for Admins)"
+      }
+    },
+    "/v1/me/usage": {
+      "get": {
+        "operationId": "getMeUsage",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyUsage"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An error"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "My Usage and Quota: this Quota Period, past ones, the Device split and held Refills"
       }
     },
     "/v1/nodes": {

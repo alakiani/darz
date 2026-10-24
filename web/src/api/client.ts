@@ -18,3 +18,7 @@ export const api = createClient<paths>({ baseUrl: "", headers: { "Content-Type":
 export function errorOf(e: unknown): string | undefined {
   return (e as { error?: string } | undefined)?.error;
 }
+
+// Usage and Quota (ADR 0010).
+export type MyUsage = components["schemas"]["MyUsage"];
+export type PeriodUsage = components["schemas"]["PeriodUsage"];

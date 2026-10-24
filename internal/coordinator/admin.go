@@ -212,8 +212,18 @@ func (c *Coordinator) adminInvites(w http.ResponseWriter, r *http.Request) {
 		case now.After(rec.ExpiresAt):
 			status = "expired"
 		}
-		out = append(out, protocol.InviteRecord{ID: rec.ID, Kind: rec.Kind, Handle: rec.Handle, Admin: rec.Admin,
-			DeviceCap: rec.DeviceCap, CreatedAt: rec.CreatedAt, ExpiresAt: rec.ExpiresAt, Status: status})
+		inv := protocol.InviteRecord{ID: rec.ID, Kind: rec.Kind, Handle: rec.Handle, Admin: rec.Admin,
+			DeviceCap: rec.DeviceCap, CreatedAt: rec.CreatedAt, ExpiresAt: rec.ExpiresAt, Status: status}
+		if rec.Kind == "new" {
+			inv.Quota, inv.RunningOut = rec.Quota, protocol.RunningOutBlock
+			if rec.SlowRate > 0 {
+				inv.RunningOut, inv.Rate = protocol.RunningOutSlow, rec.SlowRate
+			}
+			if rec.Refills > 0 {
+				inv.Refills, inv.RefillDays = rec.Refills, int(rec.RefillTTL/(24*time.Hour))
+			}
+		}
+		out = append(out, inv)
 	}
 	writeJSON(w, http.StatusOK, out)
 }

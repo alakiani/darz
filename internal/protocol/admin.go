@@ -126,6 +126,15 @@ type InviteRecord struct {
 	ExpiresAt time.Time `json:"expires_at"`
 	// Status is "open", "used", "expired" or "withdrawn".
 	Status string `json:"status"`
+	// What a new-User Invite presets (ADR 0010), as CreateInvite sets it:
+	// the Quota (absent is unlimited), what happens when it runs out (only
+	// for new-User Invites), the slow rate in bytes per second, and the
+	// Refills with how many days each lasts from registration.
+	Quota      *uint64    `json:"quota,omitempty"`
+	RunningOut RunningOut `json:"running_out,omitempty"`
+	Rate       uint64     `json:"rate,omitempty"`
+	Refills    int        `json:"refills,omitempty"`
+	RefillDays int        `json:"refill_days,omitempty"` // only with Refills
 }
 
 // NewNode adds a Node from the panel. SSHHost is only used to write the

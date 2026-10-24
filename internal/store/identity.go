@@ -25,14 +25,16 @@ type Account struct {
 	PasswordHash string
 	TOTPSecret   string // empty unless TOTP is on
 	TOTPPending  string
+	QuotaSetting
 }
 
 const accountColumns = `id, handle, suspended_at IS NOT NULL, is_admin, device_cap, coalesce(password_hash, ''),
-	coalesce(totp_secret, ''), coalesce(totp_pending, '')`
+	coalesce(totp_secret, ''), coalesce(totp_pending, ''), quota, coalesce(slow_rate, 0)`
 
 func scanAccount(row interface{ Scan(...any) error }) (Account, error) {
 	var a Account
-	err := row.Scan(&a.ID, &a.Handle, &a.Suspended, &a.Admin, &a.DeviceCap, &a.PasswordHash, &a.TOTPSecret, &a.TOTPPending)
+	err := row.Scan(&a.ID, &a.Handle, &a.Suspended, &a.Admin, &a.DeviceCap, &a.PasswordHash, &a.TOTPSecret, &a.TOTPPending,
+		&a.Quota, &a.SlowRate)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Account{}, ErrNotFound
 	}
@@ -123,6 +125,11 @@ type Invite struct {
 	Admin     bool
 	DeviceCap int // 0: the default
 	ExpiresAt time.Time
+	// What a new-User Invite presets (ADR 0010): the Quota and running-out
+	// setting, and Refills lasting RefillTTL from registration.
+	QuotaSetting
+	Refills   int
+	RefillTTL time.Duration
 }
 
 // CreateInvite returns a single-use Invite's secret.
@@ -136,8 +143,14 @@ func (s *Store) CreateInvite(ctx context.Context, inv Invite, ttl time.Duration)
 	if inv.DeviceCap > 0 {
 		cap = inv.DeviceCap
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO invites (hash, id, kind, user_id, is_admin, device_cap, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, hash(token), "inv_"+randomHex(8), inv.Kind, uid, inv.Admin, cap, s.unix(), expires.Unix())
+	var rate any
+	if inv.SlowRate > 0 {
+		rate = inv.SlowRate
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO invites (hash, id, kind, user_id, is_admin, device_cap, created_at, expires_at,
+			quota, slow_rate, refills, refill_ttl)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, hash(token), "inv_"+randomHex(8), inv.Kind, uid, inv.Admin, cap, s.unix(), expires.Unix(),
+		inv.Quota, rate, inv.Refills, int64(inv.RefillTTL/time.Second))
 	return token, expires, err
 }
 
@@ -154,13 +167,15 @@ func (s *Store) lookupInvite(ctx context.Context, q queryer, token string) (Invi
 	var inv Invite
 	var uid sql.NullString
 	var cap sql.NullInt64
-	var expires int64
-	err := q.QueryRowContext(ctx, `SELECT kind, user_id, is_admin, device_cap, expires_at FROM invites
-		WHERE hash = ? AND used_at IS NULL AND withdrawn_at IS NULL`, hash(token)).Scan(&inv.Kind, &uid, &inv.Admin, &cap, &expires)
+	var expires, refillTTL int64
+	err := q.QueryRowContext(ctx, `SELECT kind, user_id, is_admin, device_cap, expires_at, quota, coalesce(slow_rate, 0), refills, refill_ttl
+		FROM invites WHERE hash = ? AND used_at IS NULL AND withdrawn_at IS NULL`, hash(token)).
+		Scan(&inv.Kind, &uid, &inv.Admin, &cap, &expires, &inv.Quota, &inv.SlowRate, &inv.Refills, &refillTTL)
 	if errors.Is(err, sql.ErrNoRows) || err == nil && s.unix() > expires {
 		return Invite{}, ErrInvalidToken
 	}
 	inv.UserID, inv.DeviceCap, inv.ExpiresAt = uid.String, int(cap.Int64), time.Unix(expires, 0).UTC()
+	inv.RefillTTL = time.Duration(refillTTL) * time.Second
 	return inv, err
 }
 
@@ -183,12 +198,21 @@ func (s *Store) AcceptNewInvite(ctx context.Context, token, handle, passwordHash
 		if inv.DeviceCap > 0 {
 			cap = inv.DeviceCap
 		}
-		_, err = tx.Exec(`INSERT INTO users (id, handle, password_hash, is_admin, device_cap, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-			id, handle, passwordHash, inv.Admin, cap, s.unix())
+		var rate any
+		if inv.SlowRate > 0 {
+			rate = inv.SlowRate
+		}
+		_, err = tx.Exec(`INSERT INTO users (id, handle, password_hash, is_admin, device_cap, created_at, quota, slow_rate)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, id, handle, passwordHash, inv.Admin, cap, s.unix(), inv.Quota, rate)
 		if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			return fmt.Errorf("handle %q: %w", handle, ErrExists)
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		// Preset Refills are given now, so their lifetime counts from
+		// registration.
+		return s.giveRefills(ctx, tx, id, inv.Refills, inv.RefillTTL)
 	})
 	if err != nil {
 		return Account{}, err

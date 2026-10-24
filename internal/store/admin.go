@@ -20,12 +20,17 @@ type InviteRecord struct {
 	ExpiresAt time.Time
 	Used      bool
 	Withdrawn bool
+	// What a new-User Invite presets (ADR 0010), as Invite holds it.
+	QuotaSetting
+	Refills   int
+	RefillTTL time.Duration
 }
 
 // Invites lists Invites, newest first.
 func (s *Store) Invites(ctx context.Context) ([]InviteRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT i.id, i.kind, coalesce(u.handle, ''), i.is_admin, coalesce(i.device_cap, 0),
-		i.created_at, i.expires_at, i.used_at IS NOT NULL, i.withdrawn_at IS NOT NULL
+		i.created_at, i.expires_at, i.used_at IS NOT NULL, i.withdrawn_at IS NOT NULL,
+		i.quota, coalesce(i.slow_rate, 0), i.refills, i.refill_ttl
 		FROM invites i LEFT JOIN users u ON u.id = i.user_id ORDER BY i.created_at DESC, i.id`)
 	if err != nil {
 		return nil, err
@@ -34,11 +39,13 @@ func (s *Store) Invites(ctx context.Context) ([]InviteRecord, error) {
 	var out []InviteRecord
 	for rows.Next() {
 		var r InviteRecord
-		var created, expires int64
-		if err := rows.Scan(&r.ID, &r.Kind, &r.Handle, &r.Admin, &r.DeviceCap, &created, &expires, &r.Used, &r.Withdrawn); err != nil {
+		var created, expires, refillTTL int64
+		if err := rows.Scan(&r.ID, &r.Kind, &r.Handle, &r.Admin, &r.DeviceCap, &created, &expires, &r.Used, &r.Withdrawn,
+			&r.Quota, &r.SlowRate, &r.Refills, &refillTTL); err != nil {
 			return nil, err
 		}
 		r.CreatedAt, r.ExpiresAt = time.Unix(created, 0).UTC(), time.Unix(expires, 0).UTC()
+		r.RefillTTL = time.Duration(refillTTL) * time.Second
 		out = append(out, r)
 	}
 	return out, rows.Err()

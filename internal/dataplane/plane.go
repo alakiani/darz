@@ -174,6 +174,7 @@ func (p *Plane) Apply(ctx context.Context, st protocol.State) error {
 			return err
 		}
 		rs.ResolverAddr = addr.Addr().String()
+		rs.Throttles = throttles(b.Devices)
 		dev, tr := p.computePaths()
 		for _, r := range b.Rules {
 			prefixes, err := p.set(ctx, r.SetHash)
@@ -292,6 +293,22 @@ func (p *Plane) applyDeviceIface(ctx context.Context, b *protocol.BridgeState) e
 		return err
 	}
 	return ip(ctx, "link", "set", "dev", DeviceIface, "mtu", "1420", "up")
+}
+
+// throttles returns the snapshot's throttled Devices in address order. A
+// Device without a valid IPv4 address is left out: nft would reject the
+// whole ruleset over it.
+func throttles(devices []protocol.Device) []throttle {
+	var out []throttle
+	for _, d := range devices {
+		prefix, err := netip.ParsePrefix(d.Address)
+		if d.Rate == 0 || err != nil || !prefix.Addr().Is4() {
+			continue
+		}
+		out = append(out, throttle{Addr: prefix.Addr(), Rate: d.Rate})
+	}
+	slices.SortFunc(out, func(a, b throttle) int { return a.Addr.Compare(b.Addr) })
+	return slices.CompactFunc(out, func(a, b throttle) bool { return a.Addr == b.Addr })
 }
 
 // set returns a Destination Set's prefixes, from the cache or the
@@ -491,10 +508,14 @@ func (p *Plane) syncPaths(ctx context.Context) {
 }
 
 // Report adds bucket shares per candidate per Rule, and usage, to a
-// health report.
-func (p *Plane) Report(h *protocol.Health) {
+// health report. A Bridge reads its counters first, so the report carries
+// every byte moved until now, not as of the last 10 s reading (ADR 0010).
+func (p *Plane) Report(ctx context.Context, h *protocol.Health) {
 	p.mu.Lock()
 	h.Paths = slices.Clone(p.paths)
+	if p.st != nil && p.st.Bridge != nil {
+		p.collectUsage(ctx, p.st)
+	}
 	p.mu.Unlock()
 	h.Usage = p.meter.report(maxUsagePerReport)
 }

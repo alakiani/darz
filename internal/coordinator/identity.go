@@ -1,6 +1,7 @@
 package coordinator
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/netip"
@@ -353,13 +354,30 @@ func (c *Coordinator) respondMe(w http.ResponseWriter, r *http.Request, userID s
 }
 
 func (c *Coordinator) deviceInfo(r *http.Request, d store.UserDevice, acct store.Account) protocol.DeviceInfo {
-	state, reason := effectiveState(d.Revoked, acct.Suspended)
+	quota := c.userQuotaState(r.Context(), acct)
+	state, reason := effectiveState(d.Revoked, acct.Suspended, quota)
 	recent, err := c.store.RecentBytes(r.Context(), d.ID)
 	if err != nil {
 		c.log.Error("recent usage", "device", d.ID, "err", err)
 	}
-	return protocol.DeviceInfo{ID: d.ID, Name: d.Name, Address: d.Address.String(), CreatedAt: d.CreatedAt,
+	info := protocol.DeviceInfo{ID: d.ID, Name: d.Name, Address: d.Address.String(), CreatedAt: d.CreatedAt,
 		Revoked: d.Revoked, State: string(state), Reason: reason, RecentBytes: recent}
+	if state == StateThrottled {
+		info.Rate = quota.rate
+	}
+	return info
+}
+
+// userQuotaState is what a User's Quota does to their Devices now.
+func (c *Coordinator) userQuotaState(ctx context.Context, acct store.Account) quotaState {
+	if acct.Quota == nil {
+		return quotaState{}
+	}
+	q, err := c.store.QuotaStanding(ctx, acct.ID)
+	if err != nil {
+		c.log.Error("quota standing", "user", acct.ID, "err", err)
+	}
+	return quotaStateOf(q)
 }
 
 func (c *Coordinator) deviceUsage(w http.ResponseWriter, r *http.Request) {
@@ -392,7 +410,8 @@ func (c *Coordinator) deviceUsage(w http.ResponseWriter, r *http.Request) {
 		}
 		return out
 	}
-	writeJSON(w, http.StatusOK, protocol.DeviceUsage{Hourly: conv(u.Hourly), Daily: conv(u.Daily), Monthly: conv(u.Monthly)})
+	writeJSON(w, http.StatusOK, protocol.DeviceUsage{Hourly: conv(u.Hourly), Daily: conv(u.Daily),
+		Period: protocol.UsageRow{Period: u.Period.Period, Up: u.Period.Up, Down: u.Period.Down}})
 }
 
 // nodeNames maps Node ids to names, which usage shows Exits by.
@@ -480,7 +499,7 @@ func (c *Coordinator) deviceConfig(r *http.Request, d store.UserDevice) (protoco
 	if err != nil {
 		return protocol.DeviceConfig{}, err
 	}
-	b, err := c.bridgeState(r.Context())
+	b, err := c.bridgeState(r.Context(), nil) // for its address and port only
 	if err != nil {
 		return protocol.DeviceConfig{}, err
 	}
@@ -546,7 +565,18 @@ func (c *Coordinator) adminCreateInvite(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "device_cap must be 0 to 100")
 		return
 	}
-	c.issueInvite(w, r, store.Invite{Kind: "new", Admin: req.Admin, DeviceCap: req.DeviceCap})
+	q, msg := quotaSettingOf(req.Quota, req.RunningOut, req.Rate, true)
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
+	ttl, ok := refillTTL(req.RefillDays)
+	if req.Refills < 0 || req.Refills > maxRefills || !ok {
+		writeError(w, http.StatusBadRequest, "refills must be 0 to 100, and refill_days 1 to 3650")
+		return
+	}
+	c.issueInvite(w, r, store.Invite{Kind: "new", Admin: req.Admin, DeviceCap: req.DeviceCap,
+		QuotaSetting: q, Refills: req.Refills, RefillTTL: ttl})
 }
 
 func (c *Coordinator) userInfo(r *http.Request, a store.Account) (protocol.UserInfo, error) {
@@ -554,9 +584,18 @@ func (c *Coordinator) userInfo(r *http.Request, a store.Account) (protocol.UserI
 	if err != nil {
 		return protocol.UserInfo{}, err
 	}
-	month, err := c.store.UserMonthBytes(r.Context(), a.ID)
-	return protocol.UserInfo{ID: a.ID, Handle: a.Handle, Admin: a.Admin, Suspended: a.Suspended,
-		TOTPEnabled: a.TOTPSecret != "", DeviceCap: a.DeviceCap, DeviceCount: activeCount(devs), MonthBytes: month}, err
+	refills, err := c.store.HeldRefillCount(r.Context(), a.ID)
+	if err != nil {
+		return protocol.UserInfo{}, err
+	}
+	q, err := c.store.QuotaStanding(r.Context(), a.ID)
+	u := protocol.UserInfo{Refills: refills, ID: a.ID, Handle: a.Handle, Admin: a.Admin, Suspended: a.Suspended,
+		TOTPEnabled: a.TOTPSecret != "", DeviceCap: a.DeviceCap, DeviceCount: activeCount(devs),
+		PeriodBytes: q.Usage, PeriodRemedies: q.Remedies, Quota: a.Quota, RenewalDay: q.RenewalDay, RenewsAt: q.Period.End, RunningOut: protocol.RunningOutBlock}
+	if a.SlowRate > 0 {
+		u.RunningOut, u.Rate = protocol.RunningOutSlow, a.SlowRate
+	}
+	return u, err
 }
 
 func (c *Coordinator) adminUsers(w http.ResponseWriter, r *http.Request) {
@@ -635,6 +674,24 @@ func (c *Coordinator) adminSetCap(w http.ResponseWriter, r *http.Request) {
 	}
 	// Lowering the cap keeps existing Devices; it only stops new ones.
 	c.afterUserChange(w, r, a.ID, c.store.SetDeviceCap(r.Context(), a.ID, req.DeviceCap))
+}
+
+func (c *Coordinator) adminSetQuota(w http.ResponseWriter, r *http.Request) {
+	a, ok := c.target(w, r)
+	if !ok {
+		return
+	}
+	var req protocol.SetQuota
+	if !decode(w, r, &req) {
+		return
+	}
+	q, msg := quotaSettingOf(req.Quota, req.RunningOut, req.Rate, false)
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
+	// Every Quota edit takes effect on the next snapshot (ADR 0010).
+	c.afterUserChange(w, r, a.ID, c.store.SetQuota(r.Context(), a.ID, q))
 }
 
 func (c *Coordinator) afterUserChange(w http.ResponseWriter, r *http.Request, id string, err error) {

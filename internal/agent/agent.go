@@ -44,7 +44,7 @@ type Applier interface {
 // Reporter is implemented by an Applier that adds to every health report,
 // such as the Link layer with its Link key and measurements.
 type Reporter interface {
-	Report(h *protocol.Health)
+	Report(ctx context.Context, h *protocol.Health)
 }
 
 // Acker is implemented by an Applier that needs to know a health report
@@ -77,10 +77,10 @@ func (as Appliers) Apply(ctx context.Context, s protocol.State) error {
 	return errors.Join(errs...)
 }
 
-func (as Appliers) Report(h *protocol.Health) {
+func (as Appliers) Report(ctx context.Context, h *protocol.Health) {
 	for _, a := range as {
 		if r, ok := a.(Reporter); ok {
-			r.Report(h)
+			r.Report(ctx, h)
 		}
 	}
 }
@@ -461,7 +461,7 @@ func (a *agent) sendHealth(ctx context.Context) error {
 	}
 	a.mu.Unlock()
 	if r, ok := a.cfg.Applier.(Reporter); ok {
-		r.Report(&h)
+		r.Report(ctx, &h)
 	}
 	if _, err := a.do(ctx, a.client, http.MethodPost, "/v1/health", h, nil, a.cfg.RequestTimeout); err != nil {
 		return err
@@ -482,12 +482,18 @@ func (a *agent) healthLoop(ctx context.Context) {
 	t := time.NewTicker(a.cfg.HealthInterval)
 	defer t.Stop()
 	for {
+		// A failed report is retried after RetryInterval rather than at the
+		// next tick, so usage is late by seconds, not a whole interval
+		// (ADR 0010).
+		var retry <-chan time.Time
 		if err := a.sendHealth(ctx); err != nil && ctx.Err() == nil {
 			a.log.Warn("health report", "err", err)
+			retry = time.After(a.cfg.RetryInterval)
 		}
 		select {
 		case <-ctx.Done():
 			return
+		case <-retry:
 		case <-t.C:
 			a.mon.retry()
 		}

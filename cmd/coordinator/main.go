@@ -128,6 +128,7 @@ func serve(args []string, log *slog.Logger) error {
 	}
 	go c.RunIRFeed(ctx, 24*time.Hour)
 	go c.RunRollUps(ctx, time.Hour)
+	go c.RunQuotaPeriods(ctx, time.Minute)
 	go c.RunEndpointSlots(ctx)
 	go c.RunAlertRelay(ctx)
 	go c.RunBackups(ctx)

@@ -62,6 +62,14 @@ dd { margin: 0; }
 table.usage { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.9rem; }
 table.usage th, table.usage td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--line); text-align: start; }
 .recent { color: var(--muted); }
+.quota h2 { font-size: 1.1rem; margin: 0; }
+.quota p { margin: 0.5rem 0; }
+.quota .warning { margin: 0.75rem 0; }
+.quota progress { width: 100%; height: 0.75rem; accent-color: var(--accent); }
+.quota[data-state="warn"] progress { accent-color: #b7791f; }
+.quota[data-state="out"] progress { accent-color: var(--danger); }
+table.periods tr.sub td { color: var(--muted); }
+table.periods tr.sub td:first-child { padding-inline-start: 1.5rem; }
 
 /* The admin panel: English, left to right, denser. */
 .admin { max-width: 72rem; margin: 0 auto; padding: 0 1rem 3rem; }
@@ -76,6 +84,8 @@ table.matrix td.up { color: #1a7f37; }
 table.matrix td.down { color: var(--danger); }
 .actions button { margin-inline-end: 0.4rem; }
 input.cap { display: inline-block; width: 4.5rem; padding: 0.2rem 0.4rem; margin: 0; }
+select.cap { display: inline-block; width: auto; padding: 0.2rem 0.4rem; margin: 0; }
+table.list td.period, table.list td.renews { white-space: nowrap; }
 form.inline { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; }
 form.inline label { margin: 0; }
 label.check { display: inline-flex; align-items: center; gap: 0.3rem; margin-inline-end: 1rem; }

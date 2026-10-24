@@ -40,6 +40,7 @@ type coord struct {
 	admin    *testutil.AdminClient
 	caPEM    []byte
 	agentURL string // https://<node>:8443
+	tap      *healthTap
 }
 
 func startCoordinator(t *testing.T, node *lab.Node) *coord {
@@ -71,7 +72,8 @@ func startCoordinator(t *testing.T, node *lab.Node) *coord {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := &http.Server{Handler: c.AgentHandler()}
+	tap := &healthTap{}
+	srv := &http.Server{Handler: tap.wrap(c.AgentHandler())}
 	go srv.Serve(tls.NewListener(ln, tlsConfig))
 	t.Cleanup(func() { srv.Close() })
 
@@ -84,7 +86,7 @@ func startCoordinator(t *testing.T, node *lab.Node) *coord {
 		t.Fatal(err)
 	}
 	return &coord{c: c, store: s, admin: &testutil.AdminClient{URL: adminSrv.URL, Token: secret},
-		caPEM: authority.CertPEM(), agentURL: "https://" + addr}
+		caPEM: authority.CertPEM(), agentURL: "https://" + addr, tap: tap}
 }
 
 // health returns a Node's latest health report, or nil.

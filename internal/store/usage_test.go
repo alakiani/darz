@@ -62,7 +62,7 @@ func TestUsageUploadsReplaceAndSkipStrangers(t *testing.T) {
 }
 
 func TestRollUpKeepsTotalsAndDropsDetail(t *testing.T) {
-	s, c, d, user := usageFixture(t)
+	s, c, d, _ := usageFixture(t)
 	addr := d.Address.String()
 	start := c.t.Truncate(24 * time.Hour) // 2026-10-16 00:00
 	// Two hours on one day, through two Exits.
@@ -100,16 +100,13 @@ func TestRollUpKeepsTotalsAndDropsDetail(t *testing.T) {
 	if len(u.Daily) != 0 || len(u.Monthly) != 1 || u.Monthly[0].Up != 31 || u.Monthly[0].Down != 301 {
 		t.Errorf("after 90 days: daily %+v, monthly %+v", u.Daily, u.Monthly)
 	}
-	if n, _ := s.UserMonthBytes(ctx, user); n != 0 {
-		t.Errorf("this month (January) = %d, want 0", n)
-	}
 }
 
-func TestUserMonthBytesAndDeleteRemovesUsage(t *testing.T) {
+func TestDeleteUserRemovesUsage(t *testing.T) {
 	s, c, d, user := usageFixture(t)
 	s.PutUsage(ctx, "nd_b1", []protocol.UsageBucket{bucket(c.t.Truncate(time.Hour), d.Address.String(), "nd_x1", 7, 3)})
-	if n, _ := s.UserMonthBytes(ctx, user); n != 10 {
-		t.Errorf("month bytes = %d", n)
+	if n, _ := s.PeriodUsage(ctx, user); n != 10 {
+		t.Errorf("period bytes = %d", n)
 	}
 	if err := s.DeleteUser(ctx, user); err != nil {
 		t.Fatal(err)

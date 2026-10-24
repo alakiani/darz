@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { byQuotaShare, gbField, mbits, parseGB, periodText, rateOf, renews } from "./quota";
 
-const user = (handle: string, period_bytes: number, quota?: number) => ({ handle, period_bytes, quota });
+const user = (handle: string, period_bytes: number, quota?: number, period_remedies = 0) => ({
+  handle,
+  period_bytes,
+  quota,
+  period_remedies,
+});
 
 describe("the Users table's Quota columns", () => {
   it("shows this period against the Quota, or with ∞ when unlimited", () => {
@@ -9,6 +14,12 @@ describe("the Users table's Quota columns", () => {
     expect(periodText(user("a", 12e6, 2.5e9))).toBe("0.0 / 2.5 GB");
     expect(periodText(user("a", 3.2e9))).toBe("3.2 GB · ∞");
     expect(periodText(user("a", 0))).toBe("0 B · ∞");
+  });
+
+  it("adds this period's Top-ups and Resets to the Quota", () => {
+    expect(periodText(user("a", 3.2e9, 5e9, 2e9))).toBe("3.2 / 5 + 2 GB");
+    expect(periodText(user("a", 3.2e9, 5e9, 1e6))).toBe("3.2 / 5 GB"); // under 0.05 GB
+    expect(periodText(user("a", 3.2e9, undefined, 2e9))).toBe("3.2 GB · ∞");
   });
 
   it("orders Users by share of Quota used, then unlimited Users by bytes used", () => {
@@ -21,6 +32,17 @@ describe("the Users table's Quota columns", () => {
       user("zero", 0, 0),
     ];
     expect(users.sort(byQuotaShare).map((u) => u.handle)).toEqual(["zero", "sara", "omid", "nima", "maryam", "reza"]);
+  });
+
+  it("counts this period's Top-ups and Resets in the share of Quota used", () => {
+    const users = [
+      user("sara", 8e9, 10e9, 10e9), // 40%
+      user("omid", 1e9, 2e9), // 50%
+      user("ali", 1e9, 0, 2e9), // 50%: a zero Quota with a Top-up
+      user("zero", 1e9, 0), // nothing to use: fully used
+      user("nima", 3e9, undefined, 5e9), // unlimited stays last
+    ];
+    expect(users.sort(byQuotaShare).map((u) => u.handle)).toEqual(["zero", "ali", "omid", "sara", "nima"]);
   });
 
   it("reads and writes Quotas in GB with one decimal, empty for unlimited", () => {

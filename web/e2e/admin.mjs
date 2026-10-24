@@ -47,12 +47,14 @@ try {
   await page.locator("[data-testid=undelivered-alerts]", { hasText: "NodeUnreachable: Node ab9 is unreachable" }).waitFor();
   await page.locator("[data-testid=backup]", { hasText: "off: no age recipient configured" }).waitFor();
 
-  step("users: by share of Quota used, then unlimited Users by bytes used");
+  step("users: by share of Quota used with this period's Top-ups and Resets, then unlimited Users by bytes used");
   await screen("/admin/users", "Users");
-  await page.locator("[data-testid=user-sara] td.period", { hasText: "8.0 / 10 GB" }).waitFor();
+  // sara's 10 GB Top-up puts her 40% below omid's 50%; without it she'd lead at 80%.
+  await page.locator("[data-testid=user-sara] td.period", { hasText: "8.0 / 10 + 10 GB" }).waitFor();
+  await page.locator("[data-testid=user-omid] td.period", { hasText: "1.0 / 2 GB" }).waitFor();
   await page.locator("[data-testid=user-nima] td.period", { hasText: "3.0 GB · ∞" }).waitFor();
   const order = await page.locator("tbody tr").evaluateAll((rows) => rows.map((r) => r.dataset.testid));
-  const want = ["sara", "omid", "nima", "admin", "maryam", "reza"].map((h) => `user-${h}`);
+  const want = ["omid", "sara", "nima", "admin", "maryam", "reza"].map((h) => `user-${h}`);
   if (order.join() !== want.join()) throw new Error(`users in the order ${order}, want ${want}`);
   // Renews is a Gregorian date, not a day number or a Solar Hijri date.
   const renews = await page.locator("[data-testid=user-sara] td.renews").textContent();
@@ -94,8 +96,9 @@ try {
   saved = page.waitForResponse((r) => r.url().endsWith("/top-up") && r.status() === 200);
   await user.getByRole("button", { name: "Top-up" }).click();
   await saved;
+  await user.locator("td.period", { hasText: "0.0 / 2.5 + 1.5 GB" }).waitFor();
   saved = page.waitForResponse((r) => r.url().endsWith("/reset") && r.status() === 200);
-  await page.locator("[data-testid=user-sara]").getByRole("button", { name: "Reset now" }).click();
+  await page.locator("[data-testid=user-omid]").getByRole("button", { name: "Reset now" }).click();
   await saved;
   answers.push("2", "45");
   await user.getByRole("button", { name: "Give Refill" }).click();

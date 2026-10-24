@@ -89,12 +89,14 @@ func TestAdminPanel(t *testing.T) {
 	}
 
 	// Three more Users with Usage this Quota Period (ADR 0010): sara has
-	// used 80% of her Quota, omid 50%, and nima has no Quota.
+	// used 80% of her Quota but only 40% with this period's 10 GB Top-up,
+	// omid 50%, and nima has no Quota.
 	for _, u := range []struct {
 		handle string
 		quota  uint64
 		used   uint64
-	}{{"sara", 10e9, 8e9}, {"omid", 2e9, 1e9}, {"nima", 0, 3e9}} {
+		topUp  uint64
+	}{{"sara", 10e9, 8e9, 10e9}, {"omid", 2e9, 1e9, 0}, {"nima", 0, 3e9, 0}} {
 		tok, _, _ := co.store.CreateInvite(ctx, store.Invite{Kind: "new"}, time.Hour)
 		acct, err := co.store.AcceptNewInvite(ctx, tok, u.handle, hash)
 		if err != nil {
@@ -102,6 +104,11 @@ func TestAdminPanel(t *testing.T) {
 		}
 		if u.quota > 0 {
 			if err := co.store.SetQuota(ctx, acct.ID, store.QuotaSetting{Quota: &u.quota}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if u.topUp > 0 {
+			if err := co.store.AddRemedy(ctx, acct.ID, store.TopUp, u.topUp); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -160,9 +167,9 @@ func TestAdminPanel(t *testing.T) {
 			t.Errorf("a Refill expires in %v, want 45 days", d)
 		}
 	}
-	sara, _ := co.store.AccountByHandle(ctx, "sara")
-	if rs, _ := co.store.Remedies(ctx, sara.ID); len(rs) != 1 || rs[0].Kind != store.Reset || rs[0].Bytes != 8e9 {
-		t.Errorf("sara's remedies = %+v, want a Reset of 8 GB", rs)
+	omid, _ := co.store.AccountByHandle(ctx, "omid")
+	if rs, _ := co.store.Remedies(ctx, omid.ID); len(rs) != 1 || rs[0].Kind != store.Reset || rs[0].Bytes != 1e9 {
+		t.Errorf("omid's remedies = %+v, want a Reset of 1 GB", rs)
 	}
 
 	// The Invite made with presets.

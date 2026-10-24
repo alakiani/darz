@@ -86,9 +86,19 @@ func TestBridgeAddress(t *testing.T) {
 	if got := members(); !slices.Equal(got, []string{"ir3"}) {
 		t.Errorf("with every Bridge dead the record holds %v, want ir3 kept", got)
 	}
-	kill3.Remove()
 
-	// ir1 recovers. It rejoins only after the rejoin delay.
+	// ir3 recovers first and stays. Had ir1 come back first, it would have
+	// taken over at once from a record of dead Bridges.
+	kill3.Remove()
+	testutil.Eventually(t, 60*time.Second, "ir3 is eligible again", func() bool {
+		st, err := co.c.BridgeAddressStatus(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(st.Bridges, func(b protocol.AddressBridge) bool { return b.Name == "ir3" && b.Eligible })
+	})
+
+	// Then ir1. It rejoins only after the rejoin delay.
 	kill.Remove()
 	recovered := time.Now()
 	testutil.Eventually(t, 90*time.Second, "ir1 rejoins the record", func() bool {

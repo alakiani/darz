@@ -217,7 +217,7 @@ func TestMonitoring(t *testing.T) {
 	})
 
 	// Block the Link between ir1 and ab2: Link down.
-	l.Filter(lab.DropBetween(l.Node("ir1"), l.Node("ab2")))
+	block := l.Filter(lab.DropBetween(l.Node("ir1"), l.Node("ab2")))
 	tg.await(t, 90*time.Second, "LinkDown", "ab2/ir1", ab2)
 	// Every instance of it is down, as both ends see it: a blackout of the
 	// whole path, not one transport failing (issue #51).
@@ -239,7 +239,12 @@ func TestMonitoring(t *testing.T) {
 	}
 
 	// Kill ir3, a Bridge: it leaves the Bridge Address, which is down to
-	// ir1 alone.
+	// ir1 alone. ir1 must be eligible first, its Link to ab2 back, or the
+	// record keeps both rather than go empty (ADR 0011).
+	block.Remove()
+	testutil.Eventually(t, 90*time.Second, "ir1 is eligible again", func() bool {
+		return slices.Equal(prom.series(`ways_bridge_eligible{node="ir1"} == 1`, "node"), []string{"ir1"})
+	})
 	l.Filter(lab.DropAll(l.Node("ir3")))
 	tg.await(t, 90*time.Second, "BridgeRemovedFromBridgeAddress", "ir3", ab2)
 	tg.await(t, 60*time.Second, "BridgeAddressDownToOneBridge", "", ab2)
